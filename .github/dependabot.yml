@@ -1,0 +1,33 @@
+version: 2
+# One entry per ecosystem. Each entry lists every directory that holds a manifest for it.
+# Minor and patch updates are grouped per ecosystem. Major updates get their own pull request.
+updates:
+  - package-ecosystem: gomod
+    directories: [/core, /tests/performance/lang-bench/go]
+    schedule: { interval: weekly }
+    groups:
+      go-minor: { update-types: [minor, patch] }
+  - package-ecosystem: cargo
+    directories: [/scoring, /tests/performance/lang-bench/rust]
+    schedule: { interval: weekly }
+    groups:
+      cargo-minor: { update-types: [minor, patch] }
+  # pnpm uses the npm ecosystem. The root holds the git hook tooling. web/ has its own lockfile.
+  - package-ecosystem: npm
+    directories: [/, /web]
+    schedule: { interval: weekly }
+    groups:
+      npm-minor: { update-types: [minor, patch] }
+  # Updates the actions used in .github/workflows/.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      actions: { patterns: ['*'] }
+  # core/Dockerfile base images and the image tags in the Kubernetes manifests.
+  - package-ecosystem: docker
+    directories: [/core, /deploy/kustomize/base]
+    schedule: { interval: weekly }
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule: { interval: weekly }

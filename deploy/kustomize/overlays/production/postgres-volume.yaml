@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+spec:
+  volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: data
+      spec:
+        accessModes: ['ReadWriteOnce']
+        volumeMode: Filesystem
+        storageClassName: ''
+        volumeName: gitorgasm-postgres-vps
+        resources:
+          requests:
+            storage: 2Gi

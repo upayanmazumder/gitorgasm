@@ -1,0 +1,284 @@
+openapi: 3.0.3
+info:
+  title: Gitorgasm API
+  version: 1.0.0
+  description: |
+    Public API of the Gitorgasm core service. The frontend calls it through a same-origin
+    proxy (`/api/*` on Vercel), so session cookies are first-party.
+
+    Rules:
+    - Every error uses the `Error` schema.
+    - Lists use keyset pagination with an opaque `cursor`. `next_cursor` is null on the last page.
+    - State-changing requests must send an `Origin` header that equals the frontend origin.
+    - Organizations the caller cannot access return 404, not 403.
+servers:
+  - url: /
+security:
+  - session: []
+paths:
+  /healthz:
+    get:
+      summary: Liveness probe
+      security: []
+      responses:
+        '200':
+          description: Process is alive
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Status' }
+  /readyz:
+    get:
+      summary: Readiness probe. Ready only when PostgreSQL answers.
+      security: []
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Status' }
+        '503':
+          description: Not ready
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Status' }
+  /v1/auth/login:
+    get:
+      summary: Start GitHub App sign-in (web flow with state and PKCE)
+      security: []
+      responses:
+        '302': { description: Redirect to GitHub }
+        '503': { $ref: '#/components/responses/Error' }
+  /v1/auth/callback:
+    get:
+      summary: GitHub OAuth callback
+      security: []
+      parameters:
+        - { name: code, in: query, schema: { type: string } }
+        - { name: state, in: query, schema: { type: string } }
+      responses:
+        default: { $ref: '#/components/responses/Error' }
+        '302': { description: Session created; redirect to the frontend }
+        '400': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /v1/auth/install:
+    get:
+      summary: Redirect to the GitHub App installation page
+      security: []
+      responses:
+        '302': { description: Redirect to GitHub }
+        '503': { $ref: '#/components/responses/Error' }
+  /v1/auth/logout:
+    post:
+      summary: End the current session
+      responses:
+        default: { $ref: '#/components/responses/Error' }
+        '204': { description: Signed out }
+        '403': { $ref: '#/components/responses/Error' }
+  /v1/me:
+    get:
+      summary: Current user
+      responses:
+        default: { $ref: '#/components/responses/Error' }
+        '200':
+          description: The signed-in user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Error' }
+  /v1/organizations:
+    get:
+      summary: Organizations the caller can access through a Gitorgasm installation
+      responses:
+        default: { $ref: '#/components/responses/Error' }
+        '200':
+          description: Organizations ordered by login
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, next_cursor]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Organization' }
+                  next_cursor: { type: string, nullable: true }
+        '401': { $ref: '#/components/responses/Error' }
+  /v1/organizations/{login}/repositories:
+    get:
+      summary: Repositories of an organization, ordered by name
+      parameters:
+        - { name: login, in: path, required: true, schema: { type: string } }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 100, default: 50 },
+          }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        default: { $ref: '#/components/responses/Error' }
+        '200':
+          description: One page of repositories
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, next_cursor]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Repository' }
+                  next_cursor: { type: string, nullable: true }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /v1/organizations/{login}/sync:
+    post:
+      summary: Queue a repository sync. Pending syncs for the same organization are deduplicated.
+      parameters:
+        - { name: login, in: path, required: true, schema: { type: string } }
+      responses:
+        default: { $ref: '#/components/responses/Error' }
+        '202':
+          description: Sync queued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job_id, duplicate]
+                additionalProperties: false
+                properties:
+                  job_id: { type: integer, format: int64 }
+                  duplicate: { type: boolean }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /webhooks/github:
+    post:
+      summary: GitHub App webhook receiver (HMAC-SHA256 signed)
+      security: []
+      parameters:
+        - { name: X-Hub-Signature-256, in: header, required: true, schema: { type: string } }
+        - { name: X-GitHub-Delivery, in: header, required: true, schema: { type: string } }
+        - { name: X-GitHub-Event, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        default: { $ref: '#/components/responses/Error' }
+        '202':
+          description: Stored for asynchronous processing
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accepted, duplicate]
+                properties:
+                  accepted: { type: boolean }
+                  duplicate: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: __Host-gitorgasm_session
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Status:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }
+        database: { type: string }
+    Error:
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message, request_id]
+          additionalProperties: false
+          properties:
+            code: { type: string, description: Stable machine-readable code }
+            message: { type: string }
+            request_id: { type: string }
+    User:
+      type: object
+      required: [github_id, login, name, avatar_url]
+      additionalProperties: false
+      properties:
+        github_id: { type: integer, format: int64 }
+        login: { type: string }
+        name: { type: string, nullable: true }
+        avatar_url: { type: string, nullable: true }
+    Organization:
+      type: object
+      required:
+        [
+          login,
+          github_id,
+          type,
+          avatar_url,
+          installation_id,
+          repository_selection,
+          suspended,
+          repository_count,
+          last_synced_at,
+        ]
+      additionalProperties: false
+      properties:
+        login: { type: string }
+        github_id: { type: integer, format: int64 }
+        type: { type: string, enum: [Organization, User, Enterprise] }
+        avatar_url: { type: string, nullable: true }
+        installation_id: { type: integer, format: int64 }
+        repository_selection: { type: string, enum: [all, selected] }
+        suspended: { type: boolean }
+        repository_count: { type: integer, format: int64 }
+        last_synced_at: { type: string, format: date-time, nullable: true }
+    Repository:
+      type: object
+      required:
+        [
+          github_id,
+          name,
+          full_name,
+          description,
+          private,
+          fork,
+          archived,
+          visibility,
+          default_branch,
+          language,
+          stargazers,
+          pushed_at,
+          synced_at,
+        ]
+      additionalProperties: false
+      properties:
+        github_id: { type: integer, format: int64 }
+        name: { type: string }
+        full_name: { type: string }
+        description: { type: string, nullable: true }
+        private: { type: boolean }
+        fork: { type: boolean }
+        archived: { type: boolean }
+        visibility: { type: string, nullable: true }
+        default_branch: { type: string, nullable: true }
+        language: { type: string, nullable: true }
+        stargazers: { type: integer }
+        pushed_at: { type: string, format: date-time, nullable: true }
+        synced_at: { type: string, format: date-time }

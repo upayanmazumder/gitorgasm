@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gitorgasm
+  annotations:
+    # Never let a GitOps mistake delete the namespace that holds the database.
+    argocd.argoproj.io/sync-options: Delete=false,Prune=false
+  labels:
+    # Pods use the restricted profile, not only the warning and audit policies.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted

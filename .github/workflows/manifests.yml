@@ -1,0 +1,22 @@
+name: Manifests
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Render and validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: core/go.mod
+          cache: false
+      - run: go install github.com/yannh/kubeconform/cmd/kubeconform@v0.8.0
+      - run: kubectl kustomize deploy/kustomize/overlays/production > rendered.yaml
+      - run: '"$(go env GOPATH)/bin/kubeconform" -strict -summary -kubernetes-version 1.34.0 rendered.yaml'

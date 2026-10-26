@@ -1,0 +1,3 @@
+# Direct rustfmt calls need the edition set here.
+edition = "2024"
+style_edition = "2024"

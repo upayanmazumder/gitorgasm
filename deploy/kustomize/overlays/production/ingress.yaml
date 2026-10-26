@@ -1,0 +1,27 @@
+# Traefik uses the cluster Cloudflare Origin CA wildcard. This Ingress omits tls.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: api-gitorgasm.upayan.dev
+      http:
+        paths:
+          - path: /v1
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  name: http
+          - path: /webhooks/github
+            pathType: Exact
+            backend:
+              service:
+                name: api
+                port:
+                  name: http
