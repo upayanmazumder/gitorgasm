@@ -1,0 +1,69 @@
+# Local development stack. It never connects to production infrastructure.
+#   make up        -> postgres + migrate + api
+#   make up-github -> also starts the worker (needs GitHub App variables in .env)
+name: gitorgasm
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: gitorgasm
+      POSTGRES_PASSWORD: gitorgasm
+      POSTGRES_DB: gitorgasm
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gitorgasm -d gitorgasm"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    build:
+      context: services/core
+    command: ["migrate"]
+    environment:
+      DATABASE_URL: postgres://gitorgasm:gitorgasm@postgres:5432/gitorgasm?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: services/core
+    command: ["api"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgres://gitorgasm:gitorgasm@postgres:5432/gitorgasm?sslmode=disable
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+      COOKIE_SECURE: "false"
+      # Development-only key. Never reuse it outside this compose file.
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-ZGV2LW9ubHkta2V5LWRvLW5vdC11c2UtaW4tcHJvZCE=}
+    ports:
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    profiles: ["github"]
+    build:
+      context: services/core
+    command: ["worker"]
+    env_file:
+      - path: .env
+        required: true
+    environment:
+      DATABASE_URL: postgres://gitorgasm:gitorgasm@postgres:5432/gitorgasm?sslmode=disable
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-ZGV2LW9ubHkta2V5LWRvLW5vdC11c2UtaW4tcHJvZCE=}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:

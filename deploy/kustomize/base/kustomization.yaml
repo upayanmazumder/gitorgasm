@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Environment-neutral manifests. Secrets are NOT part of this base: each environment supplies
+# `gitorgasm-core` and `gitorgasm-postgres` Secrets (SOPS-encrypted in the cluster repo).
+# See deploy/kustomize/README.md.
+namespace: gitorgasm
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: gitorgasm
+    includeSelectors: false
+resources:
+  - namespace.yaml
+  - config.yaml
+  - postgres.yaml
+  - api.yaml
+  - worker.yaml
+  - networkpolicies.yaml
+images:
+  - name: gitorgasm-core
+    newName: ghcr.io/upayanmazumder/gitorgasm/core
+    newTag: latest

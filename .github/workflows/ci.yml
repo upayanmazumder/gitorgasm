@@ -1,0 +1,158 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Least privilege by default. Jobs that need more ask for it explicitly.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  core:
+    name: Go core (lint, test, vuln)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/core
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: gitorgasm
+          POSTGRES_PASSWORD: gitorgasm
+          POSTGRES_DB: gitorgasm
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U gitorgasm" --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      CI: "true"
+      TEST_DATABASE_URL: postgres://gitorgasm:gitorgasm@localhost:5432/gitorgasm?sslmode=disable
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: services/core/go.mod
+          cache-dependency-path: services/core/go.sum
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+      - run: go vet ./...
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.15.0
+          working-directory: services/core
+      - name: Tests (API-to-DB, worker, contract)
+        run: go test -race -count=1 ./...
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - run: CGO_ENABLED=0 go build -trimpath ./cmd/gitorgasm
+
+  web:
+    name: Web (lint, typecheck, test, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    env:
+      SKIP_ENV_VALIDATION: "true"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: apps/web/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm format:check
+      - run: pnpm test
+      - run: pnpm build
+
+  bench:
+    name: Language benchmark code (fmt, lint, test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: tests/performance/lang-bench/go/go.mod
+          cache: false
+      - name: Go
+        working-directory: tests/performance/lang-bench/go
+        run: |
+          test -z "$(gofmt -l .)"
+          go vet ./...
+          go build ./...
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tests/performance/lang-bench/rust
+      - name: Rust
+        working-directory: tests/performance/lang-bench/rust
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets --locked -- -D warnings
+          cargo test --locked
+
+  manifests:
+    name: Kubernetes manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: services/core/go.mod
+          cache: false
+      - name: Render and validate
+        run: |
+          go install github.com/yannh/kubeconform/cmd/kubeconform@v0.8.0
+          kubectl kustomize deploy/kustomize/overlays/production > rendered.yaml
+          "$(go env GOPATH)/bin/kubeconform" -strict -summary -kubernetes-version 1.34.0 rendered.yaml
+
+  image:
+    name: Container image
+    needs: [core]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # push to GHCR on main only
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}/core
+          tags: |
+            type=sha,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+      - id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: services/core
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: VERSION=${{ github.sha }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

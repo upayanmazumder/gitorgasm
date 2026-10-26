@@ -1,0 +1,5 @@
+# Build outputs
+rust/target/
+go/bin/
+# Generated fixture (~9.8 MB). Recreate with: go/bin/standalone gen fixtures/repos.json
+fixtures/

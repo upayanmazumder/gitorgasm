@@ -1,0 +1,15 @@
+[package]
+name = "langbench"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
+
+[profile.release]
+# Default release profile on purpose: no LTO, no strip, no panic=abort.
+# Stripped sizes are measured separately with `strip`.

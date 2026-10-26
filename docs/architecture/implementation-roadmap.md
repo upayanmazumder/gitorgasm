@@ -1,0 +1,146 @@
+# Implementation roadmap
+
+Status date: 2026-10-26. Labels: **Verified** (with source), **Assumption**, **Decision**, **Planned**.
+
+Stages are ordered by dependency, not by calendar. No dates are promised. A stage is done only when every acceptance criterion holds and CI is green.
+
+```mermaid
+flowchart LR
+  s0[0 Discovery<br/>Done] --> s1[1 Foundation<br/>In progress]
+  s1 --> s15[1.5 First deploy]
+  s15 --> s2[2 Identity hardening]
+  s2 --> s3[3 Sync breadth]
+  s3 --> s4[4 Operations]
+  s3 --> s5[5 Leaderboards]
+  s4 --> s6[6 Hardening]
+  s5 --> s6
+```
+
+**Decision**: Stage 4 and Stage 5 depend on Stage 3, not on each other. They can run in either order.
+
+## Stage 0: Discovery — Done
+
+Deliverables (**Verified**, files exist):
+
+- `docs/architecture/legacy-audit.md`, `feature-inventory.md`, `database-audit.md`, `cluster-audit.md`, `requirements.md`.
+- `tests/performance/lang-bench/` with `RESULTS.md` (two full runs on 2026-10-26).
+
+Outcome: legacy data worth migrating is limited to scoring presets (186 rows, all unmodified defaults). Everything else is rebuilt from GitHub (decisions §18).
+
+## Stage 1: Foundation — In progress (this bootstrap)
+
+| Item | Status at time of writing |
+| --- | --- |
+| Go core `services/core` with roles `api`, `worker`, `migrate` | **Verified** exists (`cmd/gitorgasm/main.go`) |
+| Schema migration `00001_core.sql`, River migrations | **Verified** exists (`internal/db`) |
+| GitHub App login (state + PKCE), sessions, sealed tokens | **Verified** exists (`internal/httpapi/auth.go`, `internal/secure`) |
+| `GET /v1/me`, `/v1/organizations`, repositories (keyset), `POST …/sync`, `POST /webhooks/github` | **Verified** routes in `internal/httpapi/server.go` |
+| Jobs `sync_installation` (unique by args per 1 minute, 64-bit advisory lock per installation), `process_webhook`, `reconcile_installations` | **Verified** `internal/jobs/jobs.go` |
+| App authorization revocation deletes sessions and grants | **Verified** `store.RevokeGitHubUser` |
+| OpenAPI contract `contracts/openapi/v1.yaml` with a shared `default` Error response on every non-probe operation | **Verified** exists |
+| Docker Compose local stack and Makefile (`up`, `up-github`, `down`, `db`, `smoke`, `fmt`, `lint`, `test`, `build`, `manifests`, `vuln`, `verify`) | **Verified** `compose.yaml`, `Makefile` |
+| `apps/web` from template (Next.js 16.2.11, pnpm 11.28.6 pinned by `packageManager`) | **Verified** `apps/web/package.json`. No API integration and no `/api` rewrite yet |
+| CI `.github/workflows/ci.yml`: jobs `core`, `web`, `bench`, `manifests`, `image` | **Verified** file exists. Not yet run on GitHub: the repository is not pushed |
+| Dependabot, CODEOWNERS, PR and issue templates | **Verified** `.github/` |
+| Kustomize `deploy/kustomize` (base + `overlays/production`) | **Verified** exists. The integrator validated the render with kustomize and kubeconform: 15 resources valid |
+| Architecture docs and ADRs | **Verified** `docs/architecture/`, `docs/adr/` |
+
+Remaining to close Stage 1: push the repository, get a green CI run on `main`, and publish the first `core` image to GHCR.
+
+Acceptance criteria:
+
+- `make verify` passes locally. It runs lint (gofmt, go vet, golangci-lint), Go tests against real Postgres (isolated database per test, `internal/testdb`), web checks, build, `manifests`, and `vuln` (govulncheck).
+- API responses validate against `contracts/openapi/v1.yaml` in tests (kin-openapi).
+- `make manifests` passes: kustomize render plus `kubeconform -strict`.
+- Docker image builds, runs as non-root, and starts each role.
+- CI runs the same checks on every PR. Workflow default permission is `contents: read`. Only job `image` gets `packages: write`, and it pushes only on `main`.
+
+Test requirements: unit tests for `secure` (seal/open, key version), GitHub client (classification, pagination host guard, token cache) with `httptest`, job tests with real Postgres, HTTP tests for auth, CSRF origin check, 404 on inaccessible orgs, webhook signature, app authorization revocation.
+
+Risks: R5, R15 (`risk-register.md`). Infra: none beyond a developer machine and GitHub Actions.
+
+## Stage 1.5: First deploy
+
+Deliverables:
+
+- Owner decision on GHCR access: public package or image pull secret (R20, `deployment-topology.md` §6).
+- Cluster repository PR: `k8s/apps/gitorgasm`, Application, AppProject destination, SOPS Secrets `gitorgasm-core` and `gitorgasm-postgres`, backup target, changelog entry (`deployment-topology.md` §4).
+- Host directory `/srv/data/gitorgasm-postgres` owned by UID/GID 70.
+- GitHub App registration for Gitorgasm (new App, or reuse the legacy App with new callback and webhook URLs; decide at this stage). Callback `https://gitorgasm.vercel.app/api/v1/auth/callback`, webhook `https://api-gitorgasm.upayan.dev/webhooks/github`.
+- Vercel project for `apps/web` at `gitorgasm.vercel.app` with the rewrite `/api/:path*` → `https://api-gitorgasm.upayan.dev/:path*`. Login cannot work without it, because the callback URL is on the Vercel origin.
+- DNS record `api-gitorgasm.upayan.dev` after owner approval.
+- Grafana dashboard and first alerts (`observability.md` §6). Restore runbook.
+
+Dependencies: Stage 1 CI publishes the image to GHCR. Owner approval for DNS, GHCR access, and the cluster PR.
+
+Acceptance criteria:
+
+- Argo CD shows `gitorgasm` Synced and Healthy.
+- `kubectl -n gitorgasm get pods` shows api and worker Ready (readiness checks Postgres). The Ingress does not expose `/readyz`. From outside, `curl https://api-gitorgasm.upayan.dev/v1/me` returns 401 with error code `unauthenticated`.
+- A test GitHub org installs the App. Login lists it. Repositories sync. A webhook delivery shows 202 in GitHub's delivery log.
+- First class A backup appears in restic. One restore into a scratch database succeeds.
+- Memory requests after deploy stay ≤ 88% of allocatable.
+
+Risks: R2, R3, R17, R20, R21. Infra: 200m CPU / 512Mi memory requests, `/srv/data/gitorgasm-postgres` on `vps-data`.
+
+## Stage 2: Identity hardening
+
+Deliverables:
+
+- Periodic grant re-verification from `GET /user/installations` (user token), with removal of lost grants.
+- Server-side org role check via `GET /user/memberships/orgs/{org}` before any mutation.
+- Refresh-token use for expiring user tokens. Key rotation command for `TOKEN_ENCRYPTION_KEY`.
+- In-app rate limiter. River job metrics (`observability.md` §2).
+- Frontend: login, organization list, repository list, sync button, sync status. Typed API client from `contracts/openapi/v1.yaml`. The Vercel rewrite exists from Stage 1.5.
+
+Dependencies: Stage 1.5 (a real App and callback URL).
+
+Acceptance criteria: a user removed from an org loses access within one re-verification interval. Non-admin users get 404 or 403 on admin routes, proved by tests. Expired user tokens refresh without re-login. Frontend E2E test (Playwright) covers login → orgs → repos against a stubbed GitHub.
+
+Test requirements: authorization matrix tests (member, admin, outsider, uninstalled). Contract tests for every new route.
+
+Risks: R9, R10, R11.
+
+## Stage 3: Sync breadth
+
+Deliverables: mirror teams, members, team memberships, and pending invitations through REST. Webhook coverage for `membership`, `team`, `organization`, `member`, and `installation_repositories` events. Each event enqueues a scoped sync.
+
+Dependencies: Stage 2 role checks (team data is visible only to authorized users).
+
+Acceptance criteria: after a full sync, counts match GitHub for a test org. Duplicate and out-of-order webhooks converge (test replays deliveries in random order). A failed pass never tombstones.
+
+Test requirements: recorded GitHub fixtures per endpoint, pagination tests, tombstone tests.
+
+Risks: R5, R6 (more requests per installation). Infra: Postgres size grows. Estimate stays far below the 2Gi PVC for the legacy data size (10 orgs, 372 repos).
+
+## Stage 4: Operations
+
+Deliverables: mass invite, bulk role change, team bulk-add. Each runs as a planned job: plan (dry run) → confirm → execute with per-item results and checkpoints. `Idempotency-Key` header on mutations. SSE progress stream. Audit log table.
+
+Dependencies: Stage 2 (role checks), Stage 3 (members and teams mirrored).
+
+Acceptance criteria: a worker crash mid-operation resumes from the checkpoint and does not repeat completed items. The same `Idempotency-Key` returns the first result. Every mutation writes one audit row with actor, target, and outcome. Rate-limit snooze is visible as progress state.
+
+Test requirements: crash-resume tests (kill the worker during a job), idempotency tests, secondary rate-limit simulation.
+
+Risks: R6 (secondary limits on write endpoints), R10.
+
+## Stage 5: Leaderboards
+
+Deliverables: signal ingest via GitHub GraphQL with cost accounting. Rust `services/scoring` that reads signals from Postgres and writes `computed_scores` (ADR 0003). Default scoring presets reseeded per installation, optional import from the legacy dump keyed on `(installation_id, name)`.
+
+Dependencies: Stage 3 (members). Re-run the language benchmark with legacy-shaped data before you create `services/scoring` (R15).
+
+Acceptance criteria: golden tests reproduce legacy `lib/scoring` results for fixed inputs. GraphQL point usage per sync is logged and stays inside budget. Rust CI job added.
+
+Risks: R15, R6 (GraphQL 5,000 points/h). Infra: one more small Deployment (**Assumption**: ≤ 64Mi request, based on 3.7 MB idle RSS measured in `RESULTS.md`; not measured under load).
+
+## Stage 6: Hardening
+
+Deliverables: load tests against the deployed API, monthly restore drill evidence, optional OTel trace backend, full alert set, SLOs from measured data (`reliability.md` §3), KEDA worker scaling if backlog requires it.
+
+Dependencies: production traffic data from Stages 1.5 to 5.
+
+Acceptance criteria: restore drill meets the documented RTO. SLO dashboards exist and alerts fire in a test. Load test report stored under `tests/performance/` with raw data.
+
+Risks: R1, R2, R16.

@@ -1,0 +1,23 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Data exports never belong in git (see docs/architecture/migration-plan.md)
+*.dump
+*.sql.gz
+dumps/
+
+# Build output
+services/core/bin/
+node_modules/
+.next/
+coverage/
+*.tsbuildinfo
+target/
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

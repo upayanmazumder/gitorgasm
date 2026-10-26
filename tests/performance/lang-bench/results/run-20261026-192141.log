@@ -1,0 +1,120 @@
+
+=== environment ===
+2026-10-26T13:51:41Z
+model name	: AMD Ryzen 7 7840U w/ Radeon(TM) 780M Graphics
+logical_cpus=16
+Linux 7.3.0-5-cachyos
+PRETTY_NAME="CachyOS"
+MemTotal:       14100864 kB
+governor=performance
+ac_online=1
+loadavg_start=10.73 7.06 4.57
+go version go1.27.1-X:nodwarf5 linux/amd64
+rustc 1.97.1 (8bab26f4f 2026-07-14)
+cargo 1.97.1 (c980f4866 2026-06-30)
+
+=== build ===
+
+=== binary-size-bytes ===
+4103851 go/bin/standalone
+2629792 go/bin/standalone-sw
+8898460 go/bin/hello
+5886215 go/bin/hello-sw
+657224 rust/target/release/standalone
+510576 rust/target/release/standalone-stripped
+1668360 rust/target/release/hello
+1159704 rust/target/release/hello-stripped
+
+=== fixture ===
+wrote 9784235 bytes
+elapsed=76.191854ms VmHWM=67936kB
+22afc522bad62aed2c207964a063bcf94aa61e0e9d9566274cadf45c438e1a95  fixtures/repos.json
+
+=== equivalence ===
+repos=10000 checksum=35159376198174
+elapsed=71.234074ms VmHWM=30208kB
+repos=10000 checksum=35159376198174
+elapsed=30.38271ms VmHWM=20192kB
+top=100 first=977:93.674433 id_checksum=16510352 score_sum=7575.960094
+elapsed=39.02017ms VmHWM=33912kB
+top=100 first=977:93.674433 id_checksum=16510352 score_sum=7575.960094
+elapsed=26.287527ms VmHWM=31484kB
+
+=== go-bench ===
+goos: linux
+goarch: amd64
+pkg: gitorgasm/langbench/lb
+cpu: AMD Ryzen 7 7840U w/ Radeon(TM) 780M Graphics  
+BenchmarkParseReposJSONv1       	      28	  47627570 ns/op	 205.43 MB/s	    198174 checksum_mod1e6	12897440 B/op	  113626 allocs/op
+BenchmarkParseReposJSONv1       	      24	  48778910 ns/op	 200.58 MB/s	    198174 checksum_mod1e6	12894826 B/op	  113618 allocs/op
+BenchmarkParseReposJSONv1       	      25	  55305207 ns/op	 176.91 MB/s	    198174 checksum_mod1e6	12894817 B/op	  113618 allocs/op
+BenchmarkParseReposJSONv1       	      21	  55341965 ns/op	 176.80 MB/s	    198174 checksum_mod1e6	12894862 B/op	  113618 allocs/op
+BenchmarkParseReposJSONv1       	      25	  51728374 ns/op	 189.15 MB/s	    198174 checksum_mod1e6	12894816 B/op	  113618 allocs/op
+BenchmarkParseReposJSONv1       	      18	  57776794 ns/op	 169.35 MB/s	    198174 checksum_mod1e6	12894896 B/op	  113618 allocs/op
+BenchmarkParseReposJSONv1       	      26	  43795258 ns/op	 223.41 MB/s	    198174 checksum_mod1e6	12894807 B/op	  113618 allocs/op
+BenchmarkParseReposJSONv1       	      28	  43992776 ns/op	 222.41 MB/s	    198174 checksum_mod1e6	12894793 B/op	  113618 allocs/op
+BenchmarkParseReposJSONv1-16    	      28	  42259599 ns/op	 231.53 MB/s	    198174 checksum_mod1e6	12896355 B/op	  113617 allocs/op
+BenchmarkParseReposJSONv1-16    	      21	  53961792 ns/op	 181.32 MB/s	    198174 checksum_mod1e6	12896060 B/op	  113617 allocs/op
+BenchmarkParseReposJSONv1-16    	      20	  59694795 ns/op	 163.90 MB/s	    198174 checksum_mod1e6	12896021 B/op	  113617 allocs/op
+BenchmarkParseReposJSONv1-16    	      26	  45658419 ns/op	 214.29 MB/s	    198174 checksum_mod1e6	12895936 B/op	  113617 allocs/op
+BenchmarkParseReposJSONv1-16    	      18	  65328271 ns/op	 149.77 MB/s	    198174 checksum_mod1e6	12896376 B/op	  113620 allocs/op
+BenchmarkParseReposJSONv1-16    	      18	  65778360 ns/op	 148.75 MB/s	    198174 checksum_mod1e6	12896064 B/op	  113617 allocs/op
+BenchmarkParseReposJSONv1-16    	      16	  64522884 ns/op	 151.64 MB/s	    198174 checksum_mod1e6	12896119 B/op	  113618 allocs/op
+BenchmarkParseReposJSONv1-16    	      20	  61139919 ns/op	 160.03 MB/s	    198174 checksum_mod1e6	12896022 B/op	  113617 allocs/op
+BenchmarkParseReposJSONv2       	      19	  58559615 ns/op	 167.08 MB/s	    198174 checksum_mod1e6	12896474 B/op	  113621 allocs/op
+BenchmarkParseReposJSONv2       	      22	  54383693 ns/op	 179.91 MB/s	    198174 checksum_mod1e6	12894878 B/op	  113619 allocs/op
+BenchmarkParseReposJSONv2       	      22	  48933115 ns/op	 199.95 MB/s	    198174 checksum_mod1e6	12894880 B/op	  113619 allocs/op
+BenchmarkParseReposJSONv2       	      25	  50956103 ns/op	 192.01 MB/s	    198174 checksum_mod1e6	12894840 B/op	  113618 allocs/op
+BenchmarkParseReposJSONv2       	      22	  53166815 ns/op	 184.03 MB/s	    198174 checksum_mod1e6	12894898 B/op	  113619 allocs/op
+BenchmarkParseReposJSONv2       	      26	  44405949 ns/op	 220.34 MB/s	    198174 checksum_mod1e6	12894837 B/op	  113618 allocs/op
+BenchmarkParseReposJSONv2       	      26	  44176981 ns/op	 221.48 MB/s	    198174 checksum_mod1e6	12894840 B/op	  113618 allocs/op
+BenchmarkParseReposJSONv2       	      26	  44857720 ns/op	 218.12 MB/s	    198174 checksum_mod1e6	12894854 B/op	  113619 allocs/op
+BenchmarkParseReposJSONv2-16    	      32	  44284435 ns/op	 220.94 MB/s	    198174 checksum_mod1e6	12896315 B/op	  113619 allocs/op
+BenchmarkParseReposJSONv2-16    	      32	  36800932 ns/op	 265.87 MB/s	    198174 checksum_mod1e6	12895901 B/op	  113617 allocs/op
+BenchmarkParseReposJSONv2-16    	      34	  35917039 ns/op	 272.41 MB/s	    198174 checksum_mod1e6	12896041 B/op	  113617 allocs/op
+BenchmarkParseReposJSONv2-16    	      28	  40757007 ns/op	 240.06 MB/s	    198174 checksum_mod1e6	12895942 B/op	  113617 allocs/op
+BenchmarkParseReposJSONv2-16    	      26	  51136362 ns/op	 191.34 MB/s	    198174 checksum_mod1e6	12895960 B/op	  113618 allocs/op
+BenchmarkParseReposJSONv2-16    	      24	  45703087 ns/op	 214.08 MB/s	    198174 checksum_mod1e6	12896000 B/op	  113618 allocs/op
+BenchmarkParseReposJSONv2-16    	      33	  35285879 ns/op	 277.28 MB/s	    198174 checksum_mod1e6	12895926 B/op	  113617 allocs/op
+BenchmarkParseReposJSONv2-16    	      22	  47798405 ns/op	 204.70 MB/s	    198174 checksum_mod1e6	12896033 B/op	  113618 allocs/op
+BenchmarkScore                  	      48	  31647608 ns/op	 5403234 B/op	   47704 allocs/op
+BenchmarkScore                  	      43	  39515097 ns/op	 5403232 B/op	   47704 allocs/op
+BenchmarkScore                  	      33	  31049689 ns/op	 5403232 B/op	   47704 allocs/op
+BenchmarkScore                  	      43	  24168295 ns/op	 5403232 B/op	   47704 allocs/op
+BenchmarkScore                  	      58	  35590526 ns/op	 5403232 B/op	   47704 allocs/op
+BenchmarkScore                  	      44	  40647835 ns/op	 5403232 B/op	   47704 allocs/op
+BenchmarkScore                  	      32	  34486932 ns/op	 5403232 B/op	   47704 allocs/op
+BenchmarkScore                  	      33	  30412635 ns/op	 5403232 B/op	   47704 allocs/op
+BenchmarkScore-16               	      50	  39503427 ns/op	 5403236 B/op	   47704 allocs/op
+BenchmarkScore-16               	      28	  43400391 ns/op	 5403232 B/op	   47704 allocs/op
+BenchmarkScore-16               	      28	  40797194 ns/op	 5403232 B/op	   47704 allocs/op
+BenchmarkScore-16               	      31	  37166195 ns/op	 5403239 B/op	   47704 allocs/op
+BenchmarkScore-16               	      55	  30772891 ns/op	 5403232 B/op	   47704 allocs/op
+BenchmarkScore-16               	      42	  34142308 ns/op	 5403232 B/op	   47704 allocs/op
+BenchmarkScore-16               	      45	  26385784 ns/op	 5403236 B/op	   47704 allocs/op
+BenchmarkScore-16               	      43	  29743812 ns/op	 5403232 B/op	   47704 allocs/op
+PASS
+ok  	gitorgasm/langbench/lb	60.564s
+
+=== rust-bench ===
+fixture bytes=9784235 repos=10000 checksum=35159376198174
+ParseRepos   iters=100 median=24.57379ms p95=29.896182ms mean=23.322162ms min=15.632451ms B/op=17379660 allocs/op=130875
+score first=977:93.674433 id_checksum=16510352 score_sum=7575.960094
+Score        iters=100 median=14.844065ms p95=23.402681ms mean=15.797687ms min=10.667034ms B/op=8229948 allocs/op=16
+
+=== peak-rss-kb ===
+go-repos 27828 29904 26184 27588 29780
+rust-repos 20384 20388 20256 20220 21960
+go-score 35172 35316 35304 33332 33372
+rust-score 31424 31620 31636 31612 31568
+
+=== hello-rss-kb ===
+go-nethttp after-startup: VmHWM=11376 VmRSS=11376 Threads=6 
+requests=10000 total=793.747975ms rps=12598 p50=72.106µs p95=137.639µs p99=187.444µs max=1.294993ms
+go-nethttp after-10000-requests: VmHWM=16540 VmRSS=16096 Threads=12 
+rust-axum after-startup: VmHWM=3636 VmRSS=3636 Threads=17 
+requests=10000 total=448.228891ms rps=22310 p50=39.064µs p95=76.013µs p99=108.875µs max=878.097µs
+rust-axum after-10000-requests: VmHWM=3944 VmRSS=3944 Threads=17 
+
+=== done ===
+loadavg_end=12.25 8.16 5.13
