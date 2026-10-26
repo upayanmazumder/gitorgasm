@@ -10,7 +10,7 @@ Status date: 2026-10-26. Labels: **Verified** (with source), **Assumption**, **D
 
 ```mermaid
 flowchart TB
-  user((Browser)) -->|HTTPS gitorgasm.vercel.app| vercel[Vercel Hobby<br/>web Next.js]
+  user((Browser)) -->|HTTPS gitorgasm.upayan.dev| vercel[Vercel Hobby<br/>web Next.js]
   vercel -->|same-origin rewrite /api/* → https://api-gitorgasm.upayan.dev/*<br/>Planned| cf
   gh[(GitHub<br/>api.github.com)] -->|webhooks POST /webhooks/github| cf[Cloudflare proxy<br/>DNS + Origin CA *.upayan.dev]
   cf -->|:443| traefik[Traefik<br/>kube-system, entrypoint websecure]
@@ -134,10 +134,10 @@ Source: `cluster-audit.md` §4 (**Verified** cluster conventions) and `deploy/ku
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
 | local       | **Verified**: `compose.yaml` (postgres:18-alpine on 127.0.0.1:55432, migrate, api, worker under profile `github`). `make up`, `make up-github`, `make smoke` | developer machine                                                                                                        |
 | CI          | **Verified**: `.github/workflows/ci.yml` job `core` runs `go test -race` with a `postgres:18` service container                                              | GitHub Actions                                                                                                           |
-| production  | **Verified** manifests in `overlays/production`. Deploy **Planned** Stage 1.5                                                                                | namespace `gitorgasm` on node `vps`, API host `api-gitorgasm.upayan.dev`, frontend origin `https://gitorgasm.vercel.app` |
+| production  | **Verified** manifests in `overlays/production`. Deploy **Planned** Stage 1.5                                                                                | namespace `gitorgasm` on node `vps`, API host `api-gitorgasm.upayan.dev`, frontend origin `https://gitorgasm.upayan.dev` |
 | staging     | **Proposal**, not now                                                                                                                                        | namespace `gitorgasm-staging` on the same node                                                                           |
 
-**Verified** (`overlays/production/config.yaml`): `APP_ORIGIN=https://gitorgasm.vercel.app` and `GITHUB_OAUTH_CALLBACK_URL=https://gitorgasm.vercel.app/api/v1/auth/callback`. The callback goes through the Vercel rewrite, so the oauth cookie stays on the frontend origin.
+**Verified** (`overlays/production/config.yaml`): `APP_ORIGIN=https://gitorgasm.upayan.dev` and `GITHUB_OAUTH_CALLBACK_URL=https://gitorgasm.upayan.dev/api/v1/auth/callback`. The callback goes through the Vercel rewrite, so the oauth cookie stays on the frontend origin.
 
 Staging cost note: a second copy of the budget costs 200m CPU and 512Mi memory requests. That would leave about 484Mi free (before KEDA wake-ups). **Decision**: no staging until memory is reclaimed elsewhere. CI with a real Postgres service and the local Compose stack cover pre-merge testing. A staging environment also needs a second GitHub App registration (separate webhook URL and callback).
 

@@ -111,8 +111,8 @@ flowchart LR
 **Decision** (decisions item 7): the Vercel app rewrites `/api/:path*` to `https://api-gitorgasm.upayan.dev/:path*`. **Planned** (Stage 1.5): the rewrite config in `web`. **Verified**: `web` has no rewrite and no API integration yet.
 
 - The browser sees one origin. The session cookie is first-party and host-only for the Vercel host. No CORS headers are needed. **Verified**: the server sends no `Access-Control-*` headers (`server.go`).
-- `GITHUB_OAUTH_CALLBACK_URL` must be the Vercel URL. **Verified** production value: `https://gitorgasm.vercel.app/api/v1/auth/callback` (`deploy/kustomize/overlays/production/config.yaml`). Then GitHub redirects the browser to the same origin that holds the oauth cookie. The Ingress routes `/v1` to the API, so the rewritten path `/v1/auth/callback` reaches the handler.
-- `APP_ORIGIN` must be the Vercel origin. **Verified** production value: `https://gitorgasm.vercel.app`. The Origin check and the post-login redirect use it.
+- `GITHUB_OAUTH_CALLBACK_URL` must be the Vercel URL. **Verified** production value: `https://gitorgasm.upayan.dev/api/v1/auth/callback` (`deploy/kustomize/overlays/production/config.yaml`). Then GitHub redirects the browser to the same origin that holds the oauth cookie. The Ingress routes `/v1` to the API, so the rewritten path `/v1/auth/callback` reaches the handler.
+- `APP_ORIGIN` must be the Vercel origin. **Verified** production value: `https://gitorgasm.upayan.dev`. The Origin check and the post-login redirect use it.
 - **Assumption**: Vercel rewrites forward `Cookie` and `Set-Cookie` headers unchanged and keep the `Origin` header. Verify in Stage 1.5 with a preview deployment.
 - No privileged token reaches the browser. The browser holds only the opaque session id in an HttpOnly cookie.
 

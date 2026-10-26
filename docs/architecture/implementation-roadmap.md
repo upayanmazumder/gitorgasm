@@ -66,8 +66,8 @@ Deliverables:
 - Owner decision on GHCR access: public package or image pull secret (R20, `deployment-topology.md` §6).
 - Cluster repository PR: `k8s/apps/gitorgasm`, Application, AppProject destination, SOPS Secrets `gitorgasm-core` and `gitorgasm-postgres`, backup target, changelog entry (`deployment-topology.md` §4).
 - Host directory `/srv/data/gitorgasm-postgres` owned by UID/GID 70.
-- GitHub App registration for Gitorgasm (new App, or reuse the legacy App with new callback and webhook URLs; decide at this stage). Callback `https://gitorgasm.vercel.app/api/v1/auth/callback`, webhook `https://api-gitorgasm.upayan.dev/webhooks/github`.
-- Vercel project for `web` at `gitorgasm.vercel.app` with the rewrite `/api/:path*` → `https://api-gitorgasm.upayan.dev/:path*`. Login cannot work without it, because the callback URL is on the Vercel origin.
+- GitHub App registration for Gitorgasm (new App, or reuse the legacy App with new callback and webhook URLs; decide at this stage). Callback `https://gitorgasm.upayan.dev/api/v1/auth/callback`, webhook `https://api-gitorgasm.upayan.dev/webhooks/github`.
+- Vercel project for `web` at `gitorgasm.upayan.dev` with the rewrite `/api/:path*` → `https://api-gitorgasm.upayan.dev/:path*`. Login cannot work without it, because the callback URL is on the Vercel origin.
 - DNS record `api-gitorgasm.upayan.dev` after owner approval.
 - Grafana dashboard and first alerts (`observability.md` §6). Restore runbook.
 

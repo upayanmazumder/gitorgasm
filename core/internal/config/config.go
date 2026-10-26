@@ -107,7 +107,7 @@ func Load(mode Mode) (*Config, error) {
 	if mode == ModeAPI {
 		origin, err := url.Parse(req("APP_ORIGIN"))
 		if err != nil || origin.Scheme == "" || origin.Host == "" {
-			errs = append(errs, errors.New("APP_ORIGIN must be an absolute URL such as https://gitorgasm.vercel.app"))
+			errs = append(errs, errors.New("APP_ORIGIN must be an absolute URL such as https://gitorgasm.upayan.dev"))
 		}
 		c.AppOrigin = origin
 	}
