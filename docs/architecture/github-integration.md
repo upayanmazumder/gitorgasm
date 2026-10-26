@@ -1,6 +1,6 @@
 # GitHub integration
 
-Status: Stage 1 (Foundation). This document describes how `services/core` talks to GitHub now and the design for later stages.
+Status: Stage 1 (Foundation). This document describes how `core` talks to GitHub now and the design for later stages.
 
 Labels: **Verified** (file path, command, or official URL), **Assumption**, **Decision**, **Alternative considered**, **Planned**.
 

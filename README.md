@@ -21,7 +21,7 @@ flowchart LR
 
 | Part | Path | Technology |
 |---|---|---|
-| Core backend (api, worker, migrate roles) | `services/core` | Go, net/http, pgx, River (Postgres job queue), goose |
+| Core backend (api, worker, migrate roles) | `core` | Go, net/http, pgx, River (Postgres job queue), goose |
 | Public API contract | `contracts/openapi/v1.yaml` | OpenAPI 3.0, checked against live responses in tests |
 | Frontend | `apps/web` | Next.js, TypeScript, TanStack Query, shadcn/ui (Vercel) |
 | Kubernetes manifests | `deploy/kustomize` | Kustomize, deployed by the cluster's Argo CD |

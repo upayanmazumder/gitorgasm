@@ -13,13 +13,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/config"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/db"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/github"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/httpapi"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/jobs"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/obs"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/secure"
+	"github.com/upayanmazumder/gitorgasm/core/internal/config"
+	"github.com/upayanmazumder/gitorgasm/core/internal/db"
+	"github.com/upayanmazumder/gitorgasm/core/internal/github"
+	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs"
+	"github.com/upayanmazumder/gitorgasm/core/internal/obs"
+	"github.com/upayanmazumder/gitorgasm/core/internal/secure"
 )
 
 // version is set at build time with -ldflags "-X main.version=...".

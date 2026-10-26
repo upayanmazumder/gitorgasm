@@ -4,7 +4,7 @@ This document maps the logical domains of Gitorgasm to Go packages that exist no
 
 ## 1. Decision: modular monolith first
 
-**Decision** (D1): one Go module `services/core` with one image and three roles (`api`, `worker`, `migrate`). Domains are separated by package and by table ownership, not by process.
+**Decision** (D1): one Go module `core` with one image and three roles (`api`, `worker`, `migrate`). Domains are separated by package and by table ownership, not by process.
 
 ### 1.1 Why not seven microservices now
 
@@ -12,7 +12,7 @@ This document maps the logical domains of Gitorgasm to Go packages that exist no
 |---|---|
 | Memory is the binding cluster constraint. Each service adds at least one pod request (~128Mi in this design). Seven services would need ~900Mi before Postgres. | cluster-audit.md §2 (~1,508Mi headroom, ~870Mi worst case) |
 | No domain has a different scaling profile today. All are I/O-bound on Postgres or GitHub. | [workload-model.md](./workload-model.md) §5 |
-| Transactional enqueue needs the data change and the job row in one Postgres transaction. Splitting services across databases would need sagas or an outbox relay. | `InsertTx` in `services/core/internal/httpapi/orgs.go`, `InsertManyTx` in `httpapi/auth.go` |
+| Transactional enqueue needs the data change and the job row in one Postgres transaction. Splitting services across databases would need sagas or an outbox relay. | `InsertTx` in `core/internal/httpapi/orgs.go`, `InsertManyTx` in `httpapi/auth.go` |
 | One operator. Each service adds CI, image, manifests, alerts, and upgrades. | Integrator constraint |
 | The legacy problems were correctness and security, not deployment coupling. | legacy-audit.md §13 |
 | Domain boundaries are not yet proven. Early splits freeze wrong boundaries into network contracts. | **Assumption** based on Stage 3–5 being unbuilt |
@@ -34,7 +34,7 @@ This document maps the logical domains of Gitorgasm to Go packages that exist no
 
 Shared infrastructure packages: `internal/config`, `internal/db`, `internal/obs`, `internal/testdb`, `cmd/gitorgasm`.
 
-**Verified**: all SQL lives in `services/core/internal/store/store.go`. **Planned**: when Stage 3 adds tables, split `store` into per-domain files or packages (`store/identity`, `store/sync`, …) so table ownership is visible in the import graph.
+**Verified**: all SQL lives in `core/internal/store/store.go`. **Planned**: when Stage 3 adds tables, split `store` into per-domain files or packages (`store/identity`, `store/sync`, …) so table ownership is visible in the import graph.
 
 ## 3. Data ownership rules
 

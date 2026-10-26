@@ -31,7 +31,7 @@ Outcome: legacy data worth migrating is limited to scoring presets (186 rows, al
 
 | Item | Status at time of writing |
 | --- | --- |
-| Go core `services/core` with roles `api`, `worker`, `migrate` | **Verified** exists (`cmd/gitorgasm/main.go`) |
+| Go core `core` with roles `api`, `worker`, `migrate` | **Verified** exists (`cmd/gitorgasm/main.go`) |
 | Schema migration `00001_core.sql`, River migrations | **Verified** exists (`internal/db`) |
 | GitHub App login (state + PKCE), sessions, sealed tokens | **Verified** exists (`internal/httpapi/auth.go`, `internal/secure`) |
 | `GET /v1/me`, `/v1/organizations`, repositories (keyset), `POST …/sync`, `POST /webhooks/github` | **Verified** routes in `internal/httpapi/server.go` |
@@ -127,9 +127,9 @@ Risks: R6 (secondary limits on write endpoints), R10.
 
 ## Stage 5: Leaderboards
 
-Deliverables: signal ingest via GitHub GraphQL with cost accounting. Rust `services/scoring` that reads signals from Postgres and writes `computed_scores` (ADR 0003). Default scoring presets reseeded per installation, optional import from the legacy dump keyed on `(installation_id, name)`.
+Deliverables: signal ingest via GitHub GraphQL with cost accounting. Rust `scoring` that reads signals from Postgres and writes `computed_scores` (ADR 0003). Default scoring presets reseeded per installation, optional import from the legacy dump keyed on `(installation_id, name)`.
 
-Dependencies: Stage 3 (members). Re-run the language benchmark with legacy-shaped data before you create `services/scoring` (R15).
+Dependencies: Stage 3 (members). Re-run the language benchmark with legacy-shaped data before you create `scoring` (R15).
 
 Acceptance criteria: golden tests reproduce legacy `lib/scoring` results for fixed inputs. GraphQL point usage per sync is logged and stays inside budget. Rust CI job added.
 

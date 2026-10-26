@@ -1,6 +1,6 @@
 # Data architecture
 
-Status: Stage 1 (Foundation). This document describes the data in `services/core` and the planned data for later stages.
+Status: Stage 1 (Foundation). This document describes the data in `core` and the planned data for later stages.
 
 Labels:
 
@@ -37,8 +37,8 @@ flowchart LR
   PG -. "pg_dump every 30 min, upload hourly" .-> R2
 ```
 
-- **Verified**: `services/core/internal/db/db.go` runs goose migrations first, then `rivermigrate` (`Migrate`). Both take a PostgreSQL advisory lock, so concurrent runs are safe (`lock.NewPostgresSessionLocker`).
-- **Verified**: the River table set comes from River's own migrations, not from `00001_core.sql`. The exact River table list depends on the River version in `services/core/go.mod`. **Assumption**: the names in the diagram match River v0.x. Check with `\dt river_*` after `make migrate`.
+- **Verified**: `core/internal/db/db.go` runs goose migrations first, then `rivermigrate` (`Migrate`). Both take a PostgreSQL advisory lock, so concurrent runs are safe (`lock.NewPostgresSessionLocker`).
+- **Verified**: the River table set comes from River's own migrations, not from `00001_core.sql`. The exact River table list depends on the River version in `core/go.mod`. **Assumption**: the names in the diagram match River v0.x. Check with `\dt river_*` after `make migrate`.
 - **Decision**: no Redis, NATS, Temporal, or ClickHouse. Reasons are in `decisions.md` item 4.
 - **Alternative considered**: CloudNativePG. Rejected: operator overhead, and the single node gives no real HA.
 
@@ -51,7 +51,7 @@ Categories:
 - **Derived**: computed from other tables. A recompute rebuilds it.
 - **Cache / ephemeral**: safe to drop. Users log in again or jobs re-run.
 
-Source: `services/core/internal/db/migrations/00001_core.sql`. **Verified**.
+Source: `core/internal/db/migrations/00001_core.sql`. **Verified**.
 
 | Table | Class | Writer (code) | Reader (code) | Notes |
 |---|---|---|---|---|
@@ -116,7 +116,7 @@ No purge job exists in the slice. **Verified**: no periodic job other than `reco
 
 **Decision**: tenant = GitHub installation. The grant edge is `user_installations` (decisions item 9).
 
-**Verified** (`services/core/internal/store/store.go`):
+**Verified** (`core/internal/store/store.go`):
 
 - `ListOrganizations` starts `FROM user_installations ui … WHERE ui.user_id = $1`. It also requires `i.deleted_at IS NULL`.
 - `AccessibleInstallation` joins `user_installations ui ON … AND ui.user_id = $1`. A missing grant returns `ErrNotFound`. The handler maps it to HTTP 404 `organization_not_found` (`httpapi/orgs.go` `resolveOrg`).
@@ -162,7 +162,7 @@ Sync algorithm (`SyncWorker.Work`):
    - Contract: a later release drops the old column after no code reads it.
 4. No long locks: create indexes on populated tables with `CREATE INDEX CONCURRENTLY` in a migration with `-- +goose NO TRANSACTION`. Add `NOT NULL` with a `CHECK … NOT VALID` then `VALIDATE CONSTRAINT`.
 5. The `migrate` Job runs before the new `api` and `worker` pods start. Code must work with schema N and N+1 during a rollout.
-6. CI runs all migrations on an empty PostgreSQL 18 database (`internal/testdb` creates one database per test). **Verified**: `services/core/internal/testdb/testdb.go` exists.
+6. CI runs all migrations on an empty PostgreSQL 18 database (`internal/testdb` creates one database per test). **Verified**: `core/internal/testdb/testdb.go` exists.
 
 ## 9. Job argument schema evolution
 
@@ -188,7 +188,7 @@ All rows below are **Planned**. Column lists are proposals. Mapping from legacy 
 | `idempotency_keys` | Authoritative, ephemeral | `(user_id, key)` | `Idempotency-Key` header | 4 |
 | `scoring_presets` + 7 child tables | Authoritative | `(installation_id, name)` | seed or legacy import | 5 |
 | `signals` | Derived from GitHub events | dedup tuple `(user_id, type, repository_id, event_timestamp, content_hash)` | GraphQL ingest | 5 |
-| `computed_scores`, `leaderboard_materializations` | Derived | see `database-audit.md` §7.2 | Rust `services/scoring` | 5 |
+| `computed_scores`, `leaderboard_materializations` | Derived | see `database-audit.md` §7.2 | Rust `scoring` | 5 |
 | `legacy_import_map` | Authoritative, audit | `(source_table, legacy_id)` | preset import | 5 |
 
 **Decision**: `signals` starts unpartitioned. Revisit partitioning above about 10 M rows (`database-audit.md` §7.2). The Rust scoring service reads `signals` and writes `computed_scores`. It talks to core only through tables and job rows (decisions item 3).

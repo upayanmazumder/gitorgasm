@@ -19,8 +19,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/db"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/secure"
+	"github.com/upayanmazumder/gitorgasm/core/internal/db"
+	"github.com/upayanmazumder/gitorgasm/core/internal/secure"
 )
 
 // New creates a database, applies all migrations, and drops it when the test ends.

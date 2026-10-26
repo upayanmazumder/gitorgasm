@@ -15,8 +15,8 @@ import (
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/github"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/store"
+	"github.com/upayanmazumder/gitorgasm/core/internal/github"
+	"github.com/upayanmazumder/gitorgasm/core/internal/store"
 )
 
 // QueueGitHub serializes GitHub-bound work. Its worker count is the global GitHub

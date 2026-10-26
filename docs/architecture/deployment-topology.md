@@ -56,7 +56,7 @@ flowchart TB
 | Ingress `api` (production overlay) | host `api-gitorgasm.upayan.dev`, paths `/v1` (Prefix) and `/webhooks/github` (Exact) | n/a | 443 → Service `api` `http` | n/a |
 | PersistentVolume `gitorgasm-postgres-vps` (production overlay) | 2Gi, `Retain`, hostPath `/srv/data/gitorgasm-postgres` (type `Directory`), node affinity `vps` | n/a | n/a | n/a |
 
-**Verified** (code): one image serves all roles (`services/core/cmd/gitorgasm/main.go`, `services/core/Dockerfile`, `ENTRYPOINT ["/gitorgasm"]`). The image is distroless static and runs as UID 65532. The worker refuses to start without the `GITHUB_*` configuration. The API starts without it and returns 503 `github_not_configured` on auth, sync, and webhook routes.
+**Verified** (code): one image serves all roles (`core/cmd/gitorgasm/main.go`, `core/Dockerfile`, `ENTRYPOINT ["/gitorgasm"]`). The image is distroless static and runs as UID 65532. The worker refuses to start without the `GITHUB_*` configuration. The API starts without it and returns 503 `github_not_configured` on auth, sync, and webhook routes.
 
 **Verified**: the Ingress exposes only `/v1` and `/webhooks/github`. `/healthz`, `/readyz`, and port 9090 are not reachable from the internet. Prometheus scrapes port 9090 directly by pod annotation.
 
@@ -145,7 +145,7 @@ Staging cost note: a second copy of the budget costs 200m CPU and 512Mi memory r
 
 **Verified** (`.github/workflows/ci.yml`, job `image`):
 
-1. The job runs after job `core` passes. It builds `services/core/Dockerfile` with buildx on every PR and push. It does not push on PRs.
+1. The job runs after job `core` passes. It builds `core/Dockerfile` with buildx on every PR and push. It does not push on PRs.
 2. On a push to `main`, it logs in to GHCR with `GITHUB_TOKEN` (`packages: write` on this job only) and pushes `ghcr.io/upayanmazumder/gitorgasm/core`. Tags: the full commit SHA and `latest`. `VERSION` build arg = commit SHA (embedded via `-X main.version`, visible in the `app_version` log field). Provenance (`mode=max`) and SBOM are attached.
 
 **Planned** (Stage 1.5):

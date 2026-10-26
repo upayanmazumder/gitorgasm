@@ -22,7 +22,7 @@ services:
 
   migrate:
     build:
-      context: services/core
+      context: core
     command: ["migrate"]
     environment:
       DATABASE_URL: postgres://gitorgasm:gitorgasm@postgres:5432/gitorgasm?sslmode=disable
@@ -32,7 +32,7 @@ services:
 
   api:
     build:
-      context: services/core
+      context: core
     command: ["api"]
     env_file:
       - path: .env
@@ -53,7 +53,7 @@ services:
   worker:
     profiles: ["github"]
     build:
-      context: services/core
+      context: core
     command: ["worker"]
     env_file:
       - path: .env

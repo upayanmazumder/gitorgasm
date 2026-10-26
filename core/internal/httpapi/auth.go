@@ -14,10 +14,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/github"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/jobs"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/secure"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/store"
+	"github.com/upayanmazumder/gitorgasm/core/internal/github"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs"
+	"github.com/upayanmazumder/gitorgasm/core/internal/secure"
+	"github.com/upayanmazumder/gitorgasm/core/internal/store"
 )
 
 // cookieName uses the __Host- prefix when cookies are Secure. The prefix makes browsers

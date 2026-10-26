@@ -7,7 +7,7 @@ Sources:
 - [feature-inventory.md](./feature-inventory.md) (legacy features, status, recommendation).
 - [legacy-audit.md](./legacy-audit.md) (legacy defects, security findings SEC-1 to SEC-13).
 - Integrator decisions (the decision numbers below, for example D9, refer to that list).
-- Implemented code in `services/core` (the only code that exists in the backend now).
+- Implemented code in `core` (the only code that exists in the backend now).
 
 Labels: **Verified** (cites a file, command, or URL), **Assumption**, **Decision**, **Alternative considered**, **Planned**.
 
@@ -60,10 +60,10 @@ flowchart LR
 
 | Boundary | What crosses it | Control | Status |
 |---|---|---|---|
-| Browser → api | Session cookie, JSON | Opaque 256-bit session id in `__Host-gitorgasm_session`. Only its SHA-256 hash is stored. Origin check on unsafe methods. | **Verified**: `services/core/internal/httpapi/auth.go`, `sessions.id_hash` in `services/core/internal/db/migrations/00001_core.sql` |
-| User → tenant data | Org and repository reads | Grant edge `user_installations`, written only from `GET /user/installations` with the user's token. | **Verified**: `store.ReplaceUserInstallations`, `store.AccessibleInstallation` in `services/core/internal/store/store.go` |
-| GitHub → webhook route | Signed event body | HMAC-SHA256 `X-Hub-Signature-256`, constant-time compare, 25 MiB cap, delivery-id dedupe. | **Verified**: `services/core/internal/httpapi/orgs.go` (`maxWebhookBytes = 25 << 20`, `github.VerifySignature`) |
-| api/worker → GitHub | Tokens | App private key, installation tokens cached in memory, user tokens sealed with AES-256-GCM at rest. Link-following stays on the API host. | **Verified**: `services/core/internal/github/client.go`, `services/core/internal/secure/secure.go` |
+| Browser → api | Session cookie, JSON | Opaque 256-bit session id in `__Host-gitorgasm_session`. Only its SHA-256 hash is stored. Origin check on unsafe methods. | **Verified**: `core/internal/httpapi/auth.go`, `sessions.id_hash` in `core/internal/db/migrations/00001_core.sql` |
+| User → tenant data | Org and repository reads | Grant edge `user_installations`, written only from `GET /user/installations` with the user's token. | **Verified**: `store.ReplaceUserInstallations`, `store.AccessibleInstallation` in `core/internal/store/store.go` |
+| GitHub → webhook route | Signed event body | HMAC-SHA256 `X-Hub-Signature-256`, constant-time compare, 25 MiB cap, delivery-id dedupe. | **Verified**: `core/internal/httpapi/orgs.go` (`maxWebhookBytes = 25 << 20`, `github.VerifySignature`) |
+| api/worker → GitHub | Tokens | App private key, installation tokens cached in memory, user tokens sealed with AES-256-GCM at rest. Link-following stays on the API host. | **Verified**: `core/internal/github/client.go`, `core/internal/secure/secure.go` |
 | api/worker → Postgres | SQL | Network policy (Planned in deploy manifests). Single database user (**Assumption**). | Planned |
 | Operator → cluster | Secrets | SOPS + age through ksops in the cluster repo. | **Verified** in cluster-audit.md. Gitorgasm secrets: Planned (Stage 1.5). |
 
@@ -75,7 +75,7 @@ flowchart LR
 
 | Capability | Legacy evidence | Milestone | Status in Gitorgasm |
 |---|---|---|---|
-| GitHub App sign-in and sign-out | feature-inventory §2.1, §2.3 | M1 | **Verified** implemented (redesigned with PKCE): `GET /v1/auth/login`, `GET /v1/auth/callback`, `POST /v1/auth/logout` in `services/core/internal/httpapi/server.go` |
+| GitHub App sign-in and sign-out | feature-inventory §2.1, §2.3 | M1 | **Verified** implemented (redesigned with PKCE): `GET /v1/auth/login`, `GET /v1/auth/callback`, `POST /v1/auth/logout` in `core/internal/httpapi/server.go` |
 | Installation access and permission check page | feature-inventory §2.1 | M2 | Planned. Needs a permission manifest. |
 | Scoring engine (normalize, rules, quotas, diminishing returns, multipliers, penalties) | legacy-audit §9 | M5 | Planned. Port with golden tests. |
 | Scoring presets and ruleset import/export | feature-inventory §2.1 | M5 | Planned. Reseed defaults (D18). |
@@ -102,11 +102,11 @@ flowchart LR
 
 | Capability | Why | Milestone | Status |
 |---|---|---|---|
-| Durable job queue with transactional enqueue | Legacy ran all work in requests | M1 | **Verified**: River v0.49 (`services/core/go.mod`, `services/core/internal/jobs/jobs.go`) |
+| Durable job queue with transactional enqueue | Legacy ran all work in requests | M1 | **Verified**: River v0.49 (`core/go.mod`, `core/internal/jobs/jobs.go`) |
 | Rate-limit-aware GitHub client | Legacy had one default retry | M1 | **Verified**: error classification and snooze in `jobs.retryDecision`, metrics in `github/client.go` |
-| Periodic reconciliation | Webhooks can be lost | M1 | **Verified**: `reconcile_installations`, `RECONCILE_INTERVAL` default `6h` (`services/core/internal/config/config.go`) |
+| Periodic reconciliation | Webhooks can be lost | M1 | **Verified**: `reconcile_installations`, `RECONCILE_INTERVAL` default `6h` (`core/internal/config/config.go`) |
 | Audit log | No audit in legacy | M1 (table), M4 (all mutations) | **Verified** table `audit_events` and writes for `session.created`, sync request, `session.revoked_by_github` |
-| Metrics, logs, traces | Legacy logged to console only | M1 | **Verified**: `services/core/internal/obs/obs.go`. River job metrics: Planned. |
+| Metrics, logs, traces | Legacy logged to console only | M1 | **Verified**: `core/internal/obs/obs.go`. River job metrics: Planned. |
 | Single permission manifest | Docs, runtime list, and real needs differ | M2 | Planned |
 | Scheduled maintenance (session purge, webhook payload retention) | Legacy SQL functions had no caller | M2 | Planned. No purge job exists now. |
 | Backup and restore runbook | Single disk | M1.5 | Planned (restic class A, see D4) |
@@ -146,7 +146,7 @@ Debug routes, mobile auth mode, programmatic install completion, GraphQL proxy, 
 
 | Milestone | Scope | Exit criteria | State |
 |---|---|---|---|
-| M1 Foundation | Repo, CI, core slice (auth, orgs, repos, sync, webhooks), compose, kustomize | Tests pass. OpenAPI contract matches responses. | In progress. **Verified** files exist: `services/core`, `contracts/openapi/v1.yaml`, `compose.yaml`, `Makefile`, `.github/workflows/ci.yml`, `deploy/kustomize`, `apps/web` (template only). Open: push the repository and get a green CI run ([implementation-roadmap.md](./implementation-roadmap.md) Stage 1). |
+| M1 Foundation | Repo, CI, core slice (auth, orgs, repos, sync, webhooks), compose, kustomize | Tests pass. OpenAPI contract matches responses. | In progress. **Verified** files exist: `core`, `contracts/openapi/v1.yaml`, `compose.yaml`, `Makefile`, `.github/workflows/ci.yml`, `deploy/kustomize`, `apps/web` (template only). Open: push the repository and get a green CI run ([implementation-roadmap.md](./implementation-roadmap.md) Stage 1). |
 | M1.5 First deploy | Cluster repo PR, SOPS secrets, DNS approval, GitHub App registration, GHCR access decision, Vercel rewrite | api and worker pods Ready. `GET /v1/me` on `api-gitorgasm.upayan.dev` returns 401 `unauthenticated` (the Ingress does not expose `/readyz`). Backup job runs. | Planned |
 | M2 Identity hardening | Grant re-verify, org role checks, refresh tokens, frontend login and org/repo pages | Revoked members lose access within one re-verify interval. | Planned |
 | M3 Sync breadth | Teams, members, invitations mirror. Membership, team, organization webhooks. | Mirror converges after a forced reconcile. | Planned |

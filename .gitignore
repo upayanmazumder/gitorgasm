@@ -9,7 +9,7 @@
 dumps/
 
 # Build output
-services/core/bin/
+core/bin/
 node_modules/
 .next/
 coverage/

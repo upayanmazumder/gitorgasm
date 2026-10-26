@@ -1,6 +1,6 @@
 # API design
 
-Status: Stage 1 (Foundation). Contract: `contracts/openapi/v1.yaml` (OpenAPI 3.0.3). Implementation: `services/core/internal/httpapi`.
+Status: Stage 1 (Foundation). Contract: `contracts/openapi/v1.yaml` (OpenAPI 3.0.3). Implementation: `core/internal/httpapi`.
 
 Labels: **Verified** (file path or command), **Assumption**, **Decision**, **Alternative considered**, **Planned**.
 
@@ -10,7 +10,7 @@ Labels: **Verified** (file path or command), **Assumption**, **Decision**, **Alt
 
 1. Public API = REST + JSON over HTTPS. No public GraphQL API.
 2. The OpenAPI file is the contract. Code follows the contract. A contract change and a code change ship in the same pull request.
-3. Tests validate real responses against the contract. **Verified**: `services/core/internal/httpapi/api_test.go` imports `kin-openapi/openapi3filter`.
+3. Tests validate real responses against the contract. **Verified**: `core/internal/httpapi/api_test.go` imports `kin-openapi/openapi3filter`.
 4. Resources are nouns under `/v1`. Organizations are addressed by GitHub login (`/v1/organizations/{login}`). Login match is case-insensitive (`lower(a.login) = lower($2)` in `store.AccessibleInstallation`).
 5. Inaccessible and unknown organizations both return 404 `organization_not_found`. This prevents tenant enumeration. **Verified**: `httpapi/orgs.go` `resolveOrg`.
 6. Long work is asynchronous. The API enqueues a job and returns `202`. **Verified**: `POST /v1/organizations/{login}/sync`.
@@ -48,7 +48,7 @@ Labels: **Verified** (file path or command), **Assumption**, **Decision**, **Alt
 - `message` is for humans. It never contains upstream GitHub bodies (`githubError` maps upstream failures to fixed messages).
 - `request_id` equals the `X-Request-Id` response header. An inbound `X-Request-Id` that matches `^[A-Za-z0-9._-]{8,64}$` is reused. Else the server generates one (`requestID`).
 
-Codes in use. **Verified** by `grep -n writeError services/core/internal/httpapi/*.go`:
+Codes in use. **Verified** by `grep -n writeError core/internal/httpapi/*.go`:
 
 | Code | HTTP | Where |
 |---|---|---|

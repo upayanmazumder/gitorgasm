@@ -21,13 +21,13 @@ import (
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/config"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/github"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/httpapi"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/jobs"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/secure"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/store"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/testdb"
+	"github.com/upayanmazumder/gitorgasm/core/internal/config"
+	"github.com/upayanmazumder/gitorgasm/core/internal/github"
+	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs"
+	"github.com/upayanmazumder/gitorgasm/core/internal/secure"
+	"github.com/upayanmazumder/gitorgasm/core/internal/store"
+	"github.com/upayanmazumder/gitorgasm/core/internal/testdb"
 )
 
 const (
@@ -61,7 +61,7 @@ func newHarness(t *testing.T) *harness {
 		Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Now: time.Now,
 	}
 
-	doc, err := openapi3.NewLoader().LoadFromFile("../../../../contracts/openapi/v1.yaml")
+	doc, err := openapi3.NewLoader().LoadFromFile("../../../contracts/openapi/v1.yaml")
 	if err != nil {
 		t.Fatalf("load contract: %v", err)
 	}

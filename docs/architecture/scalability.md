@@ -18,7 +18,7 @@ This document states how each part of Gitorgasm scales, what limits it, and the 
 
 **Verified** stateless properties:
 
-- Sessions are rows in Postgres (`sessions`), not process memory (`services/core/internal/httpapi/auth.go`).
+- Sessions are rows in Postgres (`sessions`), not process memory (`core/internal/httpapi/auth.go`).
 - PKCE verifier and OAuth state are in short-lived cookies, not memory (D8).
 - Jobs are enqueued in Postgres (`InsertTx`), not in process queues.
 - The only process cache is the installation token cache in `internal/github/client.go`. A cache miss costs one App JWT request. Each replica has its own cache.
@@ -26,13 +26,13 @@ This document states how each part of Gitorgasm scales, what limits it, and the 
 Consequences:
 
 - Any replica can serve any request. No sticky sessions.
-- Each replica opens up to `DB_MAX_CONNS` Postgres connections (code default 10, **Verified**: `services/core/internal/config/config.go`. Production ConfigMap sets 8, **Verified**: `deploy/kustomize/base/config.yaml`). **Rule**: replicas × `DB_MAX_CONNS` (api + worker, including surge pods during a rollout) must stay below Postgres `max_connections` minus a reserve for migrate and admin. The manifest sets `max_connections=40` (**Verified**: `deploy/kustomize/base/postgres.yaml`). With one replica each and one surge pod each: 4 × 8 + 2 (migrate) = 34.
+- Each replica opens up to `DB_MAX_CONNS` Postgres connections (code default 10, **Verified**: `core/internal/config/config.go`. Production ConfigMap sets 8, **Verified**: `deploy/kustomize/base/config.yaml`). **Rule**: replicas × `DB_MAX_CONNS` (api + worker, including surge pods during a rollout) must stay below Postgres `max_connections` minus a reserve for migrate and admin. The manifest sets `max_connections=40` (**Verified**: `deploy/kustomize/base/postgres.yaml`). With one replica each and one surge pod each: 4 × 8 + 2 (migrate) = 34.
 - One api replica already rolls without downtime: `maxSurge: 1`, `maxUnavailable: 0`, readiness gate (**Verified**: `deploy/kustomize/base/api.yaml`). **Planned**: a second api replica only if load requires it. One replica is enough for load (**Estimate**). Recheck the connection rule above first.
 - KEDA scale-to-zero is not used for the api (**Decision**): webhook acks must stay inside GitHub's 10 s limit, and a cold start adds latency.
 
 ## 3. Worker replicas and River
 
-**Verified** (`services/core/internal/jobs/jobs.go`):
+**Verified** (`core/internal/jobs/jobs.go`):
 
 - River clients in several replicas coordinate through Postgres. Each job is claimed by one worker.
 - Per replica, the `default` and `github` queues each run up to `WORKER_CONCURRENCY` jobs (default 4).
@@ -70,7 +70,7 @@ Scaling rules:
 **Gaps**:
 
 - A large bulk operation or ingest for one installation could fill all `github` slots (Stage 4–5 risk).
-- `gitorgasm_github_rate_limit_remaining{credential}` is a gauge per credential label, not a budget controller (**Verified**: `services/core/internal/github/client.go`).
+- `gitorgasm_github_rate_limit_remaining{credential}` is a gauge per credential label, not a budget controller (**Verified**: `core/internal/github/client.go`).
 
 **Planned** per-installation budget (Stage 4, before bulk operations):
 
