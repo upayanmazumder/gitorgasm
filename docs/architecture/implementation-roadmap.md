@@ -59,7 +59,13 @@ Test requirements: unit tests for `secure` (seal/open, key version), GitHub clie
 
 Risks: R5, R15 (`risk-register.md`). Infra: none beyond a developer machine and GitHub Actions.
 
-## Stage 1.5: First deploy
+## Stage 1.5: First deploy — Mostly done (2026-10-26)
+
+Status:
+
+- **Done:** GHCR package public. Cluster PR merged (`upayanmazumder/cluster#77`). Host directory created. New GitHub App `gitorgasm` (id 5482665, Metadata and Members read). Vercel project on `gitorgasm.upayan.dev` (DNS-only CNAME to Vercel) with the `/api` rewrite. `api-gitorgasm.upayan.dev` is served by the existing `*.upayan.dev` wildcard.
+- **Verified:** api, worker, and postgres Running. PVC bound to the static PV. `GET /v1/me` returns 401 `unauthenticated` directly and through `https://gitorgasm.upayan.dev/api/v1/me`. `/readyz` returns 404 publicly. `/api/v1/auth/login` redirects to GitHub with PKCE. A signed webhook through Cloudflare returned 202 and the worker processed it. A bad signature returned 401. Memory requests are 86% of allocatable.
+- **Open:** sign in with a real account and install the App on a test org. Apply the Ansible backup role so the new `pg_dump` target runs, then do one restore. Grafana dashboard and alerts.
 
 Deliverables:
 
@@ -68,7 +74,7 @@ Deliverables:
 - Host directory `/srv/data/gitorgasm-postgres` owned by UID/GID 70.
 - GitHub App registration for Gitorgasm (new App, or reuse the legacy App with new callback and webhook URLs; decide at this stage). Callback `https://gitorgasm.upayan.dev/api/v1/auth/callback`, webhook `https://api-gitorgasm.upayan.dev/webhooks/github`.
 - Vercel project for `web` at `gitorgasm.upayan.dev` with the rewrite `/api/:path*` → `https://api-gitorgasm.upayan.dev/:path*`. Login cannot work without it, because the callback URL is on the Vercel origin.
-- DNS record `api-gitorgasm.upayan.dev` after owner approval.
+- DNS: `api-gitorgasm.upayan.dev` uses the existing `*.upayan.dev` wildcard. `gitorgasm.upayan.dev` is a DNS-only CNAME to Vercel.
 - Grafana dashboard and first alerts (`observability.md` §6). Restore runbook.
 
 Dependencies: Stage 1 CI publishes the image to GHCR. Owner approval for DNS, GHCR access, and the cluster PR.

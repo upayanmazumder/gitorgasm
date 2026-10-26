@@ -3,7 +3,7 @@
 Gitorgasm is a multi-tenant platform to manage GitHub organizations. It replaces GH Org Tool.
 It mirrors GitHub App installations and repositories into PostgreSQL, serves them through a typed REST API, and runs GitHub work as durable background jobs.
 
-**Status:** Stage 1 (foundation). The first vertical slice works end to end in local development and in tests. Nothing is deployed yet. See [the roadmap](docs/architecture/implementation-roadmap.md).
+**Status:** Stage 1.5. Deployed: frontend at https://gitorgasm.upayan.dev (Vercel), API at https://api-gitorgasm.upayan.dev (k3s cluster). See [the roadmap](docs/architecture/implementation-roadmap.md).
 
 ## Architecture in one picture
 
