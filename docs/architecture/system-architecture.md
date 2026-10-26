@@ -73,19 +73,19 @@ flowchart LR
 
 | Component | Responsibility | State | Evidence |
 |---|---|---|---|
-| `gitorgasm api` | Auth (login, callback, install redirect, logout), `/v1/me`, org and repository lists, sync request, webhook intake, health | Exists | `services/core/internal/httpapi/server.go` routes |
-| `gitorgasm worker` | Runs River jobs: `sync_installation`, `process_webhook`, `reconcile_installations` | Exists | `services/core/internal/jobs/jobs.go` |
-| `gitorgasm migrate` | Applies goose and River migrations | Exists | `services/core/cmd/gitorgasm/main.go` (`runMigrate`), `services/core/internal/db/db.go` |
-| GitHub client | App JWT, installation token cache, narrow REST calls, rate-limit classification, metrics | Exists | `services/core/internal/github/client.go` |
-| Store | All SQL | Exists | `services/core/internal/store/store.go` |
-| Secure | Random tokens, AES-256-GCM sealing | Exists | `services/core/internal/secure/secure.go` |
-| Obs | slog JSON, Prometheus, OTel | Exists | `services/core/internal/obs/obs.go` |
-| PostgreSQL | Only stateful service. App tables and River tables. | Exists in local dev (`compose.yaml`) and as a manifest (`postgres:18-alpine` StatefulSet). Not deployed. | `services/core/internal/db/migrations/00001_core.sql`, `deploy/kustomize/base/postgres.yaml` |
+| `gitorgasm api` | Auth (login, callback, install redirect, logout), `/v1/me`, org and repository lists, sync request, webhook intake, health | Exists | `core/internal/httpapi/server.go` routes |
+| `gitorgasm worker` | Runs River jobs: `sync_installation`, `process_webhook`, `reconcile_installations` | Exists | `core/internal/jobs/jobs.go` |
+| `gitorgasm migrate` | Applies goose and River migrations | Exists | `core/cmd/gitorgasm/main.go` (`runMigrate`), `core/internal/db/db.go` |
+| GitHub client | App JWT, installation token cache, narrow REST calls, rate-limit classification, metrics | Exists | `core/internal/github/client.go` |
+| Store | All SQL | Exists | `core/internal/store/store.go` |
+| Secure | Random tokens, AES-256-GCM sealing | Exists | `core/internal/secure/secure.go` |
+| Obs | slog JSON, Prometheus, OTel | Exists | `core/internal/obs/obs.go` |
+| PostgreSQL | Only stateful service. App tables and River tables. | Exists in local dev (`compose.yaml`) and as a manifest (`postgres:18-alpine` StatefulSet). Not deployed. | `core/internal/db/migrations/00001_core.sql`, `deploy/kustomize/base/postgres.yaml` |
 | Web app | UI, same-origin rewrite | Template app exists (`apps/web`, Next.js 16.2.11). No API integration and no rewrite yet: Planned | D7 |
 | Kustomize manifests | Namespace, ConfigMap, Deployments (api with `migrate` initContainer, worker), postgres StatefulSet, Services, NetworkPolicies, Ingress, static PV | Exists (`deploy/kustomize`). Validated with kubeconform. Not deployed | D15 |
 | Scoring service | Rust scoring engine | Planned, hypothesis | [rust-vs-go.md](./rust-vs-go.md) §5 |
 
-**Decision**: one image serves all three roles so versions cannot drift (comment in `services/core/cmd/gitorgasm/main.go`).
+**Decision**: one image serves all three roles so versions cannot drift (comment in `core/cmd/gitorgasm/main.go`).
 
 ## 4. Request path
 

@@ -1,6 +1,6 @@
 # Security threat model
 
-Status: Stage 1 (Foundation). Scope: `services/core` (api, worker, migrate roles), PostgreSQL, the GitHub App, the Vercel frontend proxy, CI/CD, and the k3s deployment.
+Status: Stage 1 (Foundation). Scope: `core` (api, worker, migrate roles), PostgreSQL, the GitHub App, the Vercel frontend proxy, CI/CD, and the k3s deployment.
 
 Labels: **Verified** (file path, command, or official URL), **Assumption**, **Decision**, **Planned**. "Now" in the tables means the control exists in code today. Every "Now" cell cites the code.
 

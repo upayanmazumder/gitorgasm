@@ -17,7 +17,7 @@ See the quick start in [README.md](README.md). Tests need Docker: `make test` st
 
 ## Standards
 
-### Go (`services/core`)
+### Go (`core`)
 
 - All SQL lives in `internal/store`. Handlers and workers never build SQL.
 - Every org-scoped query joins `user_installations`. Inaccessible organizations return 404.
@@ -25,7 +25,7 @@ See the quick start in [README.md](README.md). Tests need Docker: `make test` st
 - GitHub calls go through `internal/github`. Verify each new endpoint against the pinned REST description (`github/rest-api-description` v2.1.0) or docs.github.com before you use it. Record the operationId in the doc comment.
 - Return classified errors. Workers map them with `retryDecision`.
 - Never log tokens, cookies, webhook payloads, or private repository content.
-- Lint: `golangci-lint` with `services/core/.golangci.yml`.
+- Lint: `golangci-lint` with `core/.golangci.yml`.
 
 ### API contract
 
@@ -35,7 +35,7 @@ See the quick start in [README.md](README.md). Tests need Docker: `make test` st
 
 ### Database migrations
 
-- Add a new file in `services/core/internal/db/migrations` (`NNNNN_name.sql`, goose format). Never edit a merged migration.
+- Add a new file in `core/internal/db/migrations` (`NNNNN_name.sql`, goose format). Never edit a merged migration.
 - Migrations run before the new API version starts. They must work with the previous release: expand first, contract in a later release.
 
 ### Frontend (`apps/web`)

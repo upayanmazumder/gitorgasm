@@ -25,7 +25,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/config"
+	"github.com/upayanmazumder/gitorgasm/core/internal/config"
 )
 
 // APIVersion is the REST API version header value that matches the pinned description.

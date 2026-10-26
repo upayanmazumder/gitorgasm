@@ -15,7 +15,7 @@ The tenant is a GitHub App installation (one organization or account). The legac
 - Installation deletion revokes all grants for that installation.
 - **Planned** Stage 2: periodic re-verification of grants, and a server-side check of `GET /user/memberships/orgs/{org}` (role `admin`) before any mutation.
 
-Implementation: **Verified** `services/core/internal/httpapi/auth.go`, `internal/store/store.go`, `internal/httpapi/orgs.go`.
+Implementation: **Verified** `core/internal/httpapi/auth.go`, `internal/store/store.go`, `internal/httpapi/orgs.go`.
 
 ## Consequences
 

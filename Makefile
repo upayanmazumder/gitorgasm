@@ -3,7 +3,7 @@ SHELL := /usr/bin/env bash
 .SHELLFLAGS := -eu -o pipefail -c
 .DEFAULT_GOAL := help
 
-CORE := services/core
+CORE := core
 WEB := apps/web
 BENCH := tests/performance/lang-bench
 GOBIN := $(shell go env GOPATH)/bin

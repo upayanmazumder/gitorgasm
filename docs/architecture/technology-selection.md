@@ -28,13 +28,13 @@ This document records each technology option, the verdict, and the reason. Each 
 | Managed Postgres (Neon, Supabase, RDS) | Rejected | Paid at useful size, or adds a cross-internet hop. Legacy Supabase shows the risk: staging/prod projects are gone (NXDOMAIN). |
 | SQLite | Rejected | River needs Postgres. Multiple api/worker processes need a network database. |
 
-**Verified**: local dev uses `postgres:18-alpine` (`compose.yaml`). Migrations: goose plus River migrations run by the `migrate` role (`services/core/internal/db/db.go`, `services/core/cmd/gitorgasm/main.go`).
+**Verified**: local dev uses `postgres:18-alpine` (`compose.yaml`). Migrations: goose plus River migrations run by the `migrate` role (`core/internal/db/db.go`, `core/cmd/gitorgasm/main.go`).
 
 ### 2.2 Cache
 
 | Option | Verdict | Reason |
 |---|---|---|
-| No cache service | **Selected** | Read paths query Postgres only, no GitHub call (**Verified**: `services/core/internal/httpapi/orgs.go`). Sessions, locks (advisory locks in `jobs.go`), and the queue live in Postgres. Legacy Redis was a response cache only and caused SEC-1 (cross-tenant leak). |
+| No cache service | **Selected** | Read paths query Postgres only, no GitHub call (**Verified**: `core/internal/httpapi/orgs.go`). Sessions, locks (advisory locks in `jobs.go`), and the queue live in Postgres. Legacy Redis was a response cache only and caused SEC-1 (cross-tenant leak). |
 | Valkey | Rejected now | Adds ~50–100Mi requests (**Assumption**) for no current need. Revisit only if measured p95 read latency fails the target in [requirements.md](./requirements.md) §6 after indexing. |
 | Dragonfly | Rejected | Same as Valkey, with a larger default memory footprint (**Assumption**). |
 | In-process cache | Allowed, narrow | Installation tokens are cached in memory today (**Verified**: `github/client.go`). Any other in-process cache must be tenant-keyed. |
@@ -43,7 +43,7 @@ This document records each technology option, the verdict, and the reason. Each 
 
 | Option | Verdict | Reason |
 |---|---|---|
-| River (Postgres-backed queue) | **Selected** | Transactional enqueue with the data change (**Verified**: `InsertTx`, `InsertManyTx` in `httpapi/orgs.go`, `httpapi/auth.go`). Unique jobs, snooze, periodic jobs, retries. No new stateful service. v0.49 (**Verified**: `services/core/go.mod`). |
+| River (Postgres-backed queue) | **Selected** | Transactional enqueue with the data change (**Verified**: `InsertTx`, `InsertManyTx` in `httpapi/orgs.go`, `httpapi/auth.go`). Unique jobs, snooze, periodic jobs, retries. No new stateful service. v0.49 (**Verified**: `core/go.mod`). |
 | NATS JetStream | Rejected now | Not installed. Adds a stateful service and a second source of truth. Fan-out to many consumers is not needed with one service. Revisit if several services need the same event stream. |
 | Temporal | Rejected | Needs its own server, history store, and UI. Several hundred Mi of memory (**Assumption**). River jobs with checkpoints in Postgres cover bulk operations (Stage 4). |
 | Kafka / Redpanda | Rejected | Far beyond the event volume in workload-model.md §2.3. |
@@ -109,7 +109,7 @@ This document records each technology option, the verdict, and the reason. Each 
 
 | Option | Verdict | Reason |
 |---|---|---|
-| Prometheus scrape via pod annotations, Loki via stdout JSON | **Selected** | Existing stack (**Verified**: cluster-audit.md). Code exposes `/metrics` on `:9090` (`services/core/internal/obs/obs.go`). |
+| Prometheus scrape via pod annotations, Loki via stdout JSON | **Selected** | Existing stack (**Verified**: cluster-audit.md). Code exposes `/metrics` on `:9090` (`core/internal/obs/obs.go`). |
 | OTel traces with OTLP/HTTP export when `OTEL_EXPORTER_OTLP_ENDPOINT` is set | **Selected**, export off by default | No Tempo in the cluster. Instrumentation exists (`obs.InitTracing`). A trace backend is Planned (Stage 6). |
 
 ## 3. Memory budget summary

@@ -3,3 +3,5 @@ packages:
 allowBuilds:
   sharp: true
   unrs-resolver: true
+overrides:
+  brace-expansion@>=4.0.0 <5.0.12: ^5.0.12

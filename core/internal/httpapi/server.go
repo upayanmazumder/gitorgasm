@@ -19,9 +19,9 @@ import (
 	"github.com/riverqueue/river"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/config"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/github"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/secure"
+	"github.com/upayanmazumder/gitorgasm/core/internal/config"
+	"github.com/upayanmazumder/gitorgasm/core/internal/github"
+	"github.com/upayanmazumder/gitorgasm/core/internal/secure"
 )
 
 var (

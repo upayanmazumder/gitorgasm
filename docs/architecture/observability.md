@@ -2,7 +2,7 @@
 
 Status date: 2026-10-26. Labels: **Verified** (with source), **Assumption**, **Decision**, **Alternative considered**, **Planned**.
 
-Scope: the Go core in `services/core`. The cluster stack is plain Prometheus with pod-annotation scrape, Grafana, Loki, and Promtail. There is no Tempo and no Prometheus Operator (**Verified** `docs/architecture/cluster-audit.md` §3).
+Scope: the Go core in `core`. The cluster stack is plain Prometheus with pod-annotation scrape, Grafana, Loki, and Promtail. There is no Tempo and no Prometheus Operator (**Verified** `docs/architecture/cluster-audit.md` §3).
 
 ## 1. Logs
 

@@ -9,7 +9,7 @@ The workload is GitHub orchestration: OAuth login, repository and membership syn
 
 ## Decision
 
-Build one Go module `services/core` with internal packages `config`, `db`, `github`, `store`, `jobs`, `httpapi`, `obs`, `secure`. Build one image. The first argument selects the role (**Verified** `services/core/cmd/gitorgasm/main.go`):
+Build one Go module `core` with internal packages `config`, `db`, `github`, `store`, `jobs`, `httpapi`, `obs`, `secure`. Build one image. The first argument selects the role (**Verified** `core/cmd/gitorgasm/main.go`):
 
 - `api`: HTTP API on `:8080`, metrics on `:9090`.
 - `worker`: River job processing, metrics and probes on `:9090`.

@@ -6,9 +6,9 @@ This document selects a language per logical service. It uses measured benchmark
 
 | Service | Language | State |
 |---|---|---|
-| core api | Go | **Verified** implemented: `services/core` (`api` role) |
-| worker / sync | Go | **Verified** implemented: `services/core` (`worker` role) |
-| webhook ingest | Go (inside core api) | **Verified** implemented: `POST /webhooks/github` in `services/core/internal/httpapi/orgs.go` |
+| core api | Go | **Verified** implemented: `core` (`api` role) |
+| worker / sync | Go | **Verified** implemented: `core` (`worker` role) |
+| webhook ingest | Go (inside core api) | **Verified** implemented: `POST /webhooks/github` in `core/internal/httpapi/orgs.go` |
 | operations (bulk mutations) | Go (inside core worker) | Planned, Stage 4 |
 | scoring engine | Rust | **Hypothesis**. Planned, Stage 5. Re-verify before building (section 5). |
 | analytics | Go + SQL rollups | Planned, Stage 5+ |
@@ -90,9 +90,9 @@ Scale: ++ strong advantage, + advantage, 0 neutral, − disadvantage. Each cell 
 
 Library facts:
 
-- River: Go only. **Verified**: `github.com/riverqueue/river` in `services/core/go.mod`. No Rust client exists in that project (**Assumption** from the repository contents).
-- GitHub clients: `go-github` (Go) and `octocrab` (Rust) both exist. **Decision**: Gitorgasm uses a narrow hand-written client for the endpoints it needs (D12, `services/core/internal/github/client.go`), so library maturity matters less.
-- Database: Gitorgasm uses `pgx/v5` with hand-written SQL in one package (`services/core/internal/store/store.go`). `sqlc` is an option, not used. Rust would use SQLx.
+- River: Go only. **Verified**: `github.com/riverqueue/river` in `core/go.mod`. No Rust client exists in that project (**Assumption** from the repository contents).
+- GitHub clients: `go-github` (Go) and `octocrab` (Rust) both exist. **Decision**: Gitorgasm uses a narrow hand-written client for the endpoints it needs (D12, `core/internal/github/client.go`), so library maturity matters less.
+- Database: Gitorgasm uses `pgx/v5` with hand-written SQL in one package (`core/internal/store/store.go`). `sqlc` is an option, not used. Rust would use SQLx.
 
 ## 4. Polyglot rules
 
@@ -101,11 +101,11 @@ These rules apply when the first non-Go service exists. They apply now to any ne
 | Topic | Rule |
 |---|---|
 | Boundaries | One service owns a domain's tables for writing. Other services read through views or documented tables only. Scoring writes `computed_scores` and reads `signals`. |
-| Contract format | Postgres tables and job rows are the contract between core and scoring. Schema changes go through the goose migrations in `services/core/internal/db/migrations`. If a synchronous RPC is ever needed: ConnectRPC with protobuf (D6). Public API: OpenAPI `contracts/openapi/v1.yaml`. |
+| Contract format | Postgres tables and job rows are the contract between core and scoring. Schema changes go through the goose migrations in `core/internal/db/migrations`. If a synchronous RPC is ever needed: ConnectRPC with protobuf (D6). Public API: OpenAPI `contracts/openapi/v1.yaml`. |
 | Serialization | JSON in `jsonb` and job args. Field names `snake_case`. Unknown fields are ignored by readers. Fields are added, never renamed or retyped in place. Integers that may exceed 2^53 travel as strings in JSON. |
 | Compatibility | Expand then contract: add the column or field, deploy readers, deploy writers, remove old fields one release later. Every job row carries a `version` in args when its shape changes. |
 | Job handoff | Core enqueues work for scoring as rows the Rust service can claim with `SELECT … FOR UPDATE SKIP LOCKED`, or as a simple jobs table. Rust does not link the River client. |
-| Logging | JSON to stdout. Keys: `time`, `level`, `msg`, `service`, `component`, `app_version`, `request_id`, `trace_id`, `span_id`. Same as `services/core/internal/obs/obs.go` and `cmd/gitorgasm/main.go`. |
+| Logging | JSON to stdout. Keys: `time`, `level`, `msg`, `service`, `component`, `app_version`, `request_id`, `trace_id`, `span_id`. Same as `core/internal/obs/obs.go` and `cmd/gitorgasm/main.go`. |
 | Tracing | W3C Trace Context. OTLP/HTTP export only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. Job rows carry `traceparent` in metadata so a job span links to its request span (Planned). |
 | Metrics | Prometheus on `:9090`, prefix `gitorgasm_`, labels with bounded cardinality. |
 | Health | `/healthz`: process alive, no dependency check. `/readyz`: Postgres reachable. Same semantics as `obs.MetricsServer` and `httpapi.Server`. |

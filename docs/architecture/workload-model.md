@@ -24,16 +24,16 @@ This document estimates GitHub request counts, rate-budget use, database size, a
 
 **Verified** consequence: each installation has its own primary budget. More orgs add more budget. They do not share it.
 
-**Assumption**: the requests made with the App JWT (`GET /app/installations/{id}`, `POST /app/installations/{id}/access_tokens`) do not count against an installation's budget. The docs page above does not state the JWT budget. Gitorgasm caches installation tokens until 5 min before expiry (**Verified**: `services/core/internal/github/client.go`, `installationToken`), so JWT calls are at most about 1 per installation per hour plus 1 per sync.
+**Assumption**: the requests made with the App JWT (`GET /app/installations/{id}`, `POST /app/installations/{id}/access_tokens`) do not count against an installation's budget. The docs page above does not state the JWT budget. Gitorgasm caches installation tokens until 5 min before expiry (**Verified**: `core/internal/github/client.go`, `installationToken`), so JWT calls are at most about 1 per installation per hour plus 1 per sync.
 
 ### 1.2 Current code behavior
 
 | Fact | Source |
 |---|---|
-| Repository sync lists `GET /installation/repositories?per_page=100` and follows `Link` pages. | **Verified**: `services/core/internal/github/client.go` (`ListInstallationRepositories`) |
-| One full sync = 1 `GET /app/installations/{id}` (JWT) + 0 or 1 token mint (JWT) + `ceil(repos/100)` pages (installation token). | **Verified**: `services/core/internal/jobs/jobs.go` (`SyncWorker.Work`) |
-| Login = token exchange on `github.com` + `GET /user` + `ceil(installations/100)` pages of `GET /user/installations` (user token). It enqueues one sync per installation. | **Verified**: `services/core/internal/httpapi/auth.go` (`callback`) |
-| Reconcile enqueues one sync per active installation every `RECONCILE_INTERVAL` (default `6h`), also on worker start. | **Verified**: `jobs.ReconcileWorker`, `services/core/internal/config/config.go` |
+| Repository sync lists `GET /installation/repositories?per_page=100` and follows `Link` pages. | **Verified**: `core/internal/github/client.go` (`ListInstallationRepositories`) |
+| One full sync = 1 `GET /app/installations/{id}` (JWT) + 0 or 1 token mint (JWT) + `ceil(repos/100)` pages (installation token). | **Verified**: `core/internal/jobs/jobs.go` (`SyncWorker.Work`) |
+| Login = token exchange on `github.com` + `GET /user` + `ceil(installations/100)` pages of `GET /user/installations` (user token). It enqueues one sync per installation. | **Verified**: `core/internal/httpapi/auth.go` (`callback`) |
+| Reconcile enqueues one sync per active installation every `RECONCILE_INTERVAL` (default `6h`), also on worker start. | **Verified**: `jobs.ReconcileWorker`, `core/internal/config/config.go` |
 | Worker concurrency: `WORKER_CONCURRENCY` default 4, applied to both the `default` and `github` queues per replica. | **Verified**: `config.go`, `jobs.NewWorkerClient` |
 | Database pool: `DB_MAX_CONNS` default 10 per process in code, 8 in the production ConfigMap. | **Verified**: `config.go`, `deploy/kustomize/base/config.yaml` |
 | Webhook events that cause work: `installation`, `installation_repositories`, `repository` (each enqueues a full installation sync), `github_app_authorization` revoked (deletes the user's sessions and grants via `store.RevokeGitHubUser`). | **Verified**: `jobs.WebhookWorker.apply` |
@@ -41,7 +41,7 @@ This document estimates GitHub request counts, rate-budget use, database size, a
 
 ### 1.3 Sync deduplication and serialization
 
-**Verified** (`services/core/internal/jobs/jobs.go`): `SyncInstallationArgs.InsertOpts` sets `UniqueOpts{ByArgs: true, ByPeriod: time.Minute}`. River keeps at most one `sync_installation` job per installation per 1-minute window. A webhook that arrives during a running sync falls into a later window and queues one follow-up pass. `SyncWorker` takes a session advisory lock `pg_try_advisory_lock(hashtextextended('gitorgasm:sync_installation:' || installation_id, 0))` for the whole pass. If another pass holds the lock, the job snoozes 30 s. So at most one pass runs per installation at a time.
+**Verified** (`core/internal/jobs/jobs.go`): `SyncInstallationArgs.InsertOpts` sets `UniqueOpts{ByArgs: true, ByPeriod: time.Minute}`. River keeps at most one `sync_installation` job per installation per 1-minute window. A webhook that arrives during a running sync falls into a later window and queues one follow-up pass. `SyncWorker` takes a session advisory lock `pg_try_advisory_lock(hashtextextended('gitorgasm:sync_installation:' || installation_id, 0))` for the whole pass. If another pass holds the lock, the job snoozes 30 s. So at most one pass runs per installation at a time.
 
 **Verified** (River source): without `ByPeriod`, the default unique states include `completed`, and completed jobs stay for 24 h (`river@v0.49.0/insert_opts.go`, `rivershared@v0.49.0/riversharedmaintenance`). The code comment in `jobs.go` records why `ByPeriod` is set.
 
@@ -142,7 +142,7 @@ Legacy runs 4 GraphQL query families per repository with up to 20 pages each (**
 
 ## 4. Database size estimates
 
-Row sizes are **Assumption** (column widths in `services/core/internal/db/migrations/00001_core.sql` plus about 30% index overhead).
+Row sizes are **Assumption** (column widths in `core/internal/db/migrations/00001_core.sql` plus about 30% index overhead).
 
 | Table | Row size (est.) | 10 repos | 1,000 repos | 10,000 repos × 10 orgs |
 |---|---|---|---|---|
@@ -174,9 +174,9 @@ CPU is not a bottleneck at any listed scale (**Verified** micro-benchmarks in `t
 
 | Metric | How measured now | Status |
 |---|---|---|
-| API latency p50/p95/p99 per route | `histogram_quantile` over `gitorgasm_http_request_duration_seconds{route}` (buckets 5 ms to 5 s) | **Verified**: `services/core/internal/httpapi/server.go` |
+| API latency p50/p95/p99 per route | `histogram_quantile` over `gitorgasm_http_request_duration_seconds{route}` (buckets 5 ms to 5 s) | **Verified**: `core/internal/httpapi/server.go` |
 | API request rate and error rate | `gitorgasm_http_requests_total{route,method,status}` | **Verified**: `httpapi/server.go` |
-| GitHub request rate and errors per operation | `gitorgasm_github_requests_total{operation,status}` | **Verified**: `services/core/internal/github/client.go` |
+| GitHub request rate and errors per operation | `gitorgasm_github_requests_total{operation,status}` | **Verified**: `core/internal/github/client.go` |
 | Rate budget remaining | `gitorgasm_github_rate_limit_remaining{credential}` from `x-ratelimit-remaining` | **Verified**: `github/client.go`. Per-installation labels: check label cardinality before Stage 3. |
 | Rate budget reset time and used fraction | Not exported | Planned: gauge from `x-ratelimit-reset` and `x-ratelimit-limit` |
 | Queue depth per queue and state | Not exported. Manual: `SELECT queue, state, count(*) FROM river_job GROUP BY 1,2` | Planned: River event subscription or SQL exporter |

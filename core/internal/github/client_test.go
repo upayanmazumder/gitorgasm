@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/config"
+	"github.com/upayanmazumder/gitorgasm/core/internal/config"
 )
 
 func TestClassifyRateLimits(t *testing.T) {

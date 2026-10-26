@@ -22,11 +22,11 @@ import (
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/riverqueue/river/rivertest"
 
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/config"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/github"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/jobs"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/store"
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/testdb"
+	"github.com/upayanmazumder/gitorgasm/core/internal/config"
+	"github.com/upayanmazumder/gitorgasm/core/internal/github"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs"
+	"github.com/upayanmazumder/gitorgasm/core/internal/store"
+	"github.com/upayanmazumder/gitorgasm/core/internal/testdb"
 )
 
 const instID = 10

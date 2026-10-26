@@ -2,8 +2,8 @@
 * @upayanmazumder
 
 # Security-sensitive paths. Review these with extra care.
-/services/core/internal/httpapi/auth.go   @upayanmazumder
-/services/core/internal/secure/           @upayanmazumder
-/services/core/internal/db/migrations/    @upayanmazumder
+/core/internal/httpapi/auth.go   @upayanmazumder
+/core/internal/secure/           @upayanmazumder
+/core/internal/db/migrations/    @upayanmazumder
 /deploy/                                  @upayanmazumder
 /.github/workflows/                       @upayanmazumder

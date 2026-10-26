@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/upayanmazumder/gitorgasm/services/core/internal/github"
+	"github.com/upayanmazumder/gitorgasm/core/internal/github"
 )
 
 // ErrNotFound is returned when a row does not exist or is not visible to the caller.

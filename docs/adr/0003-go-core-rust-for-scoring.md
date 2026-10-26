@@ -18,10 +18,10 @@ Per page of 100 repositories, parse cost is about 0.5 ms (Go) or 0.2 ms (Rust) (
 
 ## Decision
 
-- Use Go for `services/core` (API, jobs, GitHub client). Reasons: the workload is I/O-bound. River (Postgres-backed durable queue with transactional enqueue, ADR 0005) exists only for Go. The standard library HTTP stack is strong. Builds are fast. Contributors from the TypeScript legacy can learn it quickly.
-- Reserve Rust for `services/scoring` (**Planned**, Stage 5): the leaderboard scoring engine. Scoring is CPU-bound aggregation, where Rust took about 40–50% of the Go time and allocated far less.
+- Use Go for `core` (API, jobs, GitHub client). Reasons: the workload is I/O-bound. River (Postgres-backed durable queue with transactional enqueue, ADR 0005) exists only for Go. The standard library HTTP stack is strong. Builds are fast. Contributors from the TypeScript legacy can learn it quickly.
+- Reserve Rust for `scoring` (**Planned**, Stage 5): the leaderboard scoring engine. Scoring is CPU-bound aggregation, where Rust took about 40–50% of the Go time and allocated far less.
 - The scoring service communicates only through PostgreSQL (reads signals, writes `computed_scores`, consumes job rows). No FFI. No synchronous Go-to-Rust calls.
-- Do not create `services/scoring` before Stage 5. An empty service would be fake scaffolding.
+- Do not create `scoring` before Stage 5. An empty service would be fake scaffolding.
 
 ## Consequences
 

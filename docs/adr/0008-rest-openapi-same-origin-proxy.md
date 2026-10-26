@@ -10,7 +10,7 @@ The frontend (ADR 0011) and possible future clients need a stable API. Session c
 ## Decision
 
 - REST with JSON under the versioned path `/v1`. The contract is OpenAPI 3.0 at `contracts/openapi/v1.yaml`. Tests validate real responses against it (kin-openapi).
-- Error body `{"error":{"code","message","request_id"}}` (**Verified** `services/core/internal/httpapi/server.go` `writeError`).
+- Error body `{"error":{"code","message","request_id"}}` (**Verified** `core/internal/httpapi/server.go` `writeError`).
 - Keyset pagination with an opaque cursor (**Verified** `internal/httpapi/orgs.go`).
 - Idempotency: sync requests are deduplicated by River unique jobs. Webhooks by `X-GitHub-Delivery`. **Planned** Stage 4: `Idempotency-Key` header for mutations. SSE for operation progress.
 - The Vercel app rewrites `/api/:path*` to `https://api-gitorgasm.upayan.dev/:path*` (**Planned** config). The browser sees one origin, so the session cookie is first-party and no CORS is needed.

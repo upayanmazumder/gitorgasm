@@ -6,14 +6,14 @@ Guide for coding agents and new engineers. Read [CONTRIBUTING.md](CONTRIBUTING.m
 
 | Path | What it is |
 |---|---|
-| `services/core` | Go module. One binary, three roles: `gitorgasm api`, `gitorgasm worker`, `gitorgasm migrate`. |
-| `services/core/internal/config` | Environment loading and validation. All variables are documented in `.env.example`. |
-| `services/core/internal/db` | pgx pool, goose migrations (`migrations/`), River migrations. |
-| `services/core/internal/github` | Narrow GitHub REST client. Every endpoint was checked against the pinned REST description. |
-| `services/core/internal/store` | All SQL. |
-| `services/core/internal/jobs` | River jobs: `sync_installation`, `process_webhook`, `reconcile_installations`. |
-| `services/core/internal/httpapi` | HTTP handlers and middleware. The contract is `contracts/openapi/v1.yaml`. |
-| `services/core/internal/testdb` | Gives each test an isolated, migrated database. |
+| `core` | Go module. One binary, three roles: `gitorgasm api`, `gitorgasm worker`, `gitorgasm migrate`. |
+| `core/internal/config` | Environment loading and validation. All variables are documented in `.env.example`. |
+| `core/internal/db` | pgx pool, goose migrations (`migrations/`), River migrations. |
+| `core/internal/github` | Narrow GitHub REST client. Every endpoint was checked against the pinned REST description. |
+| `core/internal/store` | All SQL. |
+| `core/internal/jobs` | River jobs: `sync_installation`, `process_webhook`, `reconcile_installations`. |
+| `core/internal/httpapi` | HTTP handlers and middleware. The contract is `contracts/openapi/v1.yaml`. |
+| `core/internal/testdb` | Gives each test an isolated, migrated database. |
 | `apps/web` | Next.js frontend (Vercel). It has its own `AGENTS.md`. |
 | `deploy/kustomize` | Kubernetes base and production overlay. |
 | `docs/architecture`, `docs/adr` | Architecture, audits, decisions. |
