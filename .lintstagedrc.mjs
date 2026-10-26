@@ -4,6 +4,7 @@
 //   *.rs          rustfmt (picks up the nearest rustfmt.toml)
 //   other files   Prettier (root .prettierrc)
 const quote = (files) => files.map((f) => JSON.stringify(f)).join(' ');
+const outsideWeb = (files) => files.filter((f) => !f.includes('/web/'));
 
 export default {
   'web/**/*.{ts,tsx,js,mjs,cjs}': (files) => [
@@ -15,6 +16,10 @@ export default {
   '**/*.go': (files) =>
     `go run golang.org/x/tools/cmd/goimports@v0.52.0 -local github.com/upayanmazumder/gitorgasm -w ${quote(files)}`,
   '**/*.rs': (files) => `rustfmt --edition 2024 ${quote(files)}`,
-  '!(web)/**/*.{md,yml,yaml,json}': 'prettier --write --ignore-unknown',
-  '*.{md,yml,yaml,json,mjs}': 'prettier --write --ignore-unknown',
+  // One glob for everything else. Globs without a slash match at any depth, so web/ files are
+  // filtered out here and never formatted twice with two different configs.
+  '*.{md,yml,yaml,json,mjs}': (files) => {
+    const rest = outsideWeb(files);
+    return rest.length ? `prettier --write --ignore-unknown ${quote(rest)}` : [];
+  },
 };
