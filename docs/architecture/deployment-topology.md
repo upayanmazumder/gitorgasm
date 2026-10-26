@@ -10,7 +10,7 @@ Status date: 2026-10-26. Labels: **Verified** (with source), **Assumption**, **D
 
 ```mermaid
 flowchart TB
-  user((Browser)) -->|HTTPS gitorgasm.vercel.app| vercel[Vercel Hobby<br/>apps/web Next.js]
+  user((Browser)) -->|HTTPS gitorgasm.vercel.app| vercel[Vercel Hobby<br/>web Next.js]
   vercel -->|same-origin rewrite /api/* → https://api-gitorgasm.upayan.dev/*<br/>Planned| cf
   gh[(GitHub<br/>api.github.com)] -->|webhooks POST /webhooks/github| cf[Cloudflare proxy<br/>DNS + Origin CA *.upayan.dev]
   cf -->|:443| traefik[Traefik<br/>kube-system, entrypoint websecure]
@@ -45,16 +45,16 @@ flowchart TB
 
 **Verified** in `deploy/kustomize/base/*.yaml` and `overlays/production/*.yaml`. All objects carry the label `app.kubernetes.io/name` (`api`, `worker`, `postgres`) and `app.kubernetes.io/part-of: gitorgasm`.
 
-| Object | Role | Command | Ports | Probes |
-| --- | --- | --- | --- | --- |
-| Deployment `api` | HTTP API, OAuth, webhooks | `/gitorgasm api` | 8080 `http`, 9090 `metrics` | startup `GET /healthz` (2 s × 30), liveness `GET /healthz` (20 s), readiness `GET /readyz` (5 s, 2 failures) |
-| initContainer `migrate` on `api` | goose + River migrations | `/gitorgasm migrate` | none | none |
-| Deployment `worker` | River jobs (sync, webhooks, reconcile) | `/gitorgasm worker` | 9090 `metrics` | liveness `GET /healthz :9090` (20 s), readiness `GET /readyz :9090` (10 s) |
-| StatefulSet `postgres` | only stateful store | `postgres:18-alpine` | 5432 | readiness and liveness `pg_isready -U gitorgasm -d gitorgasm` |
-| Service `api` | ClusterIP | n/a | 80 → `http` | n/a |
-| Service `postgres` | headless | n/a | 5432 | n/a |
-| Ingress `api` (production overlay) | host `api-gitorgasm.upayan.dev`, paths `/v1` (Prefix) and `/webhooks/github` (Exact) | n/a | 443 → Service `api` `http` | n/a |
-| PersistentVolume `gitorgasm-postgres-vps` (production overlay) | 2Gi, `Retain`, hostPath `/srv/data/gitorgasm-postgres` (type `Directory`), node affinity `vps` | n/a | n/a | n/a |
+| Object                                                         | Role                                                                                           | Command              | Ports                       | Probes                                                                                                       |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | -------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Deployment `api`                                               | HTTP API, OAuth, webhooks                                                                      | `/gitorgasm api`     | 8080 `http`, 9090 `metrics` | startup `GET /healthz` (2 s × 30), liveness `GET /healthz` (20 s), readiness `GET /readyz` (5 s, 2 failures) |
+| initContainer `migrate` on `api`                               | goose + River migrations                                                                       | `/gitorgasm migrate` | none                        | none                                                                                                         |
+| Deployment `worker`                                            | River jobs (sync, webhooks, reconcile)                                                         | `/gitorgasm worker`  | 9090 `metrics`              | liveness `GET /healthz :9090` (20 s), readiness `GET /readyz :9090` (10 s)                                   |
+| StatefulSet `postgres`                                         | only stateful store                                                                            | `postgres:18-alpine` | 5432                        | readiness and liveness `pg_isready -U gitorgasm -d gitorgasm`                                                |
+| Service `api`                                                  | ClusterIP                                                                                      | n/a                  | 80 → `http`                 | n/a                                                                                                          |
+| Service `postgres`                                             | headless                                                                                       | n/a                  | 5432                        | n/a                                                                                                          |
+| Ingress `api` (production overlay)                             | host `api-gitorgasm.upayan.dev`, paths `/v1` (Prefix) and `/webhooks/github` (Exact)           | n/a                  | 443 → Service `api` `http`  | n/a                                                                                                          |
+| PersistentVolume `gitorgasm-postgres-vps` (production overlay) | 2Gi, `Retain`, hostPath `/srv/data/gitorgasm-postgres` (type `Directory`), node affinity `vps` | n/a                  | n/a                         | n/a                                                                                                          |
 
 **Verified** (code): one image serves all roles (`core/cmd/gitorgasm/main.go`, `core/Dockerfile`, `ENTRYPOINT ["/gitorgasm"]`). The image is distroless static and runs as UID 65532. The worker refuses to start without the `GITHUB_*` configuration. The API starts without it and returns 503 `github_not_configured` on auth, sync, and webhook routes.
 
@@ -68,14 +68,14 @@ flowchart TB
 
 **Verified** `deploy/kustomize/base/networkpolicies.yaml`:
 
-| Policy | Selects | Allows |
-| --- | --- | --- |
-| `default-deny` | all pods | nothing (ingress and egress) |
-| `allow-dns-egress` | all pods | egress UDP/TCP 53 to pods `k8s-app=kube-dns` in `kube-system` |
-| `api-ingress` | `api` | ingress TCP 8080 from pods `app.kubernetes.io/name=traefik` in `kube-system` |
-| `metrics-ingress` | `api`, `worker` | ingress TCP 9090 from namespace `monitoring` |
-| `core-egress` | `api`, `worker` | egress TCP 5432 to `postgres`. Egress TCP 443 to `0.0.0.0/0` except `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `100.64.0.0/10`, `169.254.0.0/16` |
-| `postgres-ingress` | `postgres` | ingress TCP 5432 from `api` (includes the `migrate` initContainer) and `worker` |
+| Policy             | Selects         | Allows                                                                                                                                                 |
+| ------------------ | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `default-deny`     | all pods        | nothing (ingress and egress)                                                                                                                           |
+| `allow-dns-egress` | all pods        | egress UDP/TCP 53 to pods `k8s-app=kube-dns` in `kube-system`                                                                                          |
+| `api-ingress`      | `api`           | ingress TCP 8080 from pods `app.kubernetes.io/name=traefik` in `kube-system`                                                                           |
+| `metrics-ingress`  | `api`, `worker` | ingress TCP 9090 from namespace `monitoring`                                                                                                           |
+| `core-egress`      | `api`, `worker` | egress TCP 5432 to `postgres`. Egress TCP 443 to `0.0.0.0/0` except `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `100.64.0.0/10`, `169.254.0.0/16` |
+| `postgres-ingress` | `postgres`      | ingress TCP 5432 from `api` (includes the `migrate` initContainer) and `worker`                                                                        |
 
 **Decision**: egress to GitHub uses public IP ranges, not GitHub's published ranges. NetworkPolicy has no FQDN rule, and the GitHub ranges change.
 
@@ -87,13 +87,13 @@ flowchart TB
 
 Source for capacity: `docs/architecture/cluster-audit.md` §2 and §8 (**Verified** on 2026-10-26). Values below are **Verified** in the manifests.
 
-| Workload | Replicas | CPU req | CPU limit | Mem req | Mem limit | Notes |
-| --- | --- | --- | --- | --- | --- | --- |
-| api | 1 | 50m | 500m | 128Mi | 256Mi | `GOMEMLIMIT=200MiB`, `DB_MAX_CONNS=8` |
-| migrate (init) | per api pod start | 20m | 500m | 32Mi | 128Mi | runs to completion before `api` starts. Lower than app requests, so it adds nothing to the pod sum |
-| worker | 1 | 50m | 500m | 128Mi | 256Mi | `GOMEMLIMIT=200MiB`, `DB_MAX_CONNS=8`, `WORKER_CONCURRENCY=4` |
-| postgres | 1 | 100m | 1000m | 256Mi | 512Mi | `shared_buffers=64MB`, `max_connections=40`, `work_mem=4MB`, `log_min_duration_statement=500ms` |
-| **Total** | | **200m** | 2000m | **512Mi** | 1024Mi | |
+| Workload       | Replicas          | CPU req  | CPU limit | Mem req   | Mem limit | Notes                                                                                              |
+| -------------- | ----------------- | -------- | --------- | --------- | --------- | -------------------------------------------------------------------------------------------------- |
+| api            | 1                 | 50m      | 500m      | 128Mi     | 256Mi     | `GOMEMLIMIT=200MiB`, `DB_MAX_CONNS=8`                                                              |
+| migrate (init) | per api pod start | 20m      | 500m      | 32Mi      | 128Mi     | runs to completion before `api` starts. Lower than app requests, so it adds nothing to the pod sum |
+| worker         | 1                 | 50m      | 500m      | 128Mi     | 256Mi     | `GOMEMLIMIT=200MiB`, `DB_MAX_CONNS=8`, `WORKER_CONCURRENCY=4`                                      |
+| postgres       | 1                 | 100m     | 1000m     | 256Mi     | 512Mi     | `shared_buffers=64MB`, `max_connections=40`, `work_mem=4MB`, `log_min_duration_statement=500ms`    |
+| **Total**      |                   | **200m** | 2000m     | **512Mi** | 1024Mi    |                                                                                                    |
 
 Fit (**Verified** inputs, arithmetic here):
 
@@ -130,12 +130,12 @@ Source: `cluster-audit.md` §4 (**Verified** cluster conventions) and `deploy/ku
 
 ## 5. Environments
 
-| Environment | State | Where |
-| --- | --- | --- |
-| local | **Verified**: `compose.yaml` (postgres:18-alpine on 127.0.0.1:55432, migrate, api, worker under profile `github`). `make up`, `make up-github`, `make smoke` | developer machine |
-| CI | **Verified**: `.github/workflows/ci.yml` job `core` runs `go test -race` with a `postgres:18` service container | GitHub Actions |
-| production | **Verified** manifests in `overlays/production`. Deploy **Planned** Stage 1.5 | namespace `gitorgasm` on node `vps`, API host `api-gitorgasm.upayan.dev`, frontend origin `https://gitorgasm.vercel.app` |
-| staging | **Proposal**, not now | namespace `gitorgasm-staging` on the same node |
+| Environment | State                                                                                                                                                        | Where                                                                                                                    |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| local       | **Verified**: `compose.yaml` (postgres:18-alpine on 127.0.0.1:55432, migrate, api, worker under profile `github`). `make up`, `make up-github`, `make smoke` | developer machine                                                                                                        |
+| CI          | **Verified**: `.github/workflows/ci.yml` job `core` runs `go test -race` with a `postgres:18` service container                                              | GitHub Actions                                                                                                           |
+| production  | **Verified** manifests in `overlays/production`. Deploy **Planned** Stage 1.5                                                                                | namespace `gitorgasm` on node `vps`, API host `api-gitorgasm.upayan.dev`, frontend origin `https://gitorgasm.vercel.app` |
+| staging     | **Proposal**, not now                                                                                                                                        | namespace `gitorgasm-staging` on the same node                                                                           |
 
 **Verified** (`overlays/production/config.yaml`): `APP_ORIGIN=https://gitorgasm.vercel.app` and `GITHUB_OAUTH_CALLBACK_URL=https://gitorgasm.vercel.app/api/v1/auth/callback`. The callback goes through the Vercel rewrite, so the oauth cookie stays on the frontend origin.
 
@@ -164,10 +164,10 @@ Risk R20 in `risk-register.md` tracks this decision.
 
 **Verified** (`deploy/kustomize/README.md`, `base/api.yaml`, `base/postgres.yaml`): the cluster repository provides two Secrets, encrypted with SOPS and age. They are not in this repository.
 
-| Secret | Keys | Used by |
-| --- | --- | --- |
-| `gitorgasm-core` | `DATABASE_URL`, `TOKEN_ENCRYPTION_KEY` (base64, 32 bytes), `GITHUB_APP_ID`, `GITHUB_APP_SLUG`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` | api and worker (`envFrom`), migrate (`DATABASE_URL` only) |
-| `gitorgasm-postgres` | `POSTGRES_PASSWORD` | postgres |
+| Secret               | Keys                                                                                                                                                                                     | Used by                                                   |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `gitorgasm-core`     | `DATABASE_URL`, `TOKEN_ENCRYPTION_KEY` (base64, 32 bytes), `GITHUB_APP_ID`, `GITHUB_APP_SLUG`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` | api and worker (`envFrom`), migrate (`DATABASE_URL` only) |
+| `gitorgasm-postgres` | `POSTGRES_PASSWORD`                                                                                                                                                                      | postgres                                                  |
 
 Non-secret values are in the ConfigMap `gitorgasm-core` (`base/config.yaml`, production overrides in `overlays/production/config.yaml`).
 

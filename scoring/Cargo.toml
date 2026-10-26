@@ -1,0 +1,23 @@
+[package]
+name = "gitorgasm-scoring"
+version = "0.1.0"
+description = "Gitorgasm contributor scoring engine (port of the legacy GH Org Tool scoring)"
+license = "MIT"
+publish = false
+rust-version = "1.88"
+edition = "2024"
+
+[dependencies]
+chrono = { version = "0.4.45", default-features = false, features = ["std"] }
+serde = { version = "1.0.229", features = ["derive"] }
+
+[dev-dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = { version = "1.0.154", features = ["float_roundtrip"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }

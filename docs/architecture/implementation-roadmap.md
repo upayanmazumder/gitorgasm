@@ -29,21 +29,21 @@ Outcome: legacy data worth migrating is limited to scoring presets (186 rows, al
 
 ## Stage 1: Foundation — In progress (this bootstrap)
 
-| Item | Status at time of writing |
-| --- | --- |
-| Go core `core` with roles `api`, `worker`, `migrate` | **Verified** exists (`cmd/gitorgasm/main.go`) |
-| Schema migration `00001_core.sql`, River migrations | **Verified** exists (`internal/db`) |
-| GitHub App login (state + PKCE), sessions, sealed tokens | **Verified** exists (`internal/httpapi/auth.go`, `internal/secure`) |
-| `GET /v1/me`, `/v1/organizations`, repositories (keyset), `POST …/sync`, `POST /webhooks/github` | **Verified** routes in `internal/httpapi/server.go` |
-| Jobs `sync_installation` (unique by args per 1 minute, 64-bit advisory lock per installation), `process_webhook`, `reconcile_installations` | **Verified** `internal/jobs/jobs.go` |
-| App authorization revocation deletes sessions and grants | **Verified** `store.RevokeGitHubUser` |
-| OpenAPI contract `contracts/openapi/v1.yaml` with a shared `default` Error response on every non-probe operation | **Verified** exists |
-| Docker Compose local stack and Makefile (`up`, `up-github`, `down`, `db`, `smoke`, `fmt`, `lint`, `test`, `build`, `manifests`, `vuln`, `verify`) | **Verified** `compose.yaml`, `Makefile` |
-| `apps/web` from template (Next.js 16.2.11, pnpm 11.28.6 pinned by `packageManager`) | **Verified** `apps/web/package.json`. No API integration and no `/api` rewrite yet |
-| CI `.github/workflows/ci.yml`: jobs `core`, `web`, `bench`, `manifests`, `image` | **Verified** file exists. Not yet run on GitHub: the repository is not pushed |
-| Dependabot, CODEOWNERS, PR and issue templates | **Verified** `.github/` |
-| Kustomize `deploy/kustomize` (base + `overlays/production`) | **Verified** exists. The integrator validated the render with kustomize and kubeconform: 15 resources valid |
-| Architecture docs and ADRs | **Verified** `docs/architecture/`, `docs/adr/` |
+| Item                                                                                                                                              | Status at time of writing                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Go core `core` with roles `api`, `worker`, `migrate`                                                                                              | **Verified** exists (`cmd/gitorgasm/main.go`)                                                               |
+| Schema migration `00001_core.sql`, River migrations                                                                                               | **Verified** exists (`internal/db`)                                                                         |
+| GitHub App login (state + PKCE), sessions, sealed tokens                                                                                          | **Verified** exists (`internal/httpapi/auth.go`, `internal/secure`)                                         |
+| `GET /v1/me`, `/v1/organizations`, repositories (keyset), `POST …/sync`, `POST /webhooks/github`                                                  | **Verified** routes in `internal/httpapi/server.go`                                                         |
+| Jobs `sync_installation` (unique by args per 1 minute, 64-bit advisory lock per installation), `process_webhook`, `reconcile_installations`       | **Verified** `internal/jobs/jobs.go`                                                                        |
+| App authorization revocation deletes sessions and grants                                                                                          | **Verified** `store.RevokeGitHubUser`                                                                       |
+| OpenAPI contract `contracts/openapi/v1.yaml` with a shared `default` Error response on every non-probe operation                                  | **Verified** exists                                                                                         |
+| Docker Compose local stack and Makefile (`up`, `up-github`, `down`, `db`, `smoke`, `fmt`, `lint`, `test`, `build`, `manifests`, `vuln`, `verify`) | **Verified** `compose.yaml`, `Makefile`                                                                     |
+| `web` from template (Next.js 16.2.11, pnpm 11.28.6 pinned by `packageManager`)                                                                    | **Verified** `web/package.json`. No API integration and no `/api` rewrite yet                               |
+| CI `.github/workflows/ci.yml`: jobs `core`, `web`, `bench`, `manifests`, `image`                                                                  | **Verified** file exists. Not yet run on GitHub: the repository is not pushed                               |
+| Dependabot, CODEOWNERS, PR and issue templates                                                                                                    | **Verified** `.github/`                                                                                     |
+| Kustomize `deploy/kustomize` (base + `overlays/production`)                                                                                       | **Verified** exists. The integrator validated the render with kustomize and kubeconform: 15 resources valid |
+| Architecture docs and ADRs                                                                                                                        | **Verified** `docs/architecture/`, `docs/adr/`                                                              |
 
 Remaining to close Stage 1: push the repository, get a green CI run on `main`, and publish the first `core` image to GHCR.
 
@@ -67,7 +67,7 @@ Deliverables:
 - Cluster repository PR: `k8s/apps/gitorgasm`, Application, AppProject destination, SOPS Secrets `gitorgasm-core` and `gitorgasm-postgres`, backup target, changelog entry (`deployment-topology.md` §4).
 - Host directory `/srv/data/gitorgasm-postgres` owned by UID/GID 70.
 - GitHub App registration for Gitorgasm (new App, or reuse the legacy App with new callback and webhook URLs; decide at this stage). Callback `https://gitorgasm.vercel.app/api/v1/auth/callback`, webhook `https://api-gitorgasm.upayan.dev/webhooks/github`.
-- Vercel project for `apps/web` at `gitorgasm.vercel.app` with the rewrite `/api/:path*` → `https://api-gitorgasm.upayan.dev/:path*`. Login cannot work without it, because the callback URL is on the Vercel origin.
+- Vercel project for `web` at `gitorgasm.vercel.app` with the rewrite `/api/:path*` → `https://api-gitorgasm.upayan.dev/:path*`. Login cannot work without it, because the callback URL is on the Vercel origin.
 - DNS record `api-gitorgasm.upayan.dev` after owner approval.
 - Grafana dashboard and first alerts (`observability.md` §6). Restore runbook.
 
@@ -127,11 +127,13 @@ Risks: R6 (secondary limits on write endpoints), R10.
 
 ## Stage 5: Leaderboards
 
-Deliverables: signal ingest via GitHub GraphQL with cost accounting. Rust `scoring` that reads signals from Postgres and writes `computed_scores` (ADR 0003). Default scoring presets reseeded per installation, optional import from the legacy dump keyed on `(installation_id, name)`.
+Deliverables: signal ingest via GitHub GraphQL with cost accounting. A Rust scoring binary on top of the existing `scoring` crate that reads signals from Postgres and writes `computed_scores` (ADR 0003). Default scoring presets reseeded per installation, optional import from the legacy dump keyed on `(installation_id, name)`.
 
-Dependencies: Stage 3 (members). Re-run the language benchmark with legacy-shaped data before you create `scoring` (R15).
+Already done: the `scoring` crate with golden tests that match legacy `lib/scoring` bit for bit, and its CI job.
 
-Acceptance criteria: golden tests reproduce legacy `lib/scoring` results for fixed inputs. GraphQL point usage per sync is logged and stays inside budget. Rust CI job added.
+Dependencies: Stage 3 (members). Re-run the language benchmark with the crate and legacy-shaped data before you build the binary (R15).
+
+Acceptance criteria: golden tests stay green. GraphQL point usage per sync is logged and stays inside budget.
 
 Risks: R15, R6 (GraphQL 5,000 points/h). Infra: one more small Deployment (**Assumption**: ≤ 64Mi request, based on 3.7 MB idle RSS measured in `RESULTS.md`; not measured under load).
 

@@ -10,13 +10,13 @@ This document records the state of the legacy "GH Org Tool". Gitorgasm replaces 
 
 Each statement has one of these labels:
 
-| Label | Meaning |
-|---|---|
-| **Verified** | We read the code or ran a command. The evidence (file path, line, or command) follows the label. |
-| **Inference** | We reasoned from code plus documented GitHub, Supabase, or Upstash behavior. We did not observe it in production. |
-| **Assumption** | We believe it, but we have no direct evidence. |
-| **Decision** | A choice for Gitorgasm. |
-| **Proposal** | A recommendation that needs approval. |
+| Label          | Meaning                                                                                                           |
+| -------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **Verified**   | We read the code or ran a command. The evidence (file path, line, or command) follows the label.                  |
+| **Inference**  | We reasoned from code plus documented GitHub, Supabase, or Upstash behavior. We did not observe it in production. |
+| **Assumption** | We believe it, but we have no direct evidence.                                                                    |
+| **Decision**   | A choice for Gitorgasm.                                                                                           |
+| **Proposal**   | A recommendation that needs approval.                                                                             |
 
 Method:
 
@@ -28,34 +28,34 @@ Line numbers refer to the legacy `main` branch at commit `1b166a4`.
 
 ## 1. Repository facts
 
-| Fact | Value | Evidence |
-|---|---|---|
-| Current branch | `main` at `1b166a4` ("Merge pull request #147 from upayanmazumder/main") | **Verified**: `git log --oneline -5` |
-| Commit count on `HEAD` | 398 | **Verified**: `git rev-list --count HEAD` |
-| First and last commit dates | 2026-02-26 to 2026-09-14 | **Verified**: `git log --format=%ad --date=short` |
-| Remotes | `origin` = `github.com/upayanmazumder/gh-org-tool`, `upstream` = `github.com/CodeChefVIT/gh-org-tool`, `Taksh-Singhal` = `github.com/taksh-singhal/gh-org-tool` | **Verified**: `git remote -v` |
-| Local branches | `main`, `design`, `design-01`, `design-tokens`, `docs/agent-docs-mcp-integration`, `docs/github-api-grounding`, `fix/pullrequest-databaseid-deprecation` | **Verified**: `git branch -a` |
-| Top authors | Upayan (199), Gslmao (49), Harshil Maheshwari (45), Upayan Mazumder (27), Rewansh Choudhary (23), dependabot (16) | **Verified**: `git shortlog -sn HEAD` |
-| Tracked files | 534 | **Verified**: `git ls-files \| wc -l` |
-| TypeScript lines (tracked) | 34,639 total. `components/` has 15,200, of which `components/ui/` (shadcn) has 6,351. `app/` + `lib/` + `hooks/` have about 18,100. | **Verified**: `wc -l` |
-| API route files | **38**, not 37 as `AGENTS.md` says | **Verified**: `find app -name route.ts` |
-| Test files | 8, not 4 as `AGENTS.md` says | **Verified**: `git ls-files '*.test.ts'` |
-| Docs pages | 45 MDX files in `content/`, served by Nextra at `/docs` | **Verified**: `ls content -R` |
-| Untracked env files in the working tree | `.env`, `.env.production`, `.env.staging`. They are git-ignored (`.gitignore:40`). We did not read them. | **Verified**: `git ls-files` shows none |
+| Fact                                    | Value                                                                                                                                                           | Evidence                                          |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Current branch                          | `main` at `1b166a4` ("Merge pull request #147 from upayanmazumder/main")                                                                                        | **Verified**: `git log --oneline -5`              |
+| Commit count on `HEAD`                  | 398                                                                                                                                                             | **Verified**: `git rev-list --count HEAD`         |
+| First and last commit dates             | 2026-02-26 to 2026-09-14                                                                                                                                        | **Verified**: `git log --format=%ad --date=short` |
+| Remotes                                 | `origin` = `github.com/upayanmazumder/gh-org-tool`, `upstream` = `github.com/CodeChefVIT/gh-org-tool`, `Taksh-Singhal` = `github.com/taksh-singhal/gh-org-tool` | **Verified**: `git remote -v`                     |
+| Local branches                          | `main`, `design`, `design-01`, `design-tokens`, `docs/agent-docs-mcp-integration`, `docs/github-api-grounding`, `fix/pullrequest-databaseid-deprecation`        | **Verified**: `git branch -a`                     |
+| Top authors                             | Upayan (199), Gslmao (49), Harshil Maheshwari (45), Upayan Mazumder (27), Rewansh Choudhary (23), dependabot (16)                                               | **Verified**: `git shortlog -sn HEAD`             |
+| Tracked files                           | 534                                                                                                                                                             | **Verified**: `git ls-files \| wc -l`             |
+| TypeScript lines (tracked)              | 34,639 total. `components/` has 15,200, of which `components/ui/` (shadcn) has 6,351. `app/` + `lib/` + `hooks/` have about 18,100.                             | **Verified**: `wc -l`                             |
+| API route files                         | **38**, not 37 as `AGENTS.md` says                                                                                                                              | **Verified**: `find app -name route.ts`           |
+| Test files                              | 8, not 4 as `AGENTS.md` says                                                                                                                                    | **Verified**: `git ls-files '*.test.ts'`          |
+| Docs pages                              | 45 MDX files in `content/`, served by Nextra at `/docs`                                                                                                         | **Verified**: `ls content -R`                     |
+| Untracked env files in the working tree | `.env`, `.env.production`, `.env.staging`. They are git-ignored (`.gitignore:40`). We did not read them.                                                        | **Verified**: `git ls-files` shows none           |
 
 ### 1.1 Vercel
 
-| Fact | Value | Evidence |
-|---|---|---|
-| CLI identity | `upayanmazumder`, team scope `upayan` | **Verified**: `vercel whoami` |
-| Project | `gh-org-tool`, ID `prj_y0ACVp8W1mVZt6AJjxe3XS3zaBuW`, Next.js preset, Node 24.x, root `.` | **Verified**: `vercel project inspect gh-org-tool` |
-| Production URL | `https://gh-org-tool.upayan.dev` | **Verified**: `vercel project ls` |
-| Last deployments | 3 Production and 2 Preview deployments 20 days ago, all "Ready". Older ones show `UNKNOWN`. | **Verified**: `vercel ls gh-org-tool` |
-| Env var names (Preview + Production) | `VERCEL_DEEP_CLONE`, `REDIS_CACHE_PREFIX`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `TOKEN_ENCRYPTION_KEY`, `GITHUB_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `NODE_ENV`, `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_APP_NAME`, `NEXT_PUBLIC_APP_URL`, `AUTH_SESSION_SECRET`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`, `CRON_SECRET` | **Verified**: `vercel env ls --project gh-org-tool` (names only) |
-| `vercel link` | Not needed and not done. `--project` gave read access. The legacy repo has no `.vercel/` directory. | **Verified**: `ls -d .vercel` fails |
-| `CRON_SECRET` | Set in Vercel, but no code reads it and no `vercel.json` exists. No cron job runs. | **Verified**: grep for `CRON_SECRET` finds nothing in code |
-| `ENABLE_DEBUG_ROUTES` | Not set in Vercel. Debug routes return 403 in production. | **Verified**: env list, `lib/auth/debug.ts:8-13` |
-| `maxDuration = 300` | Two routes set it. Hobby plan caps functions at 60 s. | **Verified**: `app/api/[organization]/leaderboard/score/route.ts:31`, `.../recompute/route.ts:19`. Plan tier is an **Assumption**. |
+| Fact                                 | Value                                                                                                                                                                                                                                                                                                                                                                                                                                    | Evidence                                                                                                                           |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| CLI identity                         | `upayanmazumder`, team scope `upayan`                                                                                                                                                                                                                                                                                                                                                                                                    | **Verified**: `vercel whoami`                                                                                                      |
+| Project                              | `gh-org-tool`, ID `prj_y0ACVp8W1mVZt6AJjxe3XS3zaBuW`, Next.js preset, Node 24.x, root `.`                                                                                                                                                                                                                                                                                                                                                | **Verified**: `vercel project inspect gh-org-tool`                                                                                 |
+| Production URL                       | `https://gh-org-tool.upayan.dev`                                                                                                                                                                                                                                                                                                                                                                                                         | **Verified**: `vercel project ls`                                                                                                  |
+| Last deployments                     | 3 Production and 2 Preview deployments 20 days ago, all "Ready". Older ones show `UNKNOWN`.                                                                                                                                                                                                                                                                                                                                              | **Verified**: `vercel ls gh-org-tool`                                                                                              |
+| Env var names (Preview + Production) | `VERCEL_DEEP_CLONE`, `REDIS_CACHE_PREFIX`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `TOKEN_ENCRYPTION_KEY`, `GITHUB_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `NODE_ENV`, `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_APP_NAME`, `NEXT_PUBLIC_APP_URL`, `AUTH_SESSION_SECRET`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`, `CRON_SECRET` | **Verified**: `vercel env ls --project gh-org-tool` (names only)                                                                   |
+| `vercel link`                        | Not needed and not done. `--project` gave read access. The legacy repo has no `.vercel/` directory.                                                                                                                                                                                                                                                                                                                                      | **Verified**: `ls -d .vercel` fails                                                                                                |
+| `CRON_SECRET`                        | Set in Vercel, but no code reads it and no `vercel.json` exists. No cron job runs.                                                                                                                                                                                                                                                                                                                                                       | **Verified**: grep for `CRON_SECRET` finds nothing in code                                                                         |
+| `ENABLE_DEBUG_ROUTES`                | Not set in Vercel. Debug routes return 403 in production.                                                                                                                                                                                                                                                                                                                                                                                | **Verified**: env list, `lib/auth/debug.ts:8-13`                                                                                   |
+| `maxDuration = 300`                  | Two routes set it. Hobby plan caps functions at 60 s.                                                                                                                                                                                                                                                                                                                                                                                    | **Verified**: `app/api/[organization]/leaderboard/score/route.ts:31`, `.../recompute/route.ts:19`. Plan tier is an **Assumption**. |
 
 ## 2. Product summary
 
@@ -98,17 +98,17 @@ sequenceDiagram
 
 ### 3.1 Stack
 
-| Item | Version or value | Evidence |
-|---|---|---|
-| Next.js | 16.2.11 (exact pin), App Router, Turbopack in dev | **Verified**: `package.json` |
-| React | 19.2.3 (exact pin) | **Verified**: `package.json` |
-| Styling | Tailwind CSS 4, shadcn/ui (54 primitives in `components/ui/`), one `styled-components` use in `components/ui/loader.tsx` | **Verified** |
-| Server state | TanStack Query 5. Defaults: `staleTime` 30 s, `refetchOnWindowFocus: false`, `retry` default (3). | **Verified**: `components/providers/QueryProvider.tsx:8-20` |
-| Client state | 5 Zustand stores in `stores/`. None persists. | **Verified**: `stores/*.ts` |
-| Charts | `recharts` 2.15.4, `framer-motion` 12 | **Verified** |
-| Docs | Nextra 4 at `/docs`, Pagefind search built in `pnpm build` | **Verified**: `next.config.ts`, `package.json` scripts |
-| Env | `@t3-oss/env-nextjs` with zod. Validation is **skipped in production**. | **Verified**: `lib/env/index.ts` (`skipValidation: ... \|\| process.env.NODE_ENV === 'production'`) |
-| Package manager | pnpm 10.33.1 | **Verified**: `package.json` |
+| Item            | Version or value                                                                                                         | Evidence                                                                                            |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| Next.js         | 16.2.11 (exact pin), App Router, Turbopack in dev                                                                        | **Verified**: `package.json`                                                                        |
+| React           | 19.2.3 (exact pin)                                                                                                       | **Verified**: `package.json`                                                                        |
+| Styling         | Tailwind CSS 4, shadcn/ui (54 primitives in `components/ui/`), one `styled-components` use in `components/ui/loader.tsx` | **Verified**                                                                                        |
+| Server state    | TanStack Query 5. Defaults: `staleTime` 30 s, `refetchOnWindowFocus: false`, `retry` default (3).                        | **Verified**: `components/providers/QueryProvider.tsx:8-20`                                         |
+| Client state    | 5 Zustand stores in `stores/`. None persists.                                                                            | **Verified**: `stores/*.ts`                                                                         |
+| Charts          | `recharts` 2.15.4, `framer-motion` 12                                                                                    | **Verified**                                                                                        |
+| Docs            | Nextra 4 at `/docs`, Pagefind search built in `pnpm build`                                                               | **Verified**: `next.config.ts`, `package.json` scripts                                              |
+| Env             | `@t3-oss/env-nextjs` with zod. Validation is **skipped in production**.                                                  | **Verified**: `lib/env/index.ts` (`skipValidation: ... \|\| process.env.NODE_ENV === 'production'`) |
+| Package manager | pnpm 10.33.1                                                                                                             | **Verified**: `package.json`                                                                        |
 
 ### 3.2 Rendering and routing
 
@@ -139,18 +139,18 @@ sequenceDiagram
 
 ### 3.5 Accessibility and performance
 
-| Concern | Evidence |
-|---|---|
+| Concern                                                                                                                                   | Evidence                                                                                                                                                              |
+| ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Unlabelled controls: mass-invite file input, user-search input, team select and textarea, contributor selector label, leaderboard selects | **Verified**: `components/organization/MassInvite.tsx:279-283`, `UserSearchPanel.tsx`, `TeamManagement.tsx:95,112`, `components/analytics/ContributorSelector.tsx:43` |
-| Heatmap cells are `div`s with `title` only. Intensity is color only. | **Verified**: `components/analytics/ContributionHeatmap.tsx:186-193` |
-| `window.confirm` for preset delete | **Verified**: `components/leaderboards/scoring/ScoringRules.tsx` |
-| `Loader` has no `role="status"` | **Verified**: `components/ui/loader.tsx` |
-| `xlsx` imported at module top level in a client component | **Verified**: `components/organization/MassInvite.tsx:2` |
-| `recharts` and `framer-motion` imported statically in about 10 client components. No `next/dynamic`. | **Verified** |
-| No list virtualization in the contributor table or member lists | **Verified**: `components/leaderboards/contributor/ContributorLeaderboardTable.tsx:62` |
-| Contributor search calls `router.replace` on every keystroke | **Verified**: `components/leaderboards/contributor/ContributorLeaderboard.tsx:~155` |
-| Repository timeline invents per-user daily data by proportional split and shows it as real data | **Verified**: `components/leaderboards/RepositoryContributorsTimeline.tsx:176-181` |
-| `useAuthSession` uses `staleTime: 0` and refetches on mount and focus. Several components mount it. | **Verified**: `hooks/use-auth-session.ts:34-42` |
+| Heatmap cells are `div`s with `title` only. Intensity is color only.                                                                      | **Verified**: `components/analytics/ContributionHeatmap.tsx:186-193`                                                                                                  |
+| `window.confirm` for preset delete                                                                                                        | **Verified**: `components/leaderboards/scoring/ScoringRules.tsx`                                                                                                      |
+| `Loader` has no `role="status"`                                                                                                           | **Verified**: `components/ui/loader.tsx`                                                                                                                              |
+| `xlsx` imported at module top level in a client component                                                                                 | **Verified**: `components/organization/MassInvite.tsx:2`                                                                                                              |
+| `recharts` and `framer-motion` imported statically in about 10 client components. No `next/dynamic`.                                      | **Verified**                                                                                                                                                          |
+| No list virtualization in the contributor table or member lists                                                                           | **Verified**: `components/leaderboards/contributor/ContributorLeaderboardTable.tsx:62`                                                                                |
+| Contributor search calls `router.replace` on every keystroke                                                                              | **Verified**: `components/leaderboards/contributor/ContributorLeaderboard.tsx:~155`                                                                                   |
+| Repository timeline invents per-user daily data by proportional split and shows it as real data                                           | **Verified**: `components/leaderboards/RepositoryContributorsTimeline.tsx:176-181`                                                                                    |
+| `useAuthSession` uses `staleTime: 0` and refetches on mount and focus. Several components mount it.                                       | **Verified**: `hooks/use-auth-session.ts:34-42`                                                                                                                       |
 
 ## 4. Authentication, sessions, and tokens
 
@@ -179,12 +179,12 @@ The install flow is similar. `GET /api/install/start` signs an install state and
 
 ### 5.1 GitHub App permissions
 
-| Source | Permissions | Evidence |
-|---|---|---|
-| Setup docs | Org: Members (Read), "Teams" (Read). Repo: Metadata, Contents, Pull requests, Issues (Read). Account: Email addresses (Read). Events: Installation, Installation repositories. | **Verified**: `content/getting-started/local-development.mdx:44-56` |
-| Runtime check | `metadata`, `contents`, `pull_requests`, `issues`, `members`, all `read` | **Verified**: `lib/github/required-permissions.ts:31-67` |
+| Source                      | Permissions                                                                                                                                                                                                 | Evidence                                                                                                                                            |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Setup docs                  | Org: Members (Read), "Teams" (Read). Repo: Metadata, Contents, Pull requests, Issues (Read). Account: Email addresses (Read). Events: Installation, Installation repositories.                              | **Verified**: `content/getting-started/local-development.mdx:44-56`                                                                                 |
+| Runtime check               | `metadata`, `contents`, `pull_requests`, `issues`, `members`, all `read`                                                                                                                                    | **Verified**: `lib/github/required-permissions.ts:31-67`                                                                                            |
 | Needed by bulk admin routes | `members: write`. The routes call `POST /orgs/{org}/invitations`, `PUT /orgs/{org}/memberships/{username}`, and `PUT /orgs/{org}/teams/{team_slug}/memberships/{username}` with the **installation** token. | **Verified**: calls in `app/api/organizations/[login]/*/route.ts`. **Inference**: GitHub requires Organization "Members" write for these endpoints. |
-| OAuth `scope` param | `read:org user:email` | **Verified**: `app/api/auth/start/route.ts:25`. **Inference**: GitHub App user tokens ignore `scope`. The App permissions apply. |
+| OAuth `scope` param         | `read:org user:email`                                                                                                                                                                                       | **Verified**: `app/api/auth/start/route.ts:25`. **Inference**: GitHub App user tokens ignore `scope`. The App permissions apply.                    |
 
 **Inference**: With the documented permissions, the three bulk admin features fail with "Resource not accessible by integration". The runtime check does not report the gap.
 
@@ -192,11 +192,11 @@ There is no separate "Teams" permission for GitHub Apps. **Inference** from GitH
 
 ### 5.2 Token types
 
-| Token | Created by | Used for |
-|---|---|---|
-| App JWT | `octokit` `App` with `GITHUB_APP_ID` + `GITHUB_PRIVATE_KEY` (`lib/github/client-factory.ts:9-20`) | `GET /app/installations/{id}`, `POST /app/installations/{id}/access_tokens` |
-| Installation token | `createInstallationAccessToken`, cached in process until 1 min before expiry (`lib/github/client-factory.ts:25-47`) | Ingest GraphQL, bulk admin REST calls, `InstallationAccessSnapshot` |
-| User token (GitHub App user-to-server) | OAuth code exchange (`lib/auth/server/oauth.ts:31-89`) | `ViewerProfile`, `/user/installations`, the GraphQL proxy, and the leaderboard fallback |
+| Token                                  | Created by                                                                                                          | Used for                                                                                |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| App JWT                                | `octokit` `App` with `GITHUB_APP_ID` + `GITHUB_PRIVATE_KEY` (`lib/github/client-factory.ts:9-20`)                   | `GET /app/installations/{id}`, `POST /app/installations/{id}/access_tokens`             |
+| Installation token                     | `createInstallationAccessToken`, cached in process until 1 min before expiry (`lib/github/client-factory.ts:25-47`) | Ingest GraphQL, bulk admin REST calls, `InstallationAccessSnapshot`                     |
+| User token (GitHub App user-to-server) | OAuth code exchange (`lib/auth/server/oauth.ts:31-89`)                                                              | `ViewerProfile`, `/user/installations`, the GraphQL proxy, and the leaderboard fallback |
 
 The leaderboard uses the installation token only if the org installation ID is in `session.installationIds`. Otherwise it falls back to the user token. **Verified**: `lib/github/create-leaderboard-octokit.ts:31-70`. The cache keys for org repositories and GraphQL responses do not include the token type. Results from a user token and an installation token can mix. **Verified**: `lib/github/fetch-graphql.ts:150`, `lib/github/graphql-response-cache.ts:112-120`.
 
@@ -204,36 +204,36 @@ The leaderboard uses the installation token only if the org installation ID is i
 
 REST (all **Verified** by grep for `octokit.rest`, `octokit.request`, and `fetch(` in `app/` and `lib/`):
 
-| Call | Octokit method | Token | Caller |
-|---|---|---|---|
-| `GET https://github.com/login/oauth/authorize` | redirect | none | `app/api/auth/start/route.ts:22-27` |
-| `POST https://github.com/login/oauth/access_token` (code, refresh) | `fetch` | client secret | `lib/auth/server/oauth.ts:39`, `lib/auth/server/token-refresh.ts:44` |
-| `GET /user/installations?per_page=100&page=N` | `octokit.request` | user | `lib/auth/server/oauth.ts:105-126` |
-| `GET /user` | `users.getAuthenticated` | user | fallback in `lib/auth/server/oauth.ts:201` |
-| `GET /user/orgs?per_page=100` (one page only) | `orgs.listForAuthenticatedUser` | user | fallback in `lib/auth/server/oauth.ts:211`. Sets `viewerCanAdminister: false` for every org. |
-| `GET /app/installations/{installation_id}` | `apps.getInstallation` | app JWT | `lib/auth/server/oauth.ts:128-161` |
-| `POST /app/installations/{installation_id}/access_tokens` | `apps.createInstallationAccessToken` | app JWT | `lib/github/client-factory.ts:36` |
-| `GET /users/{username}` | `users.getByUsername` | installation | `app/api/organizations/[login]/mass-invite/route.ts:70` |
-| `POST /orgs/{org}/invitations` (`invitee_id`, `role: direct_member`) | `orgs.createInvitation` | installation | `.../mass-invite/route.ts:71` |
-| `GET /orgs/{org}/members/{username}` | `orgs.checkMembershipForUser` | installation | `.../bulk-role/route.ts:81` |
-| `PUT /orgs/{org}/memberships/{username}` (`role: member\|admin`) | `orgs.setMembershipForUser` | installation | `.../bulk-role/route.ts:91` |
-| `PUT /orgs/{org}/teams/{team_slug}/memberships/{username}` (`role: member`) | `teams.addOrUpdateMembershipForUserInOrg` | installation | `.../teams/bulk-add/route.ts:59` |
+| Call                                                                        | Octokit method                            | Token         | Caller                                                                                       |
+| --------------------------------------------------------------------------- | ----------------------------------------- | ------------- | -------------------------------------------------------------------------------------------- |
+| `GET https://github.com/login/oauth/authorize`                              | redirect                                  | none          | `app/api/auth/start/route.ts:22-27`                                                          |
+| `POST https://github.com/login/oauth/access_token` (code, refresh)          | `fetch`                                   | client secret | `lib/auth/server/oauth.ts:39`, `lib/auth/server/token-refresh.ts:44`                         |
+| `GET /user/installations?per_page=100&page=N`                               | `octokit.request`                         | user          | `lib/auth/server/oauth.ts:105-126`                                                           |
+| `GET /user`                                                                 | `users.getAuthenticated`                  | user          | fallback in `lib/auth/server/oauth.ts:201`                                                   |
+| `GET /user/orgs?per_page=100` (one page only)                               | `orgs.listForAuthenticatedUser`           | user          | fallback in `lib/auth/server/oauth.ts:211`. Sets `viewerCanAdminister: false` for every org. |
+| `GET /app/installations/{installation_id}`                                  | `apps.getInstallation`                    | app JWT       | `lib/auth/server/oauth.ts:128-161`                                                           |
+| `POST /app/installations/{installation_id}/access_tokens`                   | `apps.createInstallationAccessToken`      | app JWT       | `lib/github/client-factory.ts:36`                                                            |
+| `GET /users/{username}`                                                     | `users.getByUsername`                     | installation  | `app/api/organizations/[login]/mass-invite/route.ts:70`                                      |
+| `POST /orgs/{org}/invitations` (`invitee_id`, `role: direct_member`)        | `orgs.createInvitation`                   | installation  | `.../mass-invite/route.ts:71`                                                                |
+| `GET /orgs/{org}/members/{username}`                                        | `orgs.checkMembershipForUser`             | installation  | `.../bulk-role/route.ts:81`                                                                  |
+| `PUT /orgs/{org}/memberships/{username}` (`role: member\|admin`)            | `orgs.setMembershipForUser`               | installation  | `.../bulk-role/route.ts:91`                                                                  |
+| `PUT /orgs/{org}/teams/{team_slug}/memberships/{username}` (`role: member`) | `teams.addOrUpdateMembershipForUserInOrg` | installation  | `.../teams/bulk-add/route.ts:59`                                                             |
 
 GraphQL (all **Verified** in `lib/github/queries/*.ts`, `lib/github/operations/registry.ts`, and `lib/auth/server/installation-service.ts:199-220`):
 
-| Operation | Shape | Pagination | Token |
-|---|---|---|---|
-| `ViewerProfile` | `viewer { databaseId login name avatarUrl organizations(first:100) { databaseId login name avatarUrl viewerCanAdminister } }` | none. `hasNextPage` ignored. | user |
-| `OrgRepositories` | `organization(login) { repositories(first:$first, after, orderBy:UPDATED_AT DESC) { nameWithOwner databaseId name isPrivate isArchived isFork updatedAt defaultBranchRef{name} } }` | full cursor loop, `first: 100`. Redis cache 5 min. | installation or user. Also exposed through the proxy. |
-| `OrgTeamsData` | `organization { teams(first:100, after) { databaseId slug name members(first:100){databaseId login} repositories(first:100){databaseId nameWithOwner} } }` | teams paged. Members and repos are **not** paged. Only a warning above 100. | installation or user |
-| `TeamRepositories` | `organization { team(slug) { repositories(first, after) { nameWithOwner } } }` | full loop | installation or user |
-| `RepoScoringDataCore` | default branch `history(since, first:100)` with `authors(first:3)`. `pullRequests(first:50, UPDATED_AT DESC)`. `issues(first:50, UPDATED_AT DESC)`. | up to 20 pages each. PRs and issues stop when `updatedAt < since`. | installation or user |
-| `RepoScoringPrMeta` | `pullRequests(first:50)` with `mergedBy`, `mergeCommit`, `closingIssuesReferences(first:20)`, `commits(first:100)` | up to 20 pages. No early stop. | same |
-| `RepoScoringReviews` | `pullRequests(first:50)` with `reviews(first:50){comments(first:50)}` and `comments(first:100)` | up to 20 pages, early stop | same |
-| `RepoScoringIssueLinks` | `issues(first:50){ timelineItems(first:20, CROSS_REFERENCED_EVENT) }` | up to 20 pages | same |
-| `InstallationAccessSnapshot` | `viewer { repositories(first:100) { totalCount nodes{nameWithOwner url isPrivate} } }` | none | installation |
-| `SearchUsers` | `search(first:10, type:USER, query)` | none | user, through the proxy |
-| `OrganizationSummary`, `OrganizationRepositories` (`first:100`, no paging), `OrgScoringData` (`first:50`) | allowlisted but unused by the client | none | user |
+| Operation                                                                                                 | Shape                                                                                                                                                                               | Pagination                                                                  | Token                                                 |
+| --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `ViewerProfile`                                                                                           | `viewer { databaseId login name avatarUrl organizations(first:100) { databaseId login name avatarUrl viewerCanAdminister } }`                                                       | none. `hasNextPage` ignored.                                                | user                                                  |
+| `OrgRepositories`                                                                                         | `organization(login) { repositories(first:$first, after, orderBy:UPDATED_AT DESC) { nameWithOwner databaseId name isPrivate isArchived isFork updatedAt defaultBranchRef{name} } }` | full cursor loop, `first: 100`. Redis cache 5 min.                          | installation or user. Also exposed through the proxy. |
+| `OrgTeamsData`                                                                                            | `organization { teams(first:100, after) { databaseId slug name members(first:100){databaseId login} repositories(first:100){databaseId nameWithOwner} } }`                          | teams paged. Members and repos are **not** paged. Only a warning above 100. | installation or user                                  |
+| `TeamRepositories`                                                                                        | `organization { team(slug) { repositories(first, after) { nameWithOwner } } }`                                                                                                      | full loop                                                                   | installation or user                                  |
+| `RepoScoringDataCore`                                                                                     | default branch `history(since, first:100)` with `authors(first:3)`. `pullRequests(first:50, UPDATED_AT DESC)`. `issues(first:50, UPDATED_AT DESC)`.                                 | up to 20 pages each. PRs and issues stop when `updatedAt < since`.          | installation or user                                  |
+| `RepoScoringPrMeta`                                                                                       | `pullRequests(first:50)` with `mergedBy`, `mergeCommit`, `closingIssuesReferences(first:20)`, `commits(first:100)`                                                                  | up to 20 pages. No early stop.                                              | same                                                  |
+| `RepoScoringReviews`                                                                                      | `pullRequests(first:50)` with `reviews(first:50){comments(first:50)}` and `comments(first:100)`                                                                                     | up to 20 pages, early stop                                                  | same                                                  |
+| `RepoScoringIssueLinks`                                                                                   | `issues(first:50){ timelineItems(first:20, CROSS_REFERENCED_EVENT) }`                                                                                                               | up to 20 pages                                                              | same                                                  |
+| `InstallationAccessSnapshot`                                                                              | `viewer { repositories(first:100) { totalCount nodes{nameWithOwner url isPrivate} } }`                                                                                              | none                                                                        | installation                                          |
+| `SearchUsers`                                                                                             | `search(first:10, type:USER, query)`                                                                                                                                                | none                                                                        | user, through the proxy                               |
+| `OrganizationSummary`, `OrganizationRepositories` (`first:100`, no paging), `OrgScoringData` (`first:50`) | allowlisted but unused by the client                                                                                                                                                | none                                                                        | user                                                  |
 
 **Verified**: only `OrgRepositories` and `SearchUsers` are called through the proxy (`hooks/queries/useOrgRepositoriesQuery.ts:23`, `hooks/queries/useSearchUsersQuery.ts:33`). The other 5 allowlisted operations have no client caller.
 
@@ -250,11 +250,11 @@ The app never lists org members or pending invitations. No call to `GET /orgs/{o
 
 ### 5.5 Bulk operations
 
-| Route | Order | Admin gate | Max | Failure handling | Defects |
-|---|---|---|---|---|---|
-| `POST /api/organizations/{login}/mass-invite` | All logins in parallel with `Promise.allSettled` (`route.ts:68-76`) | `requireOrganizationAdmin` (DB role, case-insensitive) | 50 unique (`:56`) | Per-item `{success[], failed[{login,error}]}` | 50 parallel calls risk secondary rate limits. No retry. Repeated invite returns a GitHub error. |
-| `POST /api/organizations/{login}/bulk-role` | Sequential | Inline `org.login === login` (case-sensitive, `:52-54`) | 50 (`:48`) | Per-item `{success, invited, failed}` | `PUT /orgs/{org}/memberships/{user}` invites a non-member. With `role: admin`, it invites the user as an org **owner**. A non-string item crashes the route before the per-item `try`. |
-| `POST /api/organizations/{login}/teams/bulk-add` | Sequential | Inline, case-sensitive (`:39-43`) | 50 (`:37`) | Per-item by membership `state` (`active` / `pending`) | Same crash on non-string items. Role is fixed to `member`. |
+| Route                                            | Order                                                               | Admin gate                                              | Max               | Failure handling                                      | Defects                                                                                                                                                                                |
+| ------------------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------- | ----------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/organizations/{login}/mass-invite`    | All logins in parallel with `Promise.allSettled` (`route.ts:68-76`) | `requireOrganizationAdmin` (DB role, case-insensitive)  | 50 unique (`:56`) | Per-item `{success[], failed[{login,error}]}`         | 50 parallel calls risk secondary rate limits. No retry. Repeated invite returns a GitHub error.                                                                                        |
+| `POST /api/organizations/{login}/bulk-role`      | Sequential                                                          | Inline `org.login === login` (case-sensitive, `:52-54`) | 50 (`:48`)        | Per-item `{success, invited, failed}`                 | `PUT /orgs/{org}/memberships/{user}` invites a non-member. With `role: admin`, it invites the user as an org **owner**. A non-string item crashes the route before the per-item `try`. |
+| `POST /api/organizations/{login}/teams/bulk-add` | Sequential                                                          | Inline, case-sensitive (`:39-43`)                       | 50 (`:37`)        | Per-item by membership `state` (`active` / `pending`) | Same crash on non-string items. Role is fixed to `member`.                                                                                                                             |
 
 **Verified** for all rows by reading the three route files. No route records an audit log. No route runs as a background job. The client stubs for job progress return `[]` (`hooks/queries/useMassInviteJobsQuery.ts:13`).
 
@@ -296,15 +296,15 @@ The full per-route table is in [feature-inventory.md §3](./feature-inventory.md
 
 ### 6.4 Caching layers
 
-| Layer | Key | TTL | Evidence |
-|---|---|---|---|
-| Response LRU (process) | `{org}:{scope}:{entity}:{period}[...]` | 30 s, 64 entries | `lib/leaderboard/request-cache.ts:9-45` |
-| Response (Redis) | `leaderboard:response:{same}` | 24 h | `lib/leaderboard/request-cache.ts:53,67` |
-| Snapshot (Redis) | `leaderboard:snapshot:preset:{id}:{scope}:entity:{e}:period:{p}:v:{n}` | 24 h | `lib/leaderboard/redis-cache.ts` |
-| GraphQL responses | `github:graphql:{op}:{vars}` | 90 s | `lib/github/graphql-response-cache.ts` |
-| Org repositories / teams | `github:org-repositories:{org}`, `github:org-teams:v2:{org}` | 5 min | `lib/github/fetch-graphql.ts:150,923` |
-| Repo fetch log | `github:repo-fetch:id:{id}`, `github:repo-fetch:name:{name}` | 24 h | `lib/supabase/repo-cache.ts:28-31` |
-| Materialized scores | `leaderboard_materializations` + `computed_scores` | persistent | `lib/supabase/leaderboard-db.ts` |
+| Layer                    | Key                                                                    | TTL              | Evidence                                 |
+| ------------------------ | ---------------------------------------------------------------------- | ---------------- | ---------------------------------------- |
+| Response LRU (process)   | `{org}:{scope}:{entity}:{period}[...]`                                 | 30 s, 64 entries | `lib/leaderboard/request-cache.ts:9-45`  |
+| Response (Redis)         | `leaderboard:response:{same}`                                          | 24 h             | `lib/leaderboard/request-cache.ts:53,67` |
+| Snapshot (Redis)         | `leaderboard:snapshot:preset:{id}:{scope}:entity:{e}:period:{p}:v:{n}` | 24 h             | `lib/leaderboard/redis-cache.ts`         |
+| GraphQL responses        | `github:graphql:{op}:{vars}`                                           | 90 s             | `lib/github/graphql-response-cache.ts`   |
+| Org repositories / teams | `github:org-repositories:{org}`, `github:org-teams:v2:{org}`           | 5 min            | `lib/github/fetch-graphql.ts:150,923`    |
+| Repo fetch log           | `github:repo-fetch:id:{id}`, `github:repo-fetch:name:{name}`           | 24 h             | `lib/supabase/repo-cache.ts:28-31`       |
+| Materialized scores      | `leaderboard_materializations` + `computed_scores`                     | persistent       | `lib/supabase/leaderboard-db.ts`         |
 
 Preset changes clear `leaderboard:response:*` for **all** orgs, not one. **Verified**: `lib/supabase/leaderboard-db.ts:634,708,747,789`.
 
@@ -349,14 +349,14 @@ This section is precise so that Gitorgasm can port the engine and reproduce lega
 
 `normalizeGitHubData(raw)` turns raw GitHub data into `Signal { userId, userLogin, type, value: 1, repo, eventTimestamp, contentHash, metadata }`. **Verified**: `lib/scoring/normalize.ts:311-354`.
 
-| Raw item | Signals emitted | Timestamp | Metadata used by scoring |
-|---|---|---|---|
-| Commit (default branch only) | 1 `commit` for the first author with a GitHub user, plus 1 `commit` per other linked co-author (max 3 authors per commit) | `committedDate` | `isInMergedPR`, `isBot`, `additions`, `deletions` (each split evenly across authors with `Math.round`) |
-| Pull request | `pr_open` always. Then `pr_merge` if merged, else `pr_close_no_merge` if closed. | `createdAt`, `mergedAt`, `closedAt` | `isSelfMerge` (merger = author), `hasLinkedIssue` (`closingIssuesReferences` not empty), `isBot` |
-| Issue | `issue_open` always. `issue_close` if closed. **Both go to the issue author**, not the closer. | `createdAt`, `closedAt` | `hasLinkedPR` (a cross-referenced PR exists), `isBot` |
-| Review | `review` | `submittedAt` | `state` (`approved` / `changes_requested` / `commented`), `isSelfReview`, `isBot` |
-| Review comment | `review_comment` | `createdAt` | `isBot` |
-| PR conversation comment | `comment` | `createdAt` | `isBot` |
+| Raw item                     | Signals emitted                                                                                                           | Timestamp                           | Metadata used by scoring                                                                               |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Commit (default branch only) | 1 `commit` for the first author with a GitHub user, plus 1 `commit` per other linked co-author (max 3 authors per commit) | `committedDate`                     | `isInMergedPR`, `isBot`, `additions`, `deletions` (each split evenly across authors with `Math.round`) |
+| Pull request                 | `pr_open` always. Then `pr_merge` if merged, else `pr_close_no_merge` if closed.                                          | `createdAt`, `mergedAt`, `closedAt` | `isSelfMerge` (merger = author), `hasLinkedIssue` (`closingIssuesReferences` not empty), `isBot`       |
+| Issue                        | `issue_open` always. `issue_close` if closed. **Both go to the issue author**, not the closer.                            | `createdAt`, `closedAt`             | `hasLinkedPR` (a cross-referenced PR exists), `isBot`                                                  |
+| Review                       | `review`                                                                                                                  | `submittedAt`                       | `state` (`approved` / `changes_requested` / `commented`), `isSelfReview`, `isBot`                      |
+| Review comment               | `review_comment`                                                                                                          | `createdAt`                         | `isBot`                                                                                                |
+| PR conversation comment      | `comment`                                                                                                                 | `createdAt`                         | `isBot`                                                                                                |
 
 - Issue comments are not fetched. `comment` signals come only from PR conversations. **Verified**: `lib/github/queries/repoScoringDataCore.ts`, `repoScoringDataReviews.ts`.
 - No code emits `spam`. **Verified**: grep for `'spam'`.
@@ -368,16 +368,16 @@ This section is precise so that Gitorgasm can port the engine and reproduce lega
 
 Type `ScoringRuleset` (`types/scoring/rules.ts`). Default values (`lib/scoring/rules.ts:4-48`), **Verified**:
 
-| Field | Default |
-|---|---|
-| `basePoints` | commit 10, pr_merge 50, review 20, review_comment 5, issue_open 10, issue_close 10, comment 3. All other types: 0 (`pr_open`, `pr_close_no_merge`, `spam`). |
-| `multipliers` | `merged_pr_commit` ×1.2 on [commit]. `pr_linked_to_issue` ×1.1 on [pr_merge, commit]. `first_activity` ×1.5 on [commit, pr_merge, review, issue_open, issue_close, comment]. |
-| `reviewStateWeights` | approved 1.25, changes_requested 1.0, commented 0.5 |
-| `dailyQuotas` | commit 4, comment 4 |
-| `diminishingReturns` | `weeklyThreshold` 9, `decayFactor` 0.11, `floorFraction` 0.2 |
-| `zeroPointConditions` | self_review, self_merge, bot_activity, issue_closed_no_pr, pr_closed_no_merge. All enabled. |
-| `spamPenalty` | −12 |
-| `prClosedNoMergePenalty` | −10 |
+| Field                    | Default                                                                                                                                                                      |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `basePoints`             | commit 10, pr_merge 50, review 20, review_comment 5, issue_open 10, issue_close 10, comment 3. All other types: 0 (`pr_open`, `pr_close_no_merge`, `spam`).                  |
+| `multipliers`            | `merged_pr_commit` ×1.2 on [commit]. `pr_linked_to_issue` ×1.1 on [pr_merge, commit]. `first_activity` ×1.5 on [commit, pr_merge, review, issue_open, issue_close, comment]. |
+| `reviewStateWeights`     | approved 1.25, changes_requested 1.0, commented 0.5                                                                                                                          |
+| `dailyQuotas`            | commit 4, comment 4                                                                                                                                                          |
+| `diminishingReturns`     | `weeklyThreshold` 9, `decayFactor` 0.11, `floorFraction` 0.2                                                                                                                 |
+| `zeroPointConditions`    | self_review, self_merge, bot_activity, issue_closed_no_pr, pr_closed_no_merge. All enabled.                                                                                  |
+| `spamPenalty`            | −12                                                                                                                                                                          |
+| `prClosedNoMergePenalty` | −10                                                                                                                                                                          |
 
 ### 9.3 Per-contributor algorithm
 
@@ -455,30 +455,30 @@ Scores are floats. The server does not round. The UI uses `Math.round`. **Verifi
 
 `getDateRangeForScoreTimePeriod` (`lib/leaderboard/time-range.ts`), **Verified**. `to` = the next 00:00 UTC.
 
-| Period | `from` |
-|---|---|
-| today | today 00:00 UTC |
-| week | now − 7 days |
-| month | now − 30 days |
-| quarter | now − 90 days |
-| half_year | now − 180 days |
-| all_time | no bound |
+| Period    | `from`          |
+| --------- | --------------- |
+| today     | today 00:00 UTC |
+| week      | now − 7 days    |
+| month     | now − 30 days   |
+| quarter   | now − 90 days   |
+| half_year | now − 180 days  |
+| all_time  | no bound        |
 
 A signal is in range when `from <= t <= to` (`lib/leaderboard/score.ts:23-35`). The UI labels "This Week" and "This Month" describe rolling windows, not calendar periods (`lib/constants/time.ts:86-93`). A second, different period helper (`7d`/`30d`/`90d`, local-time arithmetic) serves repository analytics (`lib/time-period.ts`).
 
 ### 9.6 Engine defects to fix or keep on purpose
 
-| ID | Defect | Evidence |
-|---|---|---|
-| S1 | With defaults, `pr_closed_no_merge` zero-point returns `(0, 0)` before the penalty branch. The −10 penalty never applies. | **Verified**: `lib/scoring/engine.ts:65-67` runs before `:106-108` |
-| S2 | `spamPenalty` is dead. Nothing emits `spam`. | **Verified**: grep |
-| S3 | `pr_linked_to_issue` lists `commit`, but commits never carry `hasLinkedIssue`. | **Verified**: `lib/scoring/normalize.ts:55-62` |
-| S4 | Over-quota signals still increase the weekly counter. They push later signals into diminishing returns. | **Verified**: `lib/scoring/engine.ts:131-145` |
-| S5 | The day key is a string slice. Commit dates are `GitTimestamp`, which can carry the committer's offset. The day key then uses local committer time while the week key uses UTC. | **Verified**: `lib/scoring/engine.ts:28-30`. **Inference**: GitHub documents `GitTimestamp` as not converted to UTC. |
-| S6 | `issue_close` credits the issue author, not the person who closed it. | **Verified**: `lib/scoring/normalize.ts:197-221` |
-| S7 | One merged PR counts as 2 in `counts.pullRequests` (`pr_open` + `pr_merge`). | **Verified**: `lib/scoring/engine.ts:242-246` |
-| S8 | Ties get distinct ranks in insertion order. | **Verified**: `lib/scoring/engine.ts:345-360` |
-| S9 | Co-authors beyond the first 3 commit authors are lost. Merged-PR commits beyond 100 per PR do not get `isInMergedPR`. | **Verified**: `repoScoringDataCore.ts` (`authors(first: 3)`), `repoScoringDataPrMeta.ts` (`commits(first: 100)`) |
+| ID  | Defect                                                                                                                                                                          | Evidence                                                                                                             |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| S1  | With defaults, `pr_closed_no_merge` zero-point returns `(0, 0)` before the penalty branch. The −10 penalty never applies.                                                       | **Verified**: `lib/scoring/engine.ts:65-67` runs before `:106-108`                                                   |
+| S2  | `spamPenalty` is dead. Nothing emits `spam`.                                                                                                                                    | **Verified**: grep                                                                                                   |
+| S3  | `pr_linked_to_issue` lists `commit`, but commits never carry `hasLinkedIssue`.                                                                                                  | **Verified**: `lib/scoring/normalize.ts:55-62`                                                                       |
+| S4  | Over-quota signals still increase the weekly counter. They push later signals into diminishing returns.                                                                         | **Verified**: `lib/scoring/engine.ts:131-145`                                                                        |
+| S5  | The day key is a string slice. Commit dates are `GitTimestamp`, which can carry the committer's offset. The day key then uses local committer time while the week key uses UTC. | **Verified**: `lib/scoring/engine.ts:28-30`. **Inference**: GitHub documents `GitTimestamp` as not converted to UTC. |
+| S6  | `issue_close` credits the issue author, not the person who closed it.                                                                                                           | **Verified**: `lib/scoring/normalize.ts:197-221`                                                                     |
+| S7  | One merged PR counts as 2 in `counts.pullRequests` (`pr_open` + `pr_merge`).                                                                                                    | **Verified**: `lib/scoring/engine.ts:242-246`                                                                        |
+| S8  | Ties get distinct ranks in insertion order.                                                                                                                                     | **Verified**: `lib/scoring/engine.ts:345-360`                                                                        |
+| S9  | Co-authors beyond the first 3 commit authors are lost. Merged-PR commits beyond 100 per PR do not get `isInMergedPR`.                                                           | **Verified**: `repoScoringDataCore.ts` (`authors(first: 3)`), `repoScoringDataPrMeta.ts` (`commits(first: 100)`)     |
 
 **Decision**: Gitorgasm ports the algorithm as written first. It adds golden tests built from legacy fixtures. Then it fixes S1–S9 behind a ruleset version field, so old presets keep their scores.
 
@@ -486,21 +486,21 @@ A signal is in range when `from <= t <= to` (`lib/leaderboard/score.ts:23-35`). 
 
 Ordered by severity.
 
-| ID | Finding | Evidence |
-|---|---|---|
-| SEC-1 | **Cross-org leaderboard leak.** `leaderboard/score` reads the response cache (process LRU + Redis, 24 h) with a key built from the URL org. It returns a hit before it checks membership. Any signed-in user can read another org's cached leaderboard. | **Verified**: `app/api/[organization]/leaderboard/score/route.ts:88-96` runs before `:99` and `:115-122`, key from `lib/leaderboard/request-cache.ts:43-45` |
-| SEC-2 | **Installation-linking IDOR.** `install/complete` and `install/callback` accept any installation ID that exists. They do not check that the user can access it. `install/status` then uses that installation's token to list up to 100 repo names, including private ones. | **Verified**: `app/api/install/complete/route.ts:16-31`, `app/api/install/callback/route.ts:67-102`, `app/api/install/status/route.ts:35-42`, `lib/auth/server/installation-service.ts:194-224` |
-| SEC-3 | **Stale authorization.** Memberships are never deleted. Admin flags change only at sign-in. Bulk admin routes act with the installation token, so this stale DB flag is the only gate. | **Verified**: §4.2 |
-| SEC-4 | **RLS off** on every table while the publishable key is public. | **Verified** (no policies). Exposure is **Inference** (§7). |
-| SEC-5 | **Open redirect.** `returnTo` is not validated. `new URL(returnTo, base)` accepts absolute URLs. | **Verified**: `app/api/auth/start/route.ts:10`, `app/api/auth/route.ts:98-99`, `app/api/install/callback/route.ts:104` |
-| SEC-6 | **Webhook fails open** when the secret is unset. Env validation is skipped in production, so nothing detects a missing secret. | **Verified**: `lib/auth/server/webhook.ts:8-11`, `lib/env/index.ts` |
-| SEC-7 | **Session ID exposure.** The session credential is stored in plain text, accepted as Bearer, and returned in JSON by `/api/auth/session`. | **Verified**: §4.2 |
-| SEC-8 | **Debug routes** need no auth when `NODE_ENV != production`. In production with the flag, any signed-in user can read or wipe any org's data. | **Verified**: `lib/auth/debug.ts:8-20`, `app/api/debug/*` |
-| SEC-9 | **Bulk-role can invite an outsider as org owner.** `PUT /orgs/{org}/memberships/{user}` with `role: admin` invites non-members. | **Verified**: `app/api/organizations/[login]/bulk-role/route.ts:81-97` |
-| SEC-10 | **Weak secret fallbacks.** Session secret and token key derive from the client secret. | **Verified**: `lib/env/index.ts` |
-| SEC-11 | No PKCE. CSRF compares with `!==`. Session cookie is `Secure` only when `NODE_ENV=production`. | **Verified**: `lib/auth/server/oauth.ts:21-29`, `lib/auth/server/cookies.ts:8-13` |
-| SEC-12 | `xlsx` 0.18.5 parses user files in the browser. | **Verified**: `package.json`, `components/organization/MassInvite.tsx:139-182`. **Inference**: CVE-2023-30533 and CVE-2024-22363 affect 0.18.5. |
-| SEC-13 | `contributor/heatmap` and `contributor/profile` use `.ilike('login', input)`. `%` and `_` act as wildcards against the global `users` table. | **Verified** by RoutesAudit: `app/api/[organization]/contributor/heatmap/route.ts`, `.../profile/route.ts` |
+| ID     | Finding                                                                                                                                                                                                                                                                    | Evidence                                                                                                                                                                                        |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SEC-1  | **Cross-org leaderboard leak.** `leaderboard/score` reads the response cache (process LRU + Redis, 24 h) with a key built from the URL org. It returns a hit before it checks membership. Any signed-in user can read another org's cached leaderboard.                    | **Verified**: `app/api/[organization]/leaderboard/score/route.ts:88-96` runs before `:99` and `:115-122`, key from `lib/leaderboard/request-cache.ts:43-45`                                     |
+| SEC-2  | **Installation-linking IDOR.** `install/complete` and `install/callback` accept any installation ID that exists. They do not check that the user can access it. `install/status` then uses that installation's token to list up to 100 repo names, including private ones. | **Verified**: `app/api/install/complete/route.ts:16-31`, `app/api/install/callback/route.ts:67-102`, `app/api/install/status/route.ts:35-42`, `lib/auth/server/installation-service.ts:194-224` |
+| SEC-3  | **Stale authorization.** Memberships are never deleted. Admin flags change only at sign-in. Bulk admin routes act with the installation token, so this stale DB flag is the only gate.                                                                                     | **Verified**: §4.2                                                                                                                                                                              |
+| SEC-4  | **RLS off** on every table while the publishable key is public.                                                                                                                                                                                                            | **Verified** (no policies). Exposure is **Inference** (§7).                                                                                                                                     |
+| SEC-5  | **Open redirect.** `returnTo` is not validated. `new URL(returnTo, base)` accepts absolute URLs.                                                                                                                                                                           | **Verified**: `app/api/auth/start/route.ts:10`, `app/api/auth/route.ts:98-99`, `app/api/install/callback/route.ts:104`                                                                          |
+| SEC-6  | **Webhook fails open** when the secret is unset. Env validation is skipped in production, so nothing detects a missing secret.                                                                                                                                             | **Verified**: `lib/auth/server/webhook.ts:8-11`, `lib/env/index.ts`                                                                                                                             |
+| SEC-7  | **Session ID exposure.** The session credential is stored in plain text, accepted as Bearer, and returned in JSON by `/api/auth/session`.                                                                                                                                  | **Verified**: §4.2                                                                                                                                                                              |
+| SEC-8  | **Debug routes** need no auth when `NODE_ENV != production`. In production with the flag, any signed-in user can read or wipe any org's data.                                                                                                                              | **Verified**: `lib/auth/debug.ts:8-20`, `app/api/debug/*`                                                                                                                                       |
+| SEC-9  | **Bulk-role can invite an outsider as org owner.** `PUT /orgs/{org}/memberships/{user}` with `role: admin` invites non-members.                                                                                                                                            | **Verified**: `app/api/organizations/[login]/bulk-role/route.ts:81-97`                                                                                                                          |
+| SEC-10 | **Weak secret fallbacks.** Session secret and token key derive from the client secret.                                                                                                                                                                                     | **Verified**: `lib/env/index.ts`                                                                                                                                                                |
+| SEC-11 | No PKCE. CSRF compares with `!==`. Session cookie is `Secure` only when `NODE_ENV=production`.                                                                                                                                                                             | **Verified**: `lib/auth/server/oauth.ts:21-29`, `lib/auth/server/cookies.ts:8-13`                                                                                                               |
+| SEC-12 | `xlsx` 0.18.5 parses user files in the browser.                                                                                                                                                                                                                            | **Verified**: `package.json`, `components/organization/MassInvite.tsx:139-182`. **Inference**: CVE-2023-30533 and CVE-2024-22363 affect 0.18.5.                                                 |
+| SEC-13 | `contributor/heatmap` and `contributor/profile` use `.ilike('login', input)`. `%` and `_` act as wildcards against the global `users` table.                                                                                                                               | **Verified** by RoutesAudit: `app/api/[organization]/contributor/heatmap/route.ts`, `.../profile/route.ts`                                                                                      |
 
 **Cross-org analytics leak status.** `AGENTS.md:244` and `content/contributing/known-issues.mdx:12` say the four `analytics/*` routes query `signals` with no org filter. Commit `47bce64` (2026-09-01) fixed that. The routes now select `repositories.organization_id = org.id` first, then filter `signals` with `.in('repository_id', ids)`. **Verified**: `app/api/[organization]/analytics/overview/route.ts:17-50`, `git show --stat 47bce64`. The documented leak is closed. The live leak is SEC-1. The docs are stale.
 
@@ -526,34 +526,34 @@ Ordered by severity.
 
 ## 12. Dependency health
 
-| Package | State | Evidence |
-|---|---|---|
-| `xlsx` ^0.18.5 | Last npm release. Known CVEs (**Inference**). Used in the browser. | `package.json`, `MassInvite.tsx:2` |
-| `axios`, `fuse.js`, `next-mdx-remote`, `next-themes`, `date-fns`, `msw`, `@testing-library/*`, `react-hook-form`, `@hookform/resolvers` | No live importer | **Verified**: grep |
-| `embla-carousel-react`, `input-otp`, `react-day-picker`, `vaul`, `react-resizable-panels`, `@base-ui/react` | Imported only by unused shadcn primitives | **Verified** |
-| `rehype-*`, `remark-gfm`, `shiki`, `@theguild/remark-mermaid` | Not referenced by config or code | **Verified** |
-| `gray-matter` | Used only in a test. It is in `dependencies`. | **Verified**: `lib/test/mdx-validation.test.ts:4` |
-| `styled-components` | One file, for one loader animation | **Verified**: `components/ui/loader.tsx:1` |
-| `eslint-config-next` 16.1.6 vs `next` 16.2.11 | Version mismatch | **Verified**: `package.json` |
-| `@types/node` ^20 vs Node 24 runtime | Two majors behind | **Verified** |
-| `vitest` ^3.2.6 vs `@vitest/coverage-v8` 3.2.4 | Patch mismatch | **Verified** |
-| `octokit` 5.0.5 | Current. Bundles retry and throttling. | **Verified**: `node_modules/octokit/package.json` |
-| `pnpm.overrides` for `express-rate-limit`, `flatted`, `hono` | Transitive security pins, likely from `shadcn` tooling | **Verified**: `package.json` |
+| Package                                                                                                                                 | State                                                              | Evidence                                          |
+| --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------- |
+| `xlsx` ^0.18.5                                                                                                                          | Last npm release. Known CVEs (**Inference**). Used in the browser. | `package.json`, `MassInvite.tsx:2`                |
+| `axios`, `fuse.js`, `next-mdx-remote`, `next-themes`, `date-fns`, `msw`, `@testing-library/*`, `react-hook-form`, `@hookform/resolvers` | No live importer                                                   | **Verified**: grep                                |
+| `embla-carousel-react`, `input-otp`, `react-day-picker`, `vaul`, `react-resizable-panels`, `@base-ui/react`                             | Imported only by unused shadcn primitives                          | **Verified**                                      |
+| `rehype-*`, `remark-gfm`, `shiki`, `@theguild/remark-mermaid`                                                                           | Not referenced by config or code                                   | **Verified**                                      |
+| `gray-matter`                                                                                                                           | Used only in a test. It is in `dependencies`.                      | **Verified**: `lib/test/mdx-validation.test.ts:4` |
+| `styled-components`                                                                                                                     | One file, for one loader animation                                 | **Verified**: `components/ui/loader.tsx:1`        |
+| `eslint-config-next` 16.1.6 vs `next` 16.2.11                                                                                           | Version mismatch                                                   | **Verified**: `package.json`                      |
+| `@types/node` ^20 vs Node 24 runtime                                                                                                    | Two majors behind                                                  | **Verified**                                      |
+| `vitest` ^3.2.6 vs `@vitest/coverage-v8` 3.2.4                                                                                          | Patch mismatch                                                     | **Verified**                                      |
+| `octokit` 5.0.5                                                                                                                         | Current. Bundles retry and throttling.                             | **Verified**: `node_modules/octokit/package.json` |
+| `pnpm.overrides` for `express-rate-limit`, `flatted`, `hono`                                                                            | Transitive security pins, likely from `shadcn` tooling             | **Verified**: `package.json`                      |
 
 ## 13. Ranked defect list
 
-| Rank | Defect | Section |
-|---|---|---|
-| 1 | Cross-org leaderboard leak through the response cache | SEC-1 |
-| 2 | Installation-linking IDOR exposes other tenants' private repo names | SEC-2 |
-| 3 | Memberships never revoked. Admin role stale. Bulk admin actions gated only by that stale flag. | SEC-3 |
-| 4 | RLS disabled on all tables with a public key in the browser | SEC-4 |
-| 5 | Open redirect after sign-in and install | SEC-5 |
-| 6 | Webhook fails open. Env validation off in production. Webhook resets `repository_count` to 0. | SEC-6, §6.2 |
-| 7 | `ingest_log` never inserted, so cooldown and freshness logic do not work | §6.3 |
-| 8 | Ingest limited to 90 days for every period. Team members and repos above 100 dropped. 1000-row silent truncation. | §5.3, §7, §8 |
-| 9 | Non-atomic materialization. Owner-less locks. Locks always succeed without Redis. Fetch log written before signals. | §6.3, §8 |
-| 10 | Bulk admin routes need `members: write` but the docs and runtime check say `read`. Bulk-role can invite an outsider as owner. Mass invite fires 50 parallel calls. | §5.1, §5.5 |
+| Rank | Defect                                                                                                                                                             | Section      |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ |
+| 1    | Cross-org leaderboard leak through the response cache                                                                                                              | SEC-1        |
+| 2    | Installation-linking IDOR exposes other tenants' private repo names                                                                                                | SEC-2        |
+| 3    | Memberships never revoked. Admin role stale. Bulk admin actions gated only by that stale flag.                                                                     | SEC-3        |
+| 4    | RLS disabled on all tables with a public key in the browser                                                                                                        | SEC-4        |
+| 5    | Open redirect after sign-in and install                                                                                                                            | SEC-5        |
+| 6    | Webhook fails open. Env validation off in production. Webhook resets `repository_count` to 0.                                                                      | SEC-6, §6.2  |
+| 7    | `ingest_log` never inserted, so cooldown and freshness logic do not work                                                                                           | §6.3         |
+| 8    | Ingest limited to 90 days for every period. Team members and repos above 100 dropped. 1000-row silent truncation.                                                  | §5.3, §7, §8 |
+| 9    | Non-atomic materialization. Owner-less locks. Locks always succeed without Redis. Fetch log written before signals.                                                | §6.3, §8     |
+| 10   | Bulk admin routes need `members: write` but the docs and runtime check say `read`. Bulk-role can invite an outsider as owner. Mass invite fires 50 parallel calls. | §5.1, §5.5   |
 
 ## 14. Implications for Gitorgasm
 

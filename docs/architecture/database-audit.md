@@ -25,62 +25,62 @@ Source: `supabase/migrations/001_*.sql` to `011_*.sql` and `types/db/*.ts`. **Ve
 
 ### 2.1 Enums
 
-| Enum | Values |
-|---|---|
-| `account_type` | organization, user |
-| `signal_type` | commit, pr_open, pr_merge, pr_close_no_merge, issue_open, issue_close, review, review_comment, comment, spam |
-| `score_scope_type` | organization, team, repository |
-| `score_entity_type` | contributor, team, repository |
-| `score_time_period` | today, week, month, quarter, half_year, all_time |
-| `team_privacy` | secret, closed, open |
-| `review_state` | approved, changes_requested, commented |
-| `multiplier_kind` | merged_pr_commit, pr_linked_to_issue, first_activity |
-| `zero_point_kind` | self_review, self_merge, bot_activity, issue_closed_no_pr, pr_closed_no_merge |
+| Enum                | Values                                                                                                       |
+| ------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `account_type`      | organization, user                                                                                           |
+| `signal_type`       | commit, pr_open, pr_merge, pr_close_no_merge, issue_open, issue_close, review, review_comment, comment, spam |
+| `score_scope_type`  | organization, team, repository                                                                               |
+| `score_entity_type` | contributor, team, repository                                                                                |
+| `score_time_period` | today, week, month, quarter, half_year, all_time                                                             |
+| `team_privacy`      | secret, closed, open                                                                                         |
+| `review_state`      | approved, changes_requested, commented                                                                       |
+| `multiplier_kind`   | merged_pr_commit, pr_linked_to_issue, first_activity                                                         |
+| `zero_point_kind`   | self_review, self_merge, bot_activity, issue_closed_no_pr, pr_closed_no_merge                                |
 
 ### 2.2 Tables
 
 PK = primary key. FK actions in brackets. All `created_at`/`updated_at` columns are `timestamptz NOT NULL DEFAULT now()`. Tables marked "upd trg" have a `BEFORE UPDATE` trigger that calls `set_updated_at()`.
 
-| Table | Key columns and types | PK | FKs | Other constraints and indexes |
-|---|---|---|---|---|
-| `users` | `id bigint` (GitHub user id), `login text`, `name text?`, `avatar_url text`, `is_bot bool` | id | none | unique `login`; partial index `is_bot=true`; upd trg |
-| `organizations` | `id bigint` (GitHub org id), `login`, `name?`, `avatar_url?` | id | none | unique `login`; upd trg |
-| `organization_memberships` | `user_id`, `organization_id`, `role text` default `member` | (user_id, organization_id) | users, organizations [CASCADE] | index per column |
-| `repositories` | `id bigint` (GitHub repo id), `full_name`, `name`, `owner_login`, `organization_id?`, `is_private`, `is_archived`, `is_fork`, `default_branch?`, `html_url?`, `github_updated_at?` | id | organizations [SET NULL] | unique `full_name`; index `owner_login`; partial index `organization_id` |
-| `teams` | `id bigint` (GitHub team id), `organization_id`, `slug`, `name`, `description?`, `privacy team_privacy`, `github_created_at?`, `github_updated_at?` | id | organizations [CASCADE] | unique (organization_id, slug); upd trg |
-| `team_members` | `team_id`, `user_id`, `role` | (team_id, user_id) | teams, users [CASCADE] | upd trg |
-| `team_repositories` | `team_id`, `repository_id`, `permission` default `push` | (team_id, repository_id) | teams, repositories [CASCADE] | upd trg |
-| `github_installations` | `installation_id bigint`, `app_id`, `organization_id?`, `user_account_id?`, `account_type`, `repository_selection`, `permissions jsonb`, `repository_count int`, `suspended_at?`, `suspended_by?`, `gh_created_at?`, `gh_updated_at?` | installation_id | organizations, users [CASCADE] | CHECK exactly one of org/user set to match `account_type`; 4 indexes; upd trg |
-| `installation_repositories` | `installation_id`, `repository_id` | composite | github_installations, repositories [CASCADE] | index per column |
-| `auth_sessions` | `id text` (session bearer token), `user_id`, `github_token_encrypted`, `_iv`, `_tag`, `github_token_type`, `github_token_scope`, `tokens_encrypted bool`, refresh token triple (nullable), `github_refresh_token_expires_at?`, `github_access_token_expires_at?`, `expires_at` | id | users [CASCADE] | CHECK `tokens_encrypted = true`; index `user_id`, `expires_at`; upd trg |
-| `session_installations` | `session_id text`, `installation_id` | composite | auth_sessions, github_installations [CASCADE] | index per column |
-| `scoring_presets` | `id bigserial`, `installation_id`, `preset_name`, `is_active` | id | github_installations [CASCADE] | unique (installation_id, preset_name); partial unique `installation_id WHERE is_active`; upd trg |
-| `scoring_preset_rules` | `preset_id`, `weekly_threshold int`=9, `decay_factor numeric(6,4)`=0.11, `floor_fraction numeric(6,4)`=0.2, `spam_penalty numeric(10,4)`=-12, `pr_closed_no_merge_penalty numeric(10,4)`=-10 | preset_id (1:1) | scoring_presets [CASCADE] | upd trg |
-| `scoring_preset_base_points` | `preset_id`, `signal_type`, `points numeric(10,4)`, `sort_order` | (preset_id, signal_type) | scoring_presets [CASCADE] | upd trg |
-| `scoring_preset_multipliers` | `id bigserial`, `preset_id`, `kind multiplier_kind`, `factor numeric(10,4)`, `sort_order` | id | scoring_presets [CASCADE] | unique (preset_id, kind); upd trg |
-| `scoring_preset_multiplier_signal_types` | `multiplier_id`, `signal_type` | composite | scoring_preset_multipliers [CASCADE] | index `signal_type` |
-| `scoring_preset_review_state_weights` | `preset_id`, `state review_state`, `weight numeric(10,4)`, `sort_order` | (preset_id, state) | scoring_presets [CASCADE] | upd trg |
-| `scoring_preset_daily_quotas` | `preset_id`, `signal_type`, `quota_limit int`, `sort_order` | (preset_id, signal_type) | scoring_presets [CASCADE] | upd trg |
-| `scoring_preset_zero_point_conditions` | `preset_id`, `kind zero_point_kind`, `enabled bool`, `sort_order` | (preset_id, kind) | scoring_presets [CASCADE] | upd trg |
-| `signals` | `id bigint identity`, `installation_id`, `user_id`, `repository_id`, `type signal_type`, `value numeric(10,4)`, `event_timestamp`, `content_hash char(64)`, `metadata jsonb` | (id, event_timestamp) | github_installations [CASCADE]; users, repositories [RESTRICT] | `PARTITION BY RANGE (event_timestamp)`; CHECK metadata ≤ 2048 bytes; unique dedup (user_id, type, repository_id, event_timestamp, content_hash); BRIN and 6 btree indexes |
-| `signals_default` | partition of `signals` | | | `DEFAULT` partition; `AFTER INSERT` trigger counts rows in `signals_partition_health` |
-| `signals_partition_health` | `singleton bool`, `default_partition_row_count bigint`, `last_default_partition_hit_at?` | singleton | none | one seeded row; own upd trg |
-| `ingest_log` | `id bigserial`, `installation_id`, `organization_id`, `team_id?`, `repository_id?`, `last_successful_ingest_at` default epoch, `ingest_preset text` default `all_time`, `repo_count`, `signal_count` | id | installations, organizations, teams, repositories [CASCADE] | CHECK at most one of team/repo; 3 partial unique indexes (org, team, repo scope); upd trg |
-| `repository_sync_state` | `id bigserial`, `repository_id` unique, `organization_id`, `repo_updated_at?`, 5 `*_etag text?`, `pr_ids_hash?`, `last_fetched_at` | id | repositories, organizations [CASCADE] | index (organization_id, last_fetched_at) |
-| `leaderboard_materializations` | `id bigserial`, `preset_id`, `scope_type`, `organization_id`, `team_id?`, `repository_id?`, `entity_type`, `time_period`, `version`, `row_count`, `signal_count`, `retention_state text`, `superseded_at?`, `retention_expires_at?`, `purged_at?`, `source_updated_at?`, `redis_cache_key text?`, `computed_at`, `signals_since?`, `signals_until?` | id | scoring_presets, organizations, teams, repositories [CASCADE] | CHECK scope shape; CHECK retention_state in 4 values; CHECK lifecycle; 3 partial unique indexes; GC index; upd trg |
-| `computed_scores` | `id bigserial`, `materialization_id`, `entity_type`, `user_id?`, `scored_team_id?`, `scored_repo_id?`, `time_period`, `score numeric(12,4)`, `breakdown jsonb`, `counts jsonb`, `additions`, `deletions`, `rank`, `member_count?`, `computed_at`, `version` | id | leaderboard_materializations, users, teams, repositories [CASCADE] | CHECK exactly one entity column; unique (materialization_id, entity_type, user_id, scored_team_id, scored_repo_id); 3 more indexes |
+| Table                                    | Key columns and types                                                                                                                                                                                                                                                                                                                               | PK                         | FKs                                                                | Other constraints and indexes                                                                                                                                             |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users`                                  | `id bigint` (GitHub user id), `login text`, `name text?`, `avatar_url text`, `is_bot bool`                                                                                                                                                                                                                                                          | id                         | none                                                               | unique `login`; partial index `is_bot=true`; upd trg                                                                                                                      |
+| `organizations`                          | `id bigint` (GitHub org id), `login`, `name?`, `avatar_url?`                                                                                                                                                                                                                                                                                        | id                         | none                                                               | unique `login`; upd trg                                                                                                                                                   |
+| `organization_memberships`               | `user_id`, `organization_id`, `role text` default `member`                                                                                                                                                                                                                                                                                          | (user_id, organization_id) | users, organizations [CASCADE]                                     | index per column                                                                                                                                                          |
+| `repositories`                           | `id bigint` (GitHub repo id), `full_name`, `name`, `owner_login`, `organization_id?`, `is_private`, `is_archived`, `is_fork`, `default_branch?`, `html_url?`, `github_updated_at?`                                                                                                                                                                  | id                         | organizations [SET NULL]                                           | unique `full_name`; index `owner_login`; partial index `organization_id`                                                                                                  |
+| `teams`                                  | `id bigint` (GitHub team id), `organization_id`, `slug`, `name`, `description?`, `privacy team_privacy`, `github_created_at?`, `github_updated_at?`                                                                                                                                                                                                 | id                         | organizations [CASCADE]                                            | unique (organization_id, slug); upd trg                                                                                                                                   |
+| `team_members`                           | `team_id`, `user_id`, `role`                                                                                                                                                                                                                                                                                                                        | (team_id, user_id)         | teams, users [CASCADE]                                             | upd trg                                                                                                                                                                   |
+| `team_repositories`                      | `team_id`, `repository_id`, `permission` default `push`                                                                                                                                                                                                                                                                                             | (team_id, repository_id)   | teams, repositories [CASCADE]                                      | upd trg                                                                                                                                                                   |
+| `github_installations`                   | `installation_id bigint`, `app_id`, `organization_id?`, `user_account_id?`, `account_type`, `repository_selection`, `permissions jsonb`, `repository_count int`, `suspended_at?`, `suspended_by?`, `gh_created_at?`, `gh_updated_at?`                                                                                                               | installation_id            | organizations, users [CASCADE]                                     | CHECK exactly one of org/user set to match `account_type`; 4 indexes; upd trg                                                                                             |
+| `installation_repositories`              | `installation_id`, `repository_id`                                                                                                                                                                                                                                                                                                                  | composite                  | github_installations, repositories [CASCADE]                       | index per column                                                                                                                                                          |
+| `auth_sessions`                          | `id text` (session bearer token), `user_id`, `github_token_encrypted`, `_iv`, `_tag`, `github_token_type`, `github_token_scope`, `tokens_encrypted bool`, refresh token triple (nullable), `github_refresh_token_expires_at?`, `github_access_token_expires_at?`, `expires_at`                                                                      | id                         | users [CASCADE]                                                    | CHECK `tokens_encrypted = true`; index `user_id`, `expires_at`; upd trg                                                                                                   |
+| `session_installations`                  | `session_id text`, `installation_id`                                                                                                                                                                                                                                                                                                                | composite                  | auth_sessions, github_installations [CASCADE]                      | index per column                                                                                                                                                          |
+| `scoring_presets`                        | `id bigserial`, `installation_id`, `preset_name`, `is_active`                                                                                                                                                                                                                                                                                       | id                         | github_installations [CASCADE]                                     | unique (installation_id, preset_name); partial unique `installation_id WHERE is_active`; upd trg                                                                          |
+| `scoring_preset_rules`                   | `preset_id`, `weekly_threshold int`=9, `decay_factor numeric(6,4)`=0.11, `floor_fraction numeric(6,4)`=0.2, `spam_penalty numeric(10,4)`=-12, `pr_closed_no_merge_penalty numeric(10,4)`=-10                                                                                                                                                        | preset_id (1:1)            | scoring_presets [CASCADE]                                          | upd trg                                                                                                                                                                   |
+| `scoring_preset_base_points`             | `preset_id`, `signal_type`, `points numeric(10,4)`, `sort_order`                                                                                                                                                                                                                                                                                    | (preset_id, signal_type)   | scoring_presets [CASCADE]                                          | upd trg                                                                                                                                                                   |
+| `scoring_preset_multipliers`             | `id bigserial`, `preset_id`, `kind multiplier_kind`, `factor numeric(10,4)`, `sort_order`                                                                                                                                                                                                                                                           | id                         | scoring_presets [CASCADE]                                          | unique (preset_id, kind); upd trg                                                                                                                                         |
+| `scoring_preset_multiplier_signal_types` | `multiplier_id`, `signal_type`                                                                                                                                                                                                                                                                                                                      | composite                  | scoring_preset_multipliers [CASCADE]                               | index `signal_type`                                                                                                                                                       |
+| `scoring_preset_review_state_weights`    | `preset_id`, `state review_state`, `weight numeric(10,4)`, `sort_order`                                                                                                                                                                                                                                                                             | (preset_id, state)         | scoring_presets [CASCADE]                                          | upd trg                                                                                                                                                                   |
+| `scoring_preset_daily_quotas`            | `preset_id`, `signal_type`, `quota_limit int`, `sort_order`                                                                                                                                                                                                                                                                                         | (preset_id, signal_type)   | scoring_presets [CASCADE]                                          | upd trg                                                                                                                                                                   |
+| `scoring_preset_zero_point_conditions`   | `preset_id`, `kind zero_point_kind`, `enabled bool`, `sort_order`                                                                                                                                                                                                                                                                                   | (preset_id, kind)          | scoring_presets [CASCADE]                                          | upd trg                                                                                                                                                                   |
+| `signals`                                | `id bigint identity`, `installation_id`, `user_id`, `repository_id`, `type signal_type`, `value numeric(10,4)`, `event_timestamp`, `content_hash char(64)`, `metadata jsonb`                                                                                                                                                                        | (id, event_timestamp)      | github_installations [CASCADE]; users, repositories [RESTRICT]     | `PARTITION BY RANGE (event_timestamp)`; CHECK metadata ≤ 2048 bytes; unique dedup (user_id, type, repository_id, event_timestamp, content_hash); BRIN and 6 btree indexes |
+| `signals_default`                        | partition of `signals`                                                                                                                                                                                                                                                                                                                              |                            |                                                                    | `DEFAULT` partition; `AFTER INSERT` trigger counts rows in `signals_partition_health`                                                                                     |
+| `signals_partition_health`               | `singleton bool`, `default_partition_row_count bigint`, `last_default_partition_hit_at?`                                                                                                                                                                                                                                                            | singleton                  | none                                                               | one seeded row; own upd trg                                                                                                                                               |
+| `ingest_log`                             | `id bigserial`, `installation_id`, `organization_id`, `team_id?`, `repository_id?`, `last_successful_ingest_at` default epoch, `ingest_preset text` default `all_time`, `repo_count`, `signal_count`                                                                                                                                                | id                         | installations, organizations, teams, repositories [CASCADE]        | CHECK at most one of team/repo; 3 partial unique indexes (org, team, repo scope); upd trg                                                                                 |
+| `repository_sync_state`                  | `id bigserial`, `repository_id` unique, `organization_id`, `repo_updated_at?`, 5 `*_etag text?`, `pr_ids_hash?`, `last_fetched_at`                                                                                                                                                                                                                  | id                         | repositories, organizations [CASCADE]                              | index (organization_id, last_fetched_at)                                                                                                                                  |
+| `leaderboard_materializations`           | `id bigserial`, `preset_id`, `scope_type`, `organization_id`, `team_id?`, `repository_id?`, `entity_type`, `time_period`, `version`, `row_count`, `signal_count`, `retention_state text`, `superseded_at?`, `retention_expires_at?`, `purged_at?`, `source_updated_at?`, `redis_cache_key text?`, `computed_at`, `signals_since?`, `signals_until?` | id                         | scoring_presets, organizations, teams, repositories [CASCADE]      | CHECK scope shape; CHECK retention_state in 4 values; CHECK lifecycle; 3 partial unique indexes; GC index; upd trg                                                        |
+| `computed_scores`                        | `id bigserial`, `materialization_id`, `entity_type`, `user_id?`, `scored_team_id?`, `scored_repo_id?`, `time_period`, `score numeric(12,4)`, `breakdown jsonb`, `counts jsonb`, `additions`, `deletions`, `rank`, `member_count?`, `computed_at`, `version`                                                                                         | id                         | leaderboard_materializations, users, teams, repositories [CASCADE] | CHECK exactly one entity column; unique (materialization_id, entity_type, user_id, scored_team_id, scored_repo_id); 3 more indexes                                        |
 
 ### 2.3 Functions
 
-| Function | Purpose | Called by app code? |
-|---|---|---|
-| `set_updated_at()` | trigger: `updated_at = now()` | trigger only |
-| `set_signals_partition_health_updated_at()` | same, for the health row | trigger only |
-| `track_signals_default_usage()` | counts inserts into `signals_default` | trigger only |
-| `ensure_signals_monthly_partitions(p_start, p_end)` | creates `signals_YYYY_MM` partitions and 8 indexes each. `SECURITY DEFINER`, `search_path = public` | yes, `lib/supabase/signals.ts:211` |
-| `drop_old_signals_partitions(p_keep_months=12)` | drops monthly partitions older than N months | no |
-| `purge_superseded_materializations(p_before)` | deletes non-current materializations | no |
-| `cleanup_expired_sessions()` and `purge_expired_auth_sessions()` | identical bodies: delete expired sessions | no |
+| Function                                                         | Purpose                                                                                             | Called by app code?                |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| `set_updated_at()`                                               | trigger: `updated_at = now()`                                                                       | trigger only                       |
+| `set_signals_partition_health_updated_at()`                      | same, for the health row                                                                            | trigger only                       |
+| `track_signals_default_usage()`                                  | counts inserts into `signals_default`                                                               | trigger only                       |
+| `ensure_signals_monthly_partitions(p_start, p_end)`              | creates `signals_YYYY_MM` partitions and 8 indexes each. `SECURITY DEFINER`, `search_path = public` | yes, `lib/supabase/signals.ts:211` |
+| `drop_old_signals_partitions(p_keep_months=12)`                  | drops monthly partitions older than N months                                                        | no                                 |
+| `purge_superseded_materializations(p_before)`                    | deletes non-current materializations                                                                | no                                 |
+| `cleanup_expired_sessions()` and `purge_expired_auth_sessions()` | identical bodies: delete expired sessions                                                           | no                                 |
 
 **Verified**: a grep for each function name in `lib/` and `app/` finds only the `ensure_signals_monthly_partitions` call. No `vercel.json` cron exists in the repo root. The three cleanup functions have no scheduler in this repo.
 
@@ -100,11 +100,11 @@ PK = primary key. FK actions in brackets. All `created_at`/`updated_at` columns 
 
 Method: parse only the needed keys from each env file in a Python process. Never print values. Hash hostnames with SHA-256. Resolve with the local resolver and with `dig @1.1.1.1`. **Verified**.
 
-| Env file | `NODE_ENV` | Supabase host hash | Supabase DNS | Upstash host hash | Upstash DNS | Service-role key present |
-|---|---|---|---|---|---|---|
-| `.env` | development | `f9b757c4` | resolves, PostgREST HTTP 200/206 | `4df802c2` | NXDOMAIN | yes |
-| `.env.staging` | production | `ed6414b8` | NXDOMAIN (`URLError`, `gaierror -2`) | `7e42d517` | NXDOMAIN | yes |
-| `.env.production` | production | `2a24aaa2` | NXDOMAIN | not set | n/a | no |
+| Env file          | `NODE_ENV`  | Supabase host hash | Supabase DNS                         | Upstash host hash | Upstash DNS | Service-role key present |
+| ----------------- | ----------- | ------------------ | ------------------------------------ | ----------------- | ----------- | ------------------------ |
+| `.env`            | development | `f9b757c4`         | resolves, PostgREST HTTP 200/206     | `4df802c2`        | NXDOMAIN    | yes                      |
+| `.env.staging`    | production  | `ed6414b8`         | NXDOMAIN (`URLError`, `gaierror -2`) | `7e42d517`        | NXDOMAIN    | yes                      |
+| `.env.production` | production  | `2a24aaa2`         | NXDOMAIN                             | not set           | n/a         | no                       |
 
 - The three files point at three **different** Supabase projects and two different Upstash databases. **Verified**.
 - `.env` sets `NEXT_PUBLIC_APP_URL` to localhost. Staging points at an `upayan.dev` host. Production points at a `codechefvit.com` host. **Verified**.
@@ -119,35 +119,35 @@ On-disk table sizes are **not reachable**. PostgREST does not expose `pg_total_r
 
 ### 4.1 Row counts
 
-| Table | Rows | JSON bytes |
-|---|---:|---:|
-| users | 29 | 5,776 |
-| organizations | 10 | 2,367 |
-| organization_memberships | 16 | 1,931 |
-| repositories | 372 | 148,886 |
-| teams | 7 | 2,002 |
-| team_members | 25 | 4,039 |
-| team_repositories | 4 | 695 |
-| github_installations | 8 | 6,430 |
-| installation_repositories | 0 | 2 |
-| auth_sessions | 2 | 778 (non-secret columns only) |
-| session_installations | 5 | 410 (`installation_id` only) |
-| scoring_presets | 6 | 1,114 |
-| scoring_preset_rules | 6 | 1,476 |
-| scoring_preset_base_points | 42 | 7,486 |
-| scoring_preset_multipliers | 18 | 3,369 |
-| scoring_preset_multiplier_signal_types | 54 | 5,331 |
-| scoring_preset_review_state_weights | 18 | 3,144 |
-| scoring_preset_daily_quotas | 12 | 2,142 |
-| scoring_preset_zero_point_conditions | 30 | 5,334 |
-| signals | 50 | 24,345 |
-| signals_default | not reachable: PostgREST `404 PGRST205` (partitions are not in the schema cache). Rows are inside the `signals` count. | |
-| signals_partition_health | 1 | 194 |
-| ingest_log | 2 | 671 |
-| repository_sync_state | 17 | 5,925 |
-| leaderboard_materializations | 106 | 73,101 |
-| computed_scores | 109 | 58,939 |
-| **Total** | **949** | **365,887** |
+| Table                                  |                                                                                                                   Rows |                    JSON bytes |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------: | ----------------------------: |
+| users                                  |                                                                                                                     29 |                         5,776 |
+| organizations                          |                                                                                                                     10 |                         2,367 |
+| organization_memberships               |                                                                                                                     16 |                         1,931 |
+| repositories                           |                                                                                                                    372 |                       148,886 |
+| teams                                  |                                                                                                                      7 |                         2,002 |
+| team_members                           |                                                                                                                     25 |                         4,039 |
+| team_repositories                      |                                                                                                                      4 |                           695 |
+| github_installations                   |                                                                                                                      8 |                         6,430 |
+| installation_repositories              |                                                                                                                      0 |                             2 |
+| auth_sessions                          |                                                                                                                      2 | 778 (non-secret columns only) |
+| session_installations                  |                                                                                                                      5 |  410 (`installation_id` only) |
+| scoring_presets                        |                                                                                                                      6 |                         1,114 |
+| scoring_preset_rules                   |                                                                                                                      6 |                         1,476 |
+| scoring_preset_base_points             |                                                                                                                     42 |                         7,486 |
+| scoring_preset_multipliers             |                                                                                                                     18 |                         3,369 |
+| scoring_preset_multiplier_signal_types |                                                                                                                     54 |                         5,331 |
+| scoring_preset_review_state_weights    |                                                                                                                     18 |                         3,144 |
+| scoring_preset_daily_quotas            |                                                                                                                     12 |                         2,142 |
+| scoring_preset_zero_point_conditions   |                                                                                                                     30 |                         5,334 |
+| signals                                |                                                                                                                     50 |                        24,345 |
+| signals_default                        | not reachable: PostgREST `404 PGRST205` (partitions are not in the schema cache). Rows are inside the `signals` count. |                               |
+| signals_partition_health               |                                                                                                                      1 |                           194 |
+| ingest_log                             |                                                                                                                      2 |                           671 |
+| repository_sync_state                  |                                                                                                                     17 |                         5,925 |
+| leaderboard_materializations           |                                                                                                                    106 |                        73,101 |
+| computed_scores                        |                                                                                                                    109 |                        58,939 |
+| **Total**                              |                                                                                                                **949** |                   **365,887** |
 
 Schema drift: the PostgREST OpenAPI document (`GET /rest/v1/` with `Accept: application/openapi+json`) lists the same 25 tables. Every table has exactly the columns from the migrations. It also lists the 5 RPC functions from section 2.3. **Verified**. No drift.
 
@@ -176,16 +176,16 @@ Live introspection is **not reachable**. Both REST hostnames return `NXDOMAIN` f
 
 The namespaces below come from the code. **Verified** per file. Every key gets the prefix `${REDIS_CACHE_PREFIX}:` (default `gh-org-tool`, `lib/cache/redis.ts:43`, `lib/env/index.ts:18`). Both env files set the prefix to `gh-org-tool`. All values are JSON strings (`SET … EX`). The app uses only `GET`, `SET EX`, `SET NX EX`, `DEL`, and `SCAN`+`DEL` for pattern deletes.
 
-| Namespace (after prefix) | Type | TTL | Written by | Content |
-|---|---|---|---|---|
-| `leaderboard:snapshot:preset:<presetId>:{org\|team\|repo}:<id>:entity:<entityType>:period:<period>:v:<version\|latest>` | string (JSON) | 24 h | `lib/leaderboard/redis-cache.ts:56` | computed leaderboard rows |
-| `leaderboard:response:<org>:<scopeType>:<scopeId>:<entityType>:<period>[:p<presetId>][:<from>][:<to>]` | string (JSON) | 24 h | `lib/leaderboard/request-cache.ts:67` | full API response |
-| `leaderboard:lock:ingest:<installationId>:<org>:<scopeType>:<scopeId>` | string (ISO time) | 5 min | `lib/leaderboard/ingest.ts:145` | ingest mutex |
-| `leaderboard:lock:scores:<presetId>:<scopeType>:<orgId>:<teamId\|null>:<repoId\|null>:<entityType>:<period>` | string (ISO time) | 5 min | `lib/supabase/leaderboard-db.ts:1131` | score write mutex |
-| `github:graphql:<queryName>:<var\|var\|…>` | string (JSON) | 90 s | `lib/github/graphql-response-cache.ts:53` | GraphQL response |
-| `github:org-repositories:<org>` | string (JSON) | 5 min | `lib/github/fetch-graphql.ts:192` | org repo list |
-| `github:org-teams:v2:<org>` | string (JSON) | 5 min | `lib/github/fetch-graphql.ts:985` | team memberships |
-| `github:repo-fetch:id:<repoId>` and `github:repo-fetch:name:<owner/repo>` | string (JSON) | 24 h | `lib/supabase/repo-cache.ts:48,54` | repo sync-state copy |
+| Namespace (after prefix)                                                                                                | Type              | TTL   | Written by                                | Content                   |
+| ----------------------------------------------------------------------------------------------------------------------- | ----------------- | ----- | ----------------------------------------- | ------------------------- |
+| `leaderboard:snapshot:preset:<presetId>:{org\|team\|repo}:<id>:entity:<entityType>:period:<period>:v:<version\|latest>` | string (JSON)     | 24 h  | `lib/leaderboard/redis-cache.ts:56`       | computed leaderboard rows |
+| `leaderboard:response:<org>:<scopeType>:<scopeId>:<entityType>:<period>[:p<presetId>][:<from>][:<to>]`                  | string (JSON)     | 24 h  | `lib/leaderboard/request-cache.ts:67`     | full API response         |
+| `leaderboard:lock:ingest:<installationId>:<org>:<scopeType>:<scopeId>`                                                  | string (ISO time) | 5 min | `lib/leaderboard/ingest.ts:145`           | ingest mutex              |
+| `leaderboard:lock:scores:<presetId>:<scopeType>:<orgId>:<teamId\|null>:<repoId\|null>:<entityType>:<period>`            | string (ISO time) | 5 min | `lib/supabase/leaderboard-db.ts:1131`     | score write mutex         |
+| `github:graphql:<queryName>:<var\|var\|…>`                                                                              | string (JSON)     | 90 s  | `lib/github/graphql-response-cache.ts:53` | GraphQL response          |
+| `github:org-repositories:<org>`                                                                                         | string (JSON)     | 5 min | `lib/github/fetch-graphql.ts:192`         | org repo list             |
+| `github:org-teams:v2:<org>`                                                                                             | string (JSON)     | 5 min | `lib/github/fetch-graphql.ts:985`         | team memberships          |
+| `github:repo-fetch:id:<repoId>` and `github:repo-fetch:name:<owner/repo>`                                               | string (JSON)     | 24 h  | `lib/supabase/repo-cache.ts:48,54`        | repo sync-state copy      |
 
 Every key has a TTL of 24 h or less. **Verified** (`lib/constants/time.ts:41-51`). Redis holds no data that is not in Postgres or GitHub.
 
@@ -193,29 +193,29 @@ Every key has a TTL of 24 h or less. **Verified** (`lib/constants/time.ts:41-51`
 
 Categories: GitHub-owned authoritative, Application-owned authoritative, Derived, Cache, Sync metadata, Audit, User preferences, Sensitive credentials, Temporary processing state.
 
-| Item | Category | Action | Reason |
-|---|---|---|---|
-| `users` | GitHub-owned authoritative (mirror) | Rebuild | GitHub is the source. Login and org sync recreate rows. |
-| `organizations` | GitHub-owned authoritative (mirror) | Rebuild | Created from installation and org sync. |
-| `organization_memberships` | GitHub-owned authoritative (mirror) | Rebuild | Written at login (`lib/auth/server/user-service.ts:63`). |
-| `repositories` | GitHub-owned authoritative (mirror) | Rebuild | GraphQL org sync. |
-| `teams`, `team_members`, `team_repositories` | GitHub-owned authoritative (mirror) | Rebuild | GraphQL team sync. |
-| `github_installations` | GitHub-owned authoritative (mirror) | Rebuild | `GET /app/installations` with the App JWT lists all 8. Needed before preset import. |
-| `installation_repositories` | GitHub-owned authoritative (mirror) | Discard | 0 rows. No writer (section 2.5). |
-| `scoring_presets` + 7 child tables | Application-owned authoritative (org settings) | **Migrate** | The only data GitHub cannot recreate. 186 rows. |
-| `signals` | Derived (from GitHub events) | Rebuild | Re-ingest with `all_time`. Use the dump only to reconcile. |
-| `signals_default`, `signals_partition_health` | Sync metadata | Discard | Partition bookkeeping. Depends on the new partition design. |
-| `leaderboard_materializations` | Derived | Rebuild | Recomputed from signals and presets. Old ids and Redis keys become invalid. |
-| `computed_scores` | Derived | Rebuild | Same as above. |
-| `ingest_log` | Sync metadata | Discard | Empty state forces a full first ingest, which is the goal. |
-| `repository_sync_state` | Sync metadata | Discard | Etags are empty. Timestamps only. |
-| `auth_sessions` | Sensitive credentials | Discard | Encrypted GitHub tokens bound to `TOKEN_ENCRYPTION_KEY`. Both rows expired. Users log in again. |
-| `session_installations` | Temporary processing state (session-bound) | Discard | Cascades from sessions. |
-| Redis `leaderboard:snapshot:*`, `leaderboard:response:*` | Cache | Discard | 24 h TTL. Rebuilt on read. Databases are gone anyway. |
-| Redis `github:graphql:*`, `github:org-*`, `github:repo-fetch:*` | Cache | Discard | 90 s to 24 h TTL. |
-| Redis `leaderboard:lock:*` | Temporary processing state | Discard | 5 min mutex. |
-| Audit | none | n/a | No audit table exists. **Verified** (migrations). |
-| User preferences | none server-side | n/a | No table holds them. **Assumption**: UI settings (for example the sidebar cookie, `lib/constants/time.ts:15`) live in cookies or local storage only. |
+| Item                                                            | Category                                       | Action      | Reason                                                                                                                                               |
+| --------------------------------------------------------------- | ---------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users`                                                         | GitHub-owned authoritative (mirror)            | Rebuild     | GitHub is the source. Login and org sync recreate rows.                                                                                              |
+| `organizations`                                                 | GitHub-owned authoritative (mirror)            | Rebuild     | Created from installation and org sync.                                                                                                              |
+| `organization_memberships`                                      | GitHub-owned authoritative (mirror)            | Rebuild     | Written at login (`lib/auth/server/user-service.ts:63`).                                                                                             |
+| `repositories`                                                  | GitHub-owned authoritative (mirror)            | Rebuild     | GraphQL org sync.                                                                                                                                    |
+| `teams`, `team_members`, `team_repositories`                    | GitHub-owned authoritative (mirror)            | Rebuild     | GraphQL team sync.                                                                                                                                   |
+| `github_installations`                                          | GitHub-owned authoritative (mirror)            | Rebuild     | `GET /app/installations` with the App JWT lists all 8. Needed before preset import.                                                                  |
+| `installation_repositories`                                     | GitHub-owned authoritative (mirror)            | Discard     | 0 rows. No writer (section 2.5).                                                                                                                     |
+| `scoring_presets` + 7 child tables                              | Application-owned authoritative (org settings) | **Migrate** | The only data GitHub cannot recreate. 186 rows.                                                                                                      |
+| `signals`                                                       | Derived (from GitHub events)                   | Rebuild     | Re-ingest with `all_time`. Use the dump only to reconcile.                                                                                           |
+| `signals_default`, `signals_partition_health`                   | Sync metadata                                  | Discard     | Partition bookkeeping. Depends on the new partition design.                                                                                          |
+| `leaderboard_materializations`                                  | Derived                                        | Rebuild     | Recomputed from signals and presets. Old ids and Redis keys become invalid.                                                                          |
+| `computed_scores`                                               | Derived                                        | Rebuild     | Same as above.                                                                                                                                       |
+| `ingest_log`                                                    | Sync metadata                                  | Discard     | Empty state forces a full first ingest, which is the goal.                                                                                           |
+| `repository_sync_state`                                         | Sync metadata                                  | Discard     | Etags are empty. Timestamps only.                                                                                                                    |
+| `auth_sessions`                                                 | Sensitive credentials                          | Discard     | Encrypted GitHub tokens bound to `TOKEN_ENCRYPTION_KEY`. Both rows expired. Users log in again.                                                      |
+| `session_installations`                                         | Temporary processing state (session-bound)     | Discard     | Cascades from sessions.                                                                                                                              |
+| Redis `leaderboard:snapshot:*`, `leaderboard:response:*`        | Cache                                          | Discard     | 24 h TTL. Rebuilt on read. Databases are gone anyway.                                                                                                |
+| Redis `github:graphql:*`, `github:org-*`, `github:repo-fetch:*` | Cache                                          | Discard     | 90 s to 24 h TTL.                                                                                                                                    |
+| Redis `leaderboard:lock:*`                                      | Temporary processing state                     | Discard     | 5 min mutex.                                                                                                                                         |
+| Audit                                                           | none                                           | n/a         | No audit table exists. **Verified** (migrations).                                                                                                    |
+| User preferences                                                | none server-side                               | n/a         | No table holds them. **Assumption**: UI settings (for example the sidebar cookie, `lib/constants/time.ts:15`) live in cookies or local storage only. |
 
 **Decision**: the reason for not migrating sessions and tokens: the tokens are AES-256-GCM ciphertext (`lib/auth/server/crypto.ts:6`). Moving them would also mean moving the encryption key. Both sessions are expired. A new login costs users one OAuth round trip. No reason to keep them was found.
 
@@ -227,20 +227,20 @@ Categories: GitHub-owned authoritative, Application-owned authoritative, Derived
 
 ### 7.2 Schema mapping (Proposals)
 
-| Legacy | Gitorgasm | Change |
-|---|---|---|
-| all enums | same enums | Keep values. Add values with `ALTER TYPE … ADD VALUE` in later migrations. |
-| `users`, `organizations`, `teams`, `repositories` | same tables | Keep GitHub numeric ids as `bigint` PKs. Add `node_id text` for GraphQL global ids. |
-| `github_installations` | `installations` | Same columns. Keep the account CHECK. |
-| `installation_repositories` | drop or keep with a real writer | Decide in the app design. |
-| `scoring_presets` + children | same structure | Use `GENERATED ALWAYS AS IDENTITY`. Keep `(installation_id, preset_name)` as the natural key. Keep the partial unique "one active preset" index. |
-| `signals` (partitioned) | `signals` (not partitioned) | Data is 50 rows. Keep the dedup unique index and the BRIN index. Drop redundant btree indexes. Revisit partitioning above about 10 M rows. |
-| `computed_scores` | same | Make the entity unique index `NULLS NOT DISTINCT` (PG 15+) so the database enforces uniqueness. |
-| `leaderboard_materializations` | same | Remove `redis_cache_key` if the new cache derives keys. |
-| `auth_sessions`, `session_installations` | new session design | No data carried over. |
-| `ingest_log`, `repository_sync_state` | new sync-state table | Start empty. |
-| duplicate PK-prefix indexes | remove | Section 2.5 item 4. |
-| `cleanup_expired_sessions` / `purge_expired_auth_sessions` | one function plus a scheduled caller | Legacy never called them. |
+| Legacy                                                     | Gitorgasm                            | Change                                                                                                                                           |
+| ---------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| all enums                                                  | same enums                           | Keep values. Add values with `ALTER TYPE … ADD VALUE` in later migrations.                                                                       |
+| `users`, `organizations`, `teams`, `repositories`          | same tables                          | Keep GitHub numeric ids as `bigint` PKs. Add `node_id text` for GraphQL global ids.                                                              |
+| `github_installations`                                     | `installations`                      | Same columns. Keep the account CHECK.                                                                                                            |
+| `installation_repositories`                                | drop or keep with a real writer      | Decide in the app design.                                                                                                                        |
+| `scoring_presets` + children                               | same structure                       | Use `GENERATED ALWAYS AS IDENTITY`. Keep `(installation_id, preset_name)` as the natural key. Keep the partial unique "one active preset" index. |
+| `signals` (partitioned)                                    | `signals` (not partitioned)          | Data is 50 rows. Keep the dedup unique index and the BRIN index. Drop redundant btree indexes. Revisit partitioning above about 10 M rows.       |
+| `computed_scores`                                          | same                                 | Make the entity unique index `NULLS NOT DISTINCT` (PG 15+) so the database enforces uniqueness.                                                  |
+| `leaderboard_materializations`                             | same                                 | Remove `redis_cache_key` if the new cache derives keys.                                                                                          |
+| `auth_sessions`, `session_installations`                   | new session design                   | No data carried over.                                                                                                                            |
+| `ingest_log`, `repository_sync_state`                      | new sync-state table                 | Start empty.                                                                                                                                     |
+| duplicate PK-prefix indexes                                | remove                               | Section 2.5 item 4.                                                                                                                              |
+| `cleanup_expired_sessions` / `purge_expired_auth_sessions` | one function plus a scheduled caller | Legacy never called them.                                                                                                                        |
 
 ### 7.3 Transformation and idempotent import
 
@@ -257,14 +257,14 @@ GitHub mirror and derived data: trigger a full `all_time` ingest per installatio
 
 ### 7.4 Validation and reconciliation
 
-| Check | Pass condition |
-|---|---|
-| Preset count | Target presets for imported installations = 6. Each installation has exactly 1 active preset. |
-| Child counts | 6 rules, 42 base points, 18 multipliers, 54 multiplier signal types, 18 review weights, 12 quotas, 30 zero-point rows. |
-| Values | Per-preset hash of child rows (ordered by natural key) equals the hash computed from the dump. |
-| Installations | The 8 legacy installation ids exist, unless GitHub reports them uninstalled. List the difference. |
-| Signals | The legacy dedup tuple `(user_id, type, repository_id, event_timestamp, content_hash)` set from the dump is a subset of the rebuilt set. Explain each missing tuple (for example a deleted repo or a force-push). |
-| Leaderboards | For each org and period with legacy `computed_scores`, the top-10 contributor order matches, or the difference is explained by new signals after 2026-10-06. |
+| Check         | Pass condition                                                                                                                                                                                                    |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Preset count  | Target presets for imported installations = 6. Each installation has exactly 1 active preset.                                                                                                                     |
+| Child counts  | 6 rules, 42 base points, 18 multipliers, 54 multiplier signal types, 18 review weights, 12 quotas, 30 zero-point rows.                                                                                            |
+| Values        | Per-preset hash of child rows (ordered by natural key) equals the hash computed from the dump.                                                                                                                    |
+| Installations | The 8 legacy installation ids exist, unless GitHub reports them uninstalled. List the difference.                                                                                                                 |
+| Signals       | The legacy dedup tuple `(user_id, type, repository_id, event_timestamp, content_hash)` set from the dump is a subset of the rebuilt set. Explain each missing tuple (for example a deleted repo or a force-push). |
+| Leaderboards  | For each org and period with legacy `computed_scores`, the top-10 contributor order matches, or the difference is explained by new signals after 2026-10-06.                                                      |
 
 ### 7.5 Rollback
 

@@ -4,13 +4,13 @@ This document states how each part of Gitorgasm scales, what limits it, and the 
 
 ## 1. Summary
 
-| Part | How it scales | Limit | State |
-|---|---|---|---|
-| core api | Horizontal replicas. Stateless. | Postgres connections, node memory | Exists (stateless design). Replica count: Planned manifests. |
-| core worker | Horizontal replicas plus `WORKER_CONCURRENCY` per replica | GitHub budget and secondary limits | Exists |
-| PostgreSQL | Vertical. Partitioning for large tables. | One node's disk, memory, and I/O | Exists (local dev). Cluster: Planned. |
-| GitHub budget | Per installation. Fixed by GitHub. | 5,000–12,500 req/h per installation | **Verified**: [REST rate limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api#primary-rate-limit-for-github-app-installations) |
-| Web app | Vercel | Vercel Hobby limits | Planned |
+| Part          | How it scales                                             | Limit                               | State                                                                                                                                                             |
+| ------------- | --------------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| core api      | Horizontal replicas. Stateless.                           | Postgres connections, node memory   | Exists (stateless design). Replica count: Planned manifests.                                                                                                      |
+| core worker   | Horizontal replicas plus `WORKER_CONCURRENCY` per replica | GitHub budget and secondary limits  | Exists                                                                                                                                                            |
+| PostgreSQL    | Vertical. Partitioning for large tables.                  | One node's disk, memory, and I/O    | Exists (local dev). Cluster: Planned.                                                                                                                             |
+| GitHub budget | Per installation. Fixed by GitHub.                        | 5,000–12,500 req/h per installation | **Verified**: [REST rate limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api#primary-rate-limit-for-github-app-installations) |
+| Web app       | Vercel                                                    | Vercel Hobby limits                 | Planned                                                                                                                                                           |
 
 **Decision**: the GitHub rate budget is the true limit of the system. Compute, memory, and Postgres scale far beyond what the budget allows at every scale in workload-model.md §2–3.
 
@@ -47,16 +47,16 @@ Scaling rules:
 
 ## 4. PostgreSQL
 
-| Lever | When | Notes |
-|---|---|---|
-| Indexes for every list query | Now | Keyset index `repositories_listing_idx` exists (**Verified**: `00001_core.sql`). |
-| Retention of `webhook_deliveries` payloads | Stage 2 | Largest growth source before Stage 5 (workload-model.md §4). No purge job exists now. |
-| River completed-job retention | Now | River cleaner removes completed jobs after 24 h by default (**Verified**: `rivershared@v0.49.0`). |
-| Vertical resources | When cache hit ratio or query p95 degrades | Limit 1000m / 512Mi (D15). Raise within node headroom. |
-| Range partitioning of `signals` by month | Stage 5 | Drop old partitions instead of `DELETE`. Create partitions from a scheduled job, not on the request path (legacy defect, legacy-audit §7). |
-| Rollup tables for analytics | Stage 5+ | Precompute per day per repo per user. Read rollups, not raw signals. |
-| Connection pooler (PgBouncer) | Only if connection count is the limit | Not needed at ≤ 4 processes × 10 connections. |
-| Read replica | Only with a second node | No value on one node. |
+| Lever                                      | When                                       | Notes                                                                                                                                      |
+| ------------------------------------------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Indexes for every list query               | Now                                        | Keyset index `repositories_listing_idx` exists (**Verified**: `00001_core.sql`).                                                           |
+| Retention of `webhook_deliveries` payloads | Stage 2                                    | Largest growth source before Stage 5 (workload-model.md §4). No purge job exists now.                                                      |
+| River completed-job retention              | Now                                        | River cleaner removes completed jobs after 24 h by default (**Verified**: `rivershared@v0.49.0`).                                          |
+| Vertical resources                         | When cache hit ratio or query p95 degrades | Limit 1000m / 512Mi (D15). Raise within node headroom.                                                                                     |
+| Range partitioning of `signals` by month   | Stage 5                                    | Drop old partitions instead of `DELETE`. Create partitions from a scheduled job, not on the request path (legacy defect, legacy-audit §7). |
+| Rollup tables for analytics                | Stage 5+                                   | Precompute per day per repo per user. Read rollups, not raw signals.                                                                       |
+| Connection pooler (PgBouncer)              | Only if connection count is the limit      | Not needed at ≤ 4 processes × 10 connections.                                                                                              |
+| Read replica                               | Only with a second node                    | No value on one node.                                                                                                                      |
 
 ## 5. GitHub budget and fairness
 
@@ -91,13 +91,13 @@ flowchart LR
 
 ## 6. Limits of a single node
 
-| Limit | Effect | Mitigation now |
-|---|---|---|
-| Memory requests ~80% used | New pods may not schedule. KEDA wake-ups can trigger OOM or eviction. | Small requests (512Mi total), `GOMEMLIMIT`, no extra stateful services (technology-selection.md §3). |
-| One disk | Disk loss loses the database. | restic class-A `pg_dump` every 30 min, offsite to R2 hourly. RPO ≤ ~1 h (D4). |
-| Node reboot or failure | Full outage. | Restart-based recovery. Webhooks redeliver from GitHub on request; reconcile repairs missed events (`reconcile_installations`). |
-| No HA Postgres | Upgrades need downtime. | Short maintenance windows. Migrations run before new pods start. |
-| Shared CPU with other apps | Noisy neighbors raise tail latency. | CPU limits 500m per pod. CPU is not the bottleneck (workload-model.md §5). |
+| Limit                      | Effect                                                                | Mitigation now                                                                                                                  |
+| -------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Memory requests ~80% used  | New pods may not schedule. KEDA wake-ups can trigger OOM or eviction. | Small requests (512Mi total), `GOMEMLIMIT`, no extra stateful services (technology-selection.md §3).                            |
+| One disk                   | Disk loss loses the database.                                         | restic class-A `pg_dump` every 30 min, offsite to R2 hourly. RPO ≤ ~1 h (D4).                                                   |
+| Node reboot or failure     | Full outage.                                                          | Restart-based recovery. Webhooks redeliver from GitHub on request; reconcile repairs missed events (`reconcile_installations`). |
+| No HA Postgres             | Upgrades need downtime.                                               | Short maintenance windows. Migrations run before new pods start.                                                                |
+| Shared CPU with other apps | Noisy neighbors raise tail latency.                                   | CPU limits 500m per pod. CPU is not the bottleneck (workload-model.md §5).                                                      |
 
 ## 7. Path to multi-node
 

@@ -1,6 +1,6 @@
-# apps/web — Agent Guide
+# web — Agent Guide
 
-> Coding-agent reference for `apps/web`, the Next.js web app in the Gitorgasm monorepo. Keep it current when adding tools, scripts, or conventions.
+> Coding-agent reference for `web`, the Next.js web app in the Gitorgasm monorepo. Keep it current when adding tools, scripts, or conventions.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
@@ -254,6 +254,6 @@ Shared variants and transition presets live in `src/lib/motion.ts` — add new o
 
 ## Monorepo Notes
 
-- This app lives in `apps/web`. Repository-level tooling (CI, commit hooks, licence) lives at the monorepo root.
+- This app lives in `web`. Repository-level tooling (CI, commit hooks, licence) lives at the monorepo root.
 - The app is a plain frontend. Do not add backend rewrites or API integration without a decision in the root docs.
-- Before you open a PR, run `pnpm lint && pnpm typecheck && pnpm test && pnpm build` in `apps/web`.
+- Before you open a PR, run `pnpm lint && pnpm typecheck && pnpm test && pnpm build` in `web`.

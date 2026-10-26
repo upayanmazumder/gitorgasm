@@ -14,36 +14,36 @@ Labels: **Verified** (file path, command, or official URL), **Assumption**, **De
 
 Source: `database-audit.md` §6. **Verified**.
 
-| Legacy item | Rows | Action | Gitorgasm target | Stage |
-|---|---:|---|---|---|
-| `users` | 29 | Rebuild | `users` at login. Org members in `org_members` (Planned). | 1 / 3 |
-| `organizations`, `github_installations` | 10, 8 | Rebuild | `accounts`, `installations` from login and `reconcile_installations` | 1 |
-| `repositories` | 372 | Rebuild | `repositories` via `sync_installation` | 1 |
-| `organization_memberships` | 16 | Rebuild | `org_members` (Planned) + `user_installations` grants | 3 |
-| `teams`, `team_members`, `team_repositories` | 7, 25, 4 | Rebuild | Planned team tables | 3 |
-| `installation_repositories` | 0 | Discard | none (no writer existed) | – |
-| `scoring_presets` + 7 child tables | 186 | **Migrate or reseed** | Planned preset tables | 5 |
-| `signals` | 50 | Rebuild | Planned `signals` via full ingest. Dump used only to reconcile. | 5 |
-| `leaderboard_materializations`, `computed_scores` | 106, 109 | Rebuild | Rust scoring service output | 5 |
-| `signals_default`, `signals_partition_health` | – , 1 | Discard | none | – |
-| `ingest_log`, `repository_sync_state` | 2, 17 | Discard | `sync_state` and Planned ingest state start empty | – |
-| `auth_sessions`, `session_installations` | 2, 5 | Discard | none. Both sessions expired. Tokens bound to the legacy key. | – |
-| Redis keys (all namespaces) | n/a | Discard | none. Databases are NXDOMAIN. Cache only. | – |
+| Legacy item                                       |     Rows | Action                | Gitorgasm target                                                     | Stage |
+| ------------------------------------------------- | -------: | --------------------- | -------------------------------------------------------------------- | ----- |
+| `users`                                           |       29 | Rebuild               | `users` at login. Org members in `org_members` (Planned).            | 1 / 3 |
+| `organizations`, `github_installations`           |    10, 8 | Rebuild               | `accounts`, `installations` from login and `reconcile_installations` | 1     |
+| `repositories`                                    |      372 | Rebuild               | `repositories` via `sync_installation`                               | 1     |
+| `organization_memberships`                        |       16 | Rebuild               | `org_members` (Planned) + `user_installations` grants                | 3     |
+| `teams`, `team_members`, `team_repositories`      | 7, 25, 4 | Rebuild               | Planned team tables                                                  | 3     |
+| `installation_repositories`                       |        0 | Discard               | none (no writer existed)                                             | –     |
+| `scoring_presets` + 7 child tables                |      186 | **Migrate or reseed** | Planned preset tables                                                | 5     |
+| `signals`                                         |       50 | Rebuild               | Planned `signals` via full ingest. Dump used only to reconcile.      | 5     |
+| `leaderboard_materializations`, `computed_scores` | 106, 109 | Rebuild               | Rust scoring service output                                          | 5     |
+| `signals_default`, `signals_partition_health`     |    – , 1 | Discard               | none                                                                 | –     |
+| `ingest_log`, `repository_sync_state`             |    2, 17 | Discard               | `sync_state` and Planned ingest state start empty                    | –     |
+| `auth_sessions`, `session_installations`          |     2, 5 | Discard               | none. Both sessions expired. Tokens bound to the legacy key.         | –     |
+| Redis keys (all namespaces)                       |      n/a | Discard               | none. Databases are NXDOMAIN. Cache only.                            | –     |
 
 ## 3. Schema mapping for scoring presets (Planned, Stage 5)
 
 **Proposal**. Legacy columns from `database-audit.md` §2.2. Gitorgasm tables do not exist yet.
 
-| Legacy table | Gitorgasm table | Natural key | Column changes |
-|---|---|---|---|
-| `scoring_presets` (`id bigserial`, `installation_id`, `preset_name`, `is_active`) | `scoring_presets` (`id GENERATED ALWAYS AS IDENTITY`, `installation_id → installations.github_id`, `name`, `is_active`) | `(installation_id, name)` | rename `preset_name` → `name`. Keep partial unique index "one active preset per installation". |
-| `scoring_preset_rules` | `scoring_preset_rules` | `preset_id` (1:1) | same columns and defaults: 9, 0.11, 0.2, -12, -10 |
-| `scoring_preset_base_points` | `scoring_preset_base_points` | `(preset_id, signal_type)` | `signal_type` enum kept with same values |
-| `scoring_preset_multipliers` | `scoring_preset_multipliers` | `(preset_id, kind)` | identity id |
-| `scoring_preset_multiplier_signal_types` | `scoring_preset_multiplier_signal_types` | `(multiplier_id, signal_type)` | resolve `multiplier_id` through `(preset, kind)` |
-| `scoring_preset_review_state_weights` | same | `(preset_id, state)` | – |
-| `scoring_preset_daily_quotas` | same | `(preset_id, signal_type)` | – |
-| `scoring_preset_zero_point_conditions` | same | `(preset_id, kind)` | – |
+| Legacy table                                                                      | Gitorgasm table                                                                                                         | Natural key                    | Column changes                                                                                 |
+| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `scoring_presets` (`id bigserial`, `installation_id`, `preset_name`, `is_active`) | `scoring_presets` (`id GENERATED ALWAYS AS IDENTITY`, `installation_id → installations.github_id`, `name`, `is_active`) | `(installation_id, name)`      | rename `preset_name` → `name`. Keep partial unique index "one active preset per installation". |
+| `scoring_preset_rules`                                                            | `scoring_preset_rules`                                                                                                  | `preset_id` (1:1)              | same columns and defaults: 9, 0.11, 0.2, -12, -10                                              |
+| `scoring_preset_base_points`                                                      | `scoring_preset_base_points`                                                                                            | `(preset_id, signal_type)`     | `signal_type` enum kept with same values                                                       |
+| `scoring_preset_multipliers`                                                      | `scoring_preset_multipliers`                                                                                            | `(preset_id, kind)`            | identity id                                                                                    |
+| `scoring_preset_multiplier_signal_types`                                          | `scoring_preset_multiplier_signal_types`                                                                                | `(multiplier_id, signal_type)` | resolve `multiplier_id` through `(preset, kind)`                                               |
+| `scoring_preset_review_state_weights`                                             | same                                                                                                                    | `(preset_id, state)`           | –                                                                                              |
+| `scoring_preset_daily_quotas`                                                     | same                                                                                                                    | `(preset_id, signal_type)`     | –                                                                                              |
+| `scoring_preset_zero_point_conditions`                                            | same                                                                                                                    | `(preset_id, kind)`            | –                                                                                              |
 
 Rules (**Decision**): no `updated_at` triggers. The store sets `updated_at = now()` in each `UPDATE`, as in `store.UpsertInstallation`. Drop single-column indexes that duplicate a PK prefix (`database-audit.md` §2.5 item 4).
 
@@ -140,12 +140,12 @@ flowchart TD
 
 ## 7. Rollback
 
-| Failure | Rollback |
-|---|---|
-| Gitorgasm deploy fails | Remove the Argo CD Application. Legacy is unaffected. |
-| Preset import wrong | Delete rows listed in `legacy_import_map` for the run, or restore the `pg_dump -Fc` taken just before the import. |
-| Cutover rejected by users | Point users back to the legacy URL. |
-| Database corruption | Restore the latest restic `pg_dump` from R2. RPO ≤ about 1 h (decisions item 4). |
+| Failure                   | Rollback                                                                                                          |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Gitorgasm deploy fails    | Remove the Argo CD Application. Legacy is unaffected.                                                             |
+| Preset import wrong       | Delete rows listed in `legacy_import_map` for the run, or restore the `pg_dump -Fc` taken just before the import. |
+| Cutover rejected by users | Point users back to the legacy URL.                                                                               |
+| Database corruption       | Restore the latest restic `pg_dump` from R2. RPO ≤ about 1 h (decisions item 4).                                  |
 
 **Verified** constraint: the legacy app has no live production database. Staging and production Supabase projects and both Upstash databases are NXDOMAIN. Only the dev project resolves (`database-audit.md` §3). So "roll back to legacy" means the legacy UI backed by the dev Supabase project, with its known defects. **Assumption**: that is acceptable to the owner. Confirm before cutover.
 

@@ -9,9 +9,9 @@ The budget allows no paid resources beyond the existing VM. The cluster is memor
 
 ## Decision
 
-- Bootstrap `apps/web` from the template (**Verified** `apps/web/package.json`: Next.js 16.2.11, pnpm 11.28.6 pinned through `packageManager`). CI job `web` runs lint, typecheck, format check, tests, and build.
+- Bootstrap `web` from the template (**Verified** `web/package.json`: Next.js 16.2.11, pnpm 11.28.6 pinned through `packageManager`). CI job `web` runs lint, typecheck, format check, tests, and build.
 - Deploy on Vercel Hobby (free) at `https://gitorgasm.vercel.app`. The production overlay sets this value as `APP_ORIGIN` (**Verified** `deploy/kustomize/overlays/production/config.yaml`).
-- The frontend holds no privileged tokens and no Supabase client. It calls the backend through the same-origin rewrite `/api/:path*` (ADR 0008). **Planned** Stage 1.5: the rewrite does not exist yet in `apps/web`.
+- The frontend holds no privileged tokens and no Supabase client. It calls the backend through the same-origin rewrite `/api/:path*` (ADR 0008). **Planned** Stage 1.5: the rewrite does not exist yet in `web`.
 
 ## Consequences
 

@@ -70,11 +70,11 @@ spec:
               containerPort: 5432
           readinessProbe:
             exec:
-              command: ["pg_isready", "-U", "gitorgasm", "-d", "gitorgasm"]
+              command: ['pg_isready', '-U', 'gitorgasm', '-d', 'gitorgasm']
             periodSeconds: 5
           livenessProbe:
             exec:
-              command: ["pg_isready", "-U", "gitorgasm", "-d", "gitorgasm"]
+              command: ['pg_isready', '-U', 'gitorgasm', '-d', 'gitorgasm']
             periodSeconds: 20
             failureThreshold: 6
           resources:
@@ -82,13 +82,13 @@ spec:
               cpu: 100m
               memory: 256Mi
             limits:
-              cpu: "1"
+              cpu: '1'
               memory: 512Mi
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
-              drop: ["ALL"]
+              drop: ['ALL']
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
@@ -105,7 +105,7 @@ spec:
     - metadata:
         name: data
       spec:
-        accessModes: ["ReadWriteOnce"]
+        accessModes: ['ReadWriteOnce']
         resources:
           requests:
             storage: 2Gi

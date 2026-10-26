@@ -11,6 +11,19 @@
 
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`.
 
+### Formatters and git hooks
+
+Run `pnpm install` at the repository root once. It installs husky hooks:
+
+- `pre-commit` runs lint-staged on staged files only:
+  - `web/`: ESLint `--fix` and Prettier with `web/.prettierrc` (import sorting, Tailwind class order).
+  - `*.go`: `gofmt`. CI also runs `golangci-lint` with the gofmt and goimports formatters from `core/.golangci.yml`.
+  - `*.rs`: `rustfmt` with the nearest `rustfmt.toml`.
+  - Markdown, YAML, and JSON elsewhere: Prettier with the root `.prettierrc`.
+- `commit-msg` runs commitlint (Conventional Commits).
+
+`make fmt` formats everything. CI checks the same rules in the `Repo formatting and commit messages` job and in each language job.
+
 ## Local setup
 
 See the quick start in [README.md](README.md). Tests need Docker: `make test` starts PostgreSQL on `127.0.0.1:55432`. Each Go test creates and drops its own database.
@@ -38,9 +51,9 @@ See the quick start in [README.md](README.md). Tests need Docker: `make test` st
 - Add a new file in `core/internal/db/migrations` (`NNNNN_name.sql`, goose format). Never edit a merged migration.
 - Migrations run before the new API version starts. They must work with the previous release: expand first, contract in a later release.
 
-### Frontend (`apps/web`)
+### Frontend (`web`)
 
-- Strict TypeScript, pnpm only. See `apps/web/AGENTS.md`.
+- Strict TypeScript, pnpm only. See `web/AGENTS.md`.
 
 ### Tests
 

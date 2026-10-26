@@ -10,7 +10,7 @@ Include the affected component, the steps to reproduce, and the impact. You get 
 
 ## Scope
 
-In scope: `core`, `apps/web`, `contracts`, `deploy`, and CI workflows.
+In scope: `core`, `web`, `contracts`, `deploy`, and CI workflows.
 Out of scope: GitHub itself, Vercel, Cloudflare, and the legacy GH Org Tool.
 
 ## Security model
