@@ -22,26 +22,32 @@ Labels: **Verified** (file path or command), **Assumption**, **Decision**, **Alt
 
 **Verified**: routes in `httpapi/server.go` `Handler`.
 
-| Method and path | Auth | Success | Purpose |
-|---|---|---|---|
-| `GET /healthz` | none | 200 | liveness, no dependencies |
-| `GET /readyz` | none | 200 / 503 | ready only when PostgreSQL answers |
-| `GET /v1/auth/login` | none | 302 | start GitHub web flow |
-| `GET /v1/auth/callback` | none | 302 | finish flow, create session |
-| `GET /v1/auth/install` | none | 302 | redirect to App install page |
-| `POST /v1/auth/logout` | cookie (optional) | 204 | delete session |
-| `GET /v1/me` | session | 200 | current user |
-| `GET /v1/organizations` | session | 200 | accessible organizations |
-| `GET /v1/organizations/{login}/repositories` | session | 200 | repositories, keyset paginated |
-| `POST /v1/organizations/{login}/sync` | session | 202 | queue a repository sync |
-| `POST /webhooks/github` | HMAC | 202 | GitHub webhook inbox |
+| Method and path                              | Auth              | Success   | Purpose                            |
+| -------------------------------------------- | ----------------- | --------- | ---------------------------------- |
+| `GET /healthz`                               | none              | 200       | liveness, no dependencies          |
+| `GET /readyz`                                | none              | 200 / 503 | ready only when PostgreSQL answers |
+| `GET /v1/auth/login`                         | none              | 302       | start GitHub web flow              |
+| `GET /v1/auth/callback`                      | none              | 302       | finish flow, create session        |
+| `GET /v1/auth/install`                       | none              | 302       | redirect to App install page       |
+| `POST /v1/auth/logout`                       | cookie (optional) | 204       | delete session                     |
+| `GET /v1/me`                                 | session           | 200       | current user                       |
+| `GET /v1/organizations`                      | session           | 200       | accessible organizations           |
+| `GET /v1/organizations/{login}/repositories` | session           | 200       | repositories, keyset paginated     |
+| `POST /v1/organizations/{login}/sync`        | session           | 202       | queue a repository sync            |
+| `POST /webhooks/github`                      | HMAC              | 202       | GitHub webhook inbox               |
 
 ## 3. Error contract
 
 **Verified**: one body shape for every error (`httpapi/server.go` `apiError`, schema `Error` in the contract):
 
 ```json
-{ "error": { "code": "organization_not_found", "message": "organization not found", "request_id": "…" } }
+{
+  "error": {
+    "code": "organization_not_found",
+    "message": "organization not found",
+    "request_id": "…"
+  }
+}
 ```
 
 - `code` is stable and machine-readable. Clients branch on `code`, never on `message`.
@@ -50,25 +56,25 @@ Labels: **Verified** (file path or command), **Assumption**, **Decision**, **Alt
 
 Codes in use. **Verified** by `grep -n writeError core/internal/httpapi/*.go`:
 
-| Code | HTTP | Where |
-|---|---|---|
-| `internal` | 500 | `internalError`, `recoverer` |
-| `github_not_configured` | 503 | `requireGitHub` |
-| `origin_rejected` | 403 | `checkOrigin` |
-| `unauthenticated` | 401 | `authed` |
-| `oauth_state_missing` | 400 | `callback` |
-| `oauth_state_mismatch` | 400 | `callback` |
-| `oauth_denied` | 400 | `callback` |
-| `github_rate_limited` | 503 + `Retry-After` | `githubError` |
-| `github_auth_failed` | 400 | `githubError` |
-| `github_unavailable` | 502 | `githubError` |
-| `organization_not_found` | 404 | `resolveOrg` |
-| `invalid_limit` | 400 | `listRepositories` |
-| `invalid_cursor` | 400 | `listRepositories` |
-| `payload_too_large` | 413 | `webhook` |
-| `invalid_signature` | 401 | `webhook` |
-| `invalid_delivery` | 400 | `webhook` |
-| `invalid_payload` | 400 | `webhook` |
+| Code                     | HTTP                | Where                        |
+| ------------------------ | ------------------- | ---------------------------- |
+| `internal`               | 500                 | `internalError`, `recoverer` |
+| `github_not_configured`  | 503                 | `requireGitHub`              |
+| `origin_rejected`        | 403                 | `checkOrigin`                |
+| `unauthenticated`        | 401                 | `authed`                     |
+| `oauth_state_missing`    | 400                 | `callback`                   |
+| `oauth_state_mismatch`   | 400                 | `callback`                   |
+| `oauth_denied`           | 400                 | `callback`                   |
+| `github_rate_limited`    | 503 + `Retry-After` | `githubError`                |
+| `github_auth_failed`     | 400                 | `githubError`                |
+| `github_unavailable`     | 502                 | `githubError`                |
+| `organization_not_found` | 404                 | `resolveOrg`                 |
+| `invalid_limit`          | 400                 | `listRepositories`           |
+| `invalid_cursor`         | 400                 | `listRepositories`           |
+| `payload_too_large`      | 413                 | `webhook`                    |
+| `invalid_signature`      | 401                 | `webhook`                    |
+| `invalid_delivery`       | 400                 | `webhook`                    |
+| `invalid_payload`        | 400                 | `webhook`                    |
 
 **Decision** (rules for new codes): `snake_case`, noun first where possible, one code per distinct client action. Add the code to this table in the same pull request.
 
@@ -137,15 +143,15 @@ Conventions for Stage 2 and later. Nothing below is implemented.
 
 Design for bulk mutations. The flow is in `github-integration.md` §8.
 
-| Method and path | Purpose |
-|---|---|
-| `POST /v1/organizations/{login}/operations` | create a plan (kind, items). Returns 201 `{id, status: "planned"}` |
-| `POST /v1/organizations/{login}/operations/{id}/dry-run` | run read-only checks. 202 |
-| `POST /v1/organizations/{login}/operations/{id}/execute` | re-check admin role, start. 202 |
-| `POST /v1/organizations/{login}/operations/{id}/cancel` | stop pending items. 202 |
-| `GET /v1/organizations/{login}/operations/{id}` | status and counts |
-| `GET /v1/organizations/{login}/operations/{id}/items` | per-item results, keyset paginated |
-| `GET /v1/organizations/{login}/operations/{id}/events` | SSE progress |
+| Method and path                                          | Purpose                                                            |
+| -------------------------------------------------------- | ------------------------------------------------------------------ |
+| `POST /v1/organizations/{login}/operations`              | create a plan (kind, items). Returns 201 `{id, status: "planned"}` |
+| `POST /v1/organizations/{login}/operations/{id}/dry-run` | run read-only checks. 202                                          |
+| `POST /v1/organizations/{login}/operations/{id}/execute` | re-check admin role, start. 202                                    |
+| `POST /v1/organizations/{login}/operations/{id}/cancel`  | stop pending items. 202                                            |
+| `GET /v1/organizations/{login}/operations/{id}`          | status and counts                                                  |
+| `GET /v1/organizations/{login}/operations/{id}/items`    | per-item results, keyset paginated                                 |
+| `GET /v1/organizations/{login}/operations/{id}/events`   | SSE progress                                                       |
 
 Status values: `planned`, `dry_run`, `ready`, `running`, `cancelling`, `completed`, `partially_failed`, `failed`, `cancelled`.
 
@@ -160,7 +166,7 @@ Status values: `planned`, `dry_run`, `ready`, `running`, `cancelling`, `complete
 
 ## 11. TypeScript client (Planned)
 
-**Decision**: generate types from `contracts/openapi/v1.yaml` with `openapi-typescript`. Use `openapi-fetch` or a thin wrapper in `apps/web`. CI fails when the generated file differs from the committed file.
+**Decision**: generate types from `contracts/openapi/v1.yaml` with `openapi-typescript`. Use `openapi-fetch` or a thin wrapper in `web`. CI fails when the generated file differs from the committed file.
 
 **Alternative considered**: hand-written types. Rejected: drift from the contract.
 

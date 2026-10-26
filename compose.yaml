@@ -11,11 +11,11 @@ services:
       POSTGRES_PASSWORD: gitorgasm
       POSTGRES_DB: gitorgasm
     ports:
-      - "127.0.0.1:55432:5432"
+      - '127.0.0.1:55432:5432'
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U gitorgasm -d gitorgasm"]
+      test: ['CMD-SHELL', 'pg_isready -U gitorgasm -d gitorgasm']
       interval: 2s
       timeout: 3s
       retries: 30
@@ -23,7 +23,7 @@ services:
   migrate:
     build:
       context: core
-    command: ["migrate"]
+    command: ['migrate']
     environment:
       DATABASE_URL: postgres://gitorgasm:gitorgasm@postgres:5432/gitorgasm?sslmode=disable
     depends_on:
@@ -33,28 +33,28 @@ services:
   api:
     build:
       context: core
-    command: ["api"]
+    command: ['api']
     env_file:
       - path: .env
         required: false
     environment:
       DATABASE_URL: postgres://gitorgasm:gitorgasm@postgres:5432/gitorgasm?sslmode=disable
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
-      COOKIE_SECURE: "false"
+      COOKIE_SECURE: 'false'
       # Development-only key. Never reuse it outside this compose file.
       TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-ZGV2LW9ubHkta2V5LWRvLW5vdC11c2UtaW4tcHJvZCE=}
     ports:
-      - "127.0.0.1:8080:8080"
-      - "127.0.0.1:9090:9090"
+      - '127.0.0.1:8080:8080'
+      - '127.0.0.1:9090:9090'
     depends_on:
       migrate:
         condition: service_completed_successfully
 
   worker:
-    profiles: ["github"]
+    profiles: ['github']
     build:
       context: core
-    command: ["worker"]
+    command: ['worker']
     env_file:
       - path: .env
         required: true

@@ -1,7 +1,6 @@
 import axios from 'axios';
 
 import { API_TIMEOUT_MS } from '@/constants';
-import { env } from '@/env';
 
 import { toApiError } from './errors';
 
@@ -20,4 +19,5 @@ export function createApiClient(baseURL: string) {
   return client;
 }
 
-export const api = createApiClient(env.NEXT_PUBLIC_API_URL);
+// Requests go to this app's origin. next.config.ts rewrites /api/* to the Gitorgasm API.
+export const api = createApiClient('/api');

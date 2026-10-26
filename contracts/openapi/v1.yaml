@@ -21,33 +21,33 @@ paths:
       summary: Liveness probe
       security: []
       responses:
-        "200":
+        '200':
           description: Process is alive
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Status" }
+              schema: { $ref: '#/components/schemas/Status' }
   /readyz:
     get:
       summary: Readiness probe. Ready only when PostgreSQL answers.
       security: []
       responses:
-        "200":
+        '200':
           description: Ready
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Status" }
-        "503":
+              schema: { $ref: '#/components/schemas/Status' }
+        '503':
           description: Not ready
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Status" }
+              schema: { $ref: '#/components/schemas/Status' }
   /v1/auth/login:
     get:
       summary: Start GitHub App sign-in (web flow with state and PKCE)
       security: []
       responses:
-        "302": { description: Redirect to GitHub }
-        "503": { $ref: "#/components/responses/Error" }
+        '302': { description: Redirect to GitHub }
+        '503': { $ref: '#/components/responses/Error' }
   /v1/auth/callback:
     get:
       summary: GitHub OAuth callback
@@ -56,42 +56,42 @@ paths:
         - { name: code, in: query, schema: { type: string } }
         - { name: state, in: query, schema: { type: string } }
       responses:
-        default: { $ref: "#/components/responses/Error" }
-        "302": { description: Session created; redirect to the frontend }
-        "400": { $ref: "#/components/responses/Error" }
-        "502": { $ref: "#/components/responses/Error" }
-        "503": { $ref: "#/components/responses/Error" }
+        default: { $ref: '#/components/responses/Error' }
+        '302': { description: Session created; redirect to the frontend }
+        '400': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
   /v1/auth/install:
     get:
       summary: Redirect to the GitHub App installation page
       security: []
       responses:
-        "302": { description: Redirect to GitHub }
-        "503": { $ref: "#/components/responses/Error" }
+        '302': { description: Redirect to GitHub }
+        '503': { $ref: '#/components/responses/Error' }
   /v1/auth/logout:
     post:
       summary: End the current session
       responses:
-        default: { $ref: "#/components/responses/Error" }
-        "204": { description: Signed out }
-        "403": { $ref: "#/components/responses/Error" }
+        default: { $ref: '#/components/responses/Error' }
+        '204': { description: Signed out }
+        '403': { $ref: '#/components/responses/Error' }
   /v1/me:
     get:
       summary: Current user
       responses:
-        default: { $ref: "#/components/responses/Error" }
-        "200":
+        default: { $ref: '#/components/responses/Error' }
+        '200':
           description: The signed-in user
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/User" }
-        "401": { $ref: "#/components/responses/Error" }
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Error' }
   /v1/organizations:
     get:
       summary: Organizations the caller can access through a Gitorgasm installation
       responses:
-        default: { $ref: "#/components/responses/Error" }
-        "200":
+        default: { $ref: '#/components/responses/Error' }
+        '200':
           description: Organizations ordered by login
           content:
             application/json:
@@ -102,19 +102,23 @@ paths:
                 properties:
                   data:
                     type: array
-                    items: { $ref: "#/components/schemas/Organization" }
+                    items: { $ref: '#/components/schemas/Organization' }
                   next_cursor: { type: string, nullable: true }
-        "401": { $ref: "#/components/responses/Error" }
+        '401': { $ref: '#/components/responses/Error' }
   /v1/organizations/{login}/repositories:
     get:
       summary: Repositories of an organization, ordered by name
       parameters:
         - { name: login, in: path, required: true, schema: { type: string } }
-        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 100, default: 50 },
+          }
         - { name: cursor, in: query, schema: { type: string } }
       responses:
-        default: { $ref: "#/components/responses/Error" }
-        "200":
+        default: { $ref: '#/components/responses/Error' }
+        '200':
           description: One page of repositories
           content:
             application/json:
@@ -125,19 +129,19 @@ paths:
                 properties:
                   data:
                     type: array
-                    items: { $ref: "#/components/schemas/Repository" }
+                    items: { $ref: '#/components/schemas/Repository' }
                   next_cursor: { type: string, nullable: true }
-        "400": { $ref: "#/components/responses/Error" }
-        "401": { $ref: "#/components/responses/Error" }
-        "404": { $ref: "#/components/responses/Error" }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
   /v1/organizations/{login}/sync:
     post:
       summary: Queue a repository sync. Pending syncs for the same organization are deduplicated.
       parameters:
         - { name: login, in: path, required: true, schema: { type: string } }
       responses:
-        default: { $ref: "#/components/responses/Error" }
-        "202":
+        default: { $ref: '#/components/responses/Error' }
+        '202':
           description: Sync queued
           content:
             application/json:
@@ -148,9 +152,9 @@ paths:
                 properties:
                   job_id: { type: integer, format: int64 }
                   duplicate: { type: boolean }
-        "401": { $ref: "#/components/responses/Error" }
-        "403": { $ref: "#/components/responses/Error" }
-        "404": { $ref: "#/components/responses/Error" }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
   /webhooks/github:
     post:
       summary: GitHub App webhook receiver (HMAC-SHA256 signed)
@@ -165,8 +169,8 @@ paths:
           application/json:
             schema: { type: object }
       responses:
-        default: { $ref: "#/components/responses/Error" }
-        "202":
+        default: { $ref: '#/components/responses/Error' }
+        '202':
           description: Stored for asynchronous processing
           content:
             application/json:
@@ -176,9 +180,9 @@ paths:
                 properties:
                   accepted: { type: boolean }
                   duplicate: { type: boolean }
-        "400": { $ref: "#/components/responses/Error" }
-        "401": { $ref: "#/components/responses/Error" }
-        "413": { $ref: "#/components/responses/Error" }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '413': { $ref: '#/components/responses/Error' }
 components:
   securitySchemes:
     session:
@@ -190,7 +194,7 @@ components:
       description: Error
       content:
         application/json:
-          schema: { $ref: "#/components/schemas/Error" }
+          schema: { $ref: '#/components/schemas/Error' }
   schemas:
     Status:
       type: object
@@ -222,7 +226,18 @@ components:
         avatar_url: { type: string, nullable: true }
     Organization:
       type: object
-      required: [login, github_id, type, avatar_url, installation_id, repository_selection, suspended, repository_count, last_synced_at]
+      required:
+        [
+          login,
+          github_id,
+          type,
+          avatar_url,
+          installation_id,
+          repository_selection,
+          suspended,
+          repository_count,
+          last_synced_at,
+        ]
       additionalProperties: false
       properties:
         login: { type: string }
@@ -236,7 +251,22 @@ components:
         last_synced_at: { type: string, format: date-time, nullable: true }
     Repository:
       type: object
-      required: [github_id, name, full_name, description, private, fork, archived, visibility, default_branch, language, stargazers, pushed_at, synced_at]
+      required:
+        [
+          github_id,
+          name,
+          full_name,
+          description,
+          private,
+          fork,
+          archived,
+          visibility,
+          default_branch,
+          language,
+          stargazers,
+          pushed_at,
+          synced_at,
+        ]
       additionalProperties: false
       properties:
         github_id: { type: integer, format: int64 }

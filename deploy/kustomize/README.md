@@ -9,10 +9,10 @@ Validate with `make manifests`.
 
 The cluster repository provides two Secrets, encrypted with SOPS and age:
 
-| Secret | Keys |
-|---|---|
-| `gitorgasm-core` | `DATABASE_URL`, `TOKEN_ENCRYPTION_KEY`, `GITHUB_APP_ID`, `GITHUB_APP_SLUG`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` |
-| `gitorgasm-postgres` | `POSTGRES_PASSWORD` |
+| Secret               | Keys                                                                                                                                                                  |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gitorgasm-core`     | `DATABASE_URL`, `TOKEN_ENCRYPTION_KEY`, `GITHUB_APP_ID`, `GITHUB_APP_SLUG`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` |
+| `gitorgasm-postgres` | `POSTGRES_PASSWORD`                                                                                                                                                   |
 
 `DATABASE_URL` is `postgres://gitorgasm:<password>@postgres.gitorgasm.svc:5432/gitorgasm?sslmode=disable`.
 

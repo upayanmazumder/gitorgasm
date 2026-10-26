@@ -15,8 +15,8 @@ spec:
       labels:
         app.kubernetes.io/name: worker
       annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "9090"
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9090'
         prometheus.io/path: /metrics
     spec:
       automountServiceAccountToken: false
@@ -33,7 +33,7 @@ spec:
       containers:
         - name: worker
           image: gitorgasm-core
-          args: ["worker"]
+          args: ['worker']
           envFrom:
             - configMapRef:
                 name: gitorgasm-core
@@ -66,4 +66,4 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
-              drop: ["ALL"]
+              drop: ['ALL']

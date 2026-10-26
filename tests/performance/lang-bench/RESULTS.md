@@ -7,17 +7,17 @@ Method: see [README.md](README.md). All numbers below are **Verified**. They com
 
 ## Environment
 
-| Item | Value | Source |
-| --- | --- | --- |
-| CPU | AMD Ryzen 7 7840U w/ Radeon(TM) 780M Graphics, 16 logical CPUs | `/proc/cpuinfo`, `nproc` |
-| RAM | 14,100,864 kB (MemTotal) | `/proc/meminfo` |
-| OS | CachyOS, Linux 7.3.0-5-cachyos, x86_64 | `/etc/os-release`, `uname -sr` |
-| Power | AC online, governor `performance`, boost on | `/sys/class/power_supply`, `/sys/devices/system/cpu` |
-| Go | go1.27.1 linux/amd64, `GOAMD64` default (v1) | `go version` |
-| Rust | rustc 1.97.1, cargo 1.97.1, release profile default (opt-level 3, no LTO) | `rustc --version` |
-| Rust crates | serde 1.0.229, serde_json 1.0.154, axum 0.8.9, tokio 1.53.2 | `rust/Cargo.lock` |
-| Background load | load average 8.49 to 12.25 during the runs (other jobs on the same machine) | `loadavg_start`/`loadavg_end` in the logs |
-| Fixture | 9,784,235 bytes, SHA-256 `22afc522…438e1a95` | `fixture` section in the logs |
+| Item            | Value                                                                       | Source                                               |
+| --------------- | --------------------------------------------------------------------------- | ---------------------------------------------------- |
+| CPU             | AMD Ryzen 7 7840U w/ Radeon(TM) 780M Graphics, 16 logical CPUs              | `/proc/cpuinfo`, `nproc`                             |
+| RAM             | 14,100,864 kB (MemTotal)                                                    | `/proc/meminfo`                                      |
+| OS              | CachyOS, Linux 7.3.0-5-cachyos, x86_64                                      | `/etc/os-release`, `uname -sr`                       |
+| Power           | AC online, governor `performance`, boost on                                 | `/sys/class/power_supply`, `/sys/devices/system/cpu` |
+| Go              | go1.27.1 linux/amd64, `GOAMD64` default (v1)                                | `go version`                                         |
+| Rust            | rustc 1.97.1, cargo 1.97.1, release profile default (opt-level 3, no LTO)   | `rustc --version`                                    |
+| Rust crates     | serde 1.0.229, serde_json 1.0.154, axum 0.8.9, tokio 1.53.2                 | `rust/Cargo.lock`                                    |
+| Background load | load average 8.49 to 12.25 during the runs (other jobs on the same machine) | `loadavg_start`/`loadavg_end` in the logs            |
+| Fixture         | 9,784,235 bytes, SHA-256 `22afc522…438e1a95`                                | `fixture` section in the logs                        |
 
 **Verified**: Go and Rust produce identical output. Repo checksum `35159376198174` in both. Score top user `977` (93.674433), id checksum `16510352`, score sum `7575.960094` in both (`equivalence` section).
 
@@ -25,26 +25,26 @@ Method: see [README.md](README.md). All numbers below are **Verified**. They com
 
 Time values: Go = median of 8 `ns/op` values from `go test -bench`. Rust = median of 100 timed runs. The range is the min and max of the 8 Go values, or min and p95 of the 100 Rust runs.
 
-| Metric | Go | Rust | Rust / Go |
-| --- | --- | --- | --- |
-| Parse 10k repos, `encoding/json` v1, `GOMAXPROCS=1` (A / B) | 51.7 / 50.3 ms (range 43.8–70.7) | — | — |
-| Parse 10k repos, `encoding/json` v1, `GOMAXPROCS=16` (A / B) | 50.5 / 60.4 ms (range 42.3–65.8) | — | — |
-| Parse 10k repos, `encoding/json/v2`, `GOMAXPROCS=1` (A / B) | 43.4 / 49.9 ms (range 39.7–58.6) | — | — |
-| Parse 10k repos, `encoding/json/v2`, `GOMAXPROCS=16` (A / B) | 47.0 / 42.5 ms (range 35.3–70.6) | — | — |
-| Parse 10k repos, `serde_json` (A / B) | — | 20.1 / 24.6 ms (min 15.6, p95 27.5 / 29.9) | about 0.4–0.5× |
-| Parse: allocated bytes / allocations per op | 12.9 MB / 113,618 | 17.4 MB / 130,875 | — |
-| Score 1M events + top 100, `GOMAXPROCS=1` (A / B) | 35.0 / 33.1 ms (range 24.2–42.8) | — | — |
-| Score 1M events + top 100, `GOMAXPROCS=16` (A / B) | 27.2 / 35.7 ms (range 22.8–43.4) | — | — |
-| Score 1M events + top 100 (A / B) | — | 13.6 / 14.8 ms (min 10.7, p95 19.5 / 23.4) | about 0.4–0.5× |
-| Score: allocated bytes / allocations per op | 5.4 MB / 47,704 | 8.2 MB / 16 | — |
-| Peak RSS, standalone `repos` (median of 5, A / B) | 29,740 / 27,828 kB | 20,372 / 20,384 kB | about 0.7× |
-| Peak RSS, standalone `score` (median of 5, A / B) | 35,216 / 35,172 kB | 31,624 / 31,612 kB | about 0.9× |
-| Binary size, workload `standalone` (default / stripped) | 4,103,851 / 2,629,792 B (`-s -w`) | 657,224 / 510,576 B (`strip`) | about 0.16–0.19× |
-| Binary size, hello service (default / stripped) | 8,898,460 / 5,886,215 B (`-s -w`) | 1,668,360 / 1,159,704 B (`strip`) | about 0.19–0.20× |
-| Hello service RSS 1 s after start (A / B) | 11,392 / 11,376 kB, 6 threads | 3,724 / 3,636 kB, 17 threads | about 0.32× |
-| Hello service RSS after 10k sequential requests (A / B) | 16,764 / 16,096 kB, 11–12 threads | 4,032 / 3,944 kB, 17 threads | about 0.24× |
-| 10k sequential keep-alive requests, p50 / p99 latency (A) | 57 / 150 µs, 15,850 req/s | 63 / 133 µs, 15,021 req/s | — |
-| 10k sequential keep-alive requests, p50 / p99 latency (B) | 72 / 187 µs, 12,598 req/s | 39 / 109 µs, 22,310 req/s | — |
+| Metric                                                       | Go                                | Rust                                       | Rust / Go        |
+| ------------------------------------------------------------ | --------------------------------- | ------------------------------------------ | ---------------- |
+| Parse 10k repos, `encoding/json` v1, `GOMAXPROCS=1` (A / B)  | 51.7 / 50.3 ms (range 43.8–70.7)  | —                                          | —                |
+| Parse 10k repos, `encoding/json` v1, `GOMAXPROCS=16` (A / B) | 50.5 / 60.4 ms (range 42.3–65.8)  | —                                          | —                |
+| Parse 10k repos, `encoding/json/v2`, `GOMAXPROCS=1` (A / B)  | 43.4 / 49.9 ms (range 39.7–58.6)  | —                                          | —                |
+| Parse 10k repos, `encoding/json/v2`, `GOMAXPROCS=16` (A / B) | 47.0 / 42.5 ms (range 35.3–70.6)  | —                                          | —                |
+| Parse 10k repos, `serde_json` (A / B)                        | —                                 | 20.1 / 24.6 ms (min 15.6, p95 27.5 / 29.9) | about 0.4–0.5×   |
+| Parse: allocated bytes / allocations per op                  | 12.9 MB / 113,618                 | 17.4 MB / 130,875                          | —                |
+| Score 1M events + top 100, `GOMAXPROCS=1` (A / B)            | 35.0 / 33.1 ms (range 24.2–42.8)  | —                                          | —                |
+| Score 1M events + top 100, `GOMAXPROCS=16` (A / B)           | 27.2 / 35.7 ms (range 22.8–43.4)  | —                                          | —                |
+| Score 1M events + top 100 (A / B)                            | —                                 | 13.6 / 14.8 ms (min 10.7, p95 19.5 / 23.4) | about 0.4–0.5×   |
+| Score: allocated bytes / allocations per op                  | 5.4 MB / 47,704                   | 8.2 MB / 16                                | —                |
+| Peak RSS, standalone `repos` (median of 5, A / B)            | 29,740 / 27,828 kB                | 20,372 / 20,384 kB                         | about 0.7×       |
+| Peak RSS, standalone `score` (median of 5, A / B)            | 35,216 / 35,172 kB                | 31,624 / 31,612 kB                         | about 0.9×       |
+| Binary size, workload `standalone` (default / stripped)      | 4,103,851 / 2,629,792 B (`-s -w`) | 657,224 / 510,576 B (`strip`)              | about 0.16–0.19× |
+| Binary size, hello service (default / stripped)              | 8,898,460 / 5,886,215 B (`-s -w`) | 1,668,360 / 1,159,704 B (`strip`)          | about 0.19–0.20× |
+| Hello service RSS 1 s after start (A / B)                    | 11,392 / 11,376 kB, 6 threads     | 3,724 / 3,636 kB, 17 threads               | about 0.32×      |
+| Hello service RSS after 10k sequential requests (A / B)      | 16,764 / 16,096 kB, 11–12 threads | 4,032 / 3,944 kB, 17 threads               | about 0.24×      |
+| 10k sequential keep-alive requests, p50 / p99 latency (A)    | 57 / 150 µs, 15,850 req/s         | 63 / 133 µs, 15,021 req/s                  | —                |
+| 10k sequential keep-alive requests, p50 / p99 latency (B)    | 72 / 187 µs, 12,598 req/s         | 39 / 109 µs, 22,310 req/s                  | —                |
 
 Notes on the table:
 

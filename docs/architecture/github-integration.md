@@ -10,11 +10,11 @@ Pinned API description: `github/rest-api-description` release v2.1.0, file `desc
 
 **Decision**: Gitorgasm is a GitHub App. It uses three credentials.
 
-| Credential | How it is made | Lifetime | Used for | Code |
-|---|---|---|---|---|
-| App JWT (RS256) | signed with `GITHUB_PRIVATE_KEY`, `iss` = App id, `iat` = now − 60 s, `exp` = now + 9 min | 9 minutes | `apps/get-installation`, `apps/create-installation-access-token` | `github.Client.appJWT` |
-| Installation access token | `POST /app/installations/{id}/access_tokens` | 1 hour. Cache refreshes 5 min before expiry. | `GET /installation/repositories` | `github.Client.installationToken` |
-| User access token | web application flow with `state` + PKCE S256 | 8 hours when expiring tokens are on. Refresh token 6 months. Else no expiry. | `GET /user`, `GET /user/installations` | `github.Client.ExchangeCode` |
+| Credential                | How it is made                                                                            | Lifetime                                                                     | Used for                                                         | Code                              |
+| ------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------- |
+| App JWT (RS256)           | signed with `GITHUB_PRIVATE_KEY`, `iss` = App id, `iat` = now − 60 s, `exp` = now + 9 min | 9 minutes                                                                    | `apps/get-installation`, `apps/create-installation-access-token` | `github.Client.appJWT`            |
+| Installation access token | `POST /app/installations/{id}/access_tokens`                                              | 1 hour. Cache refreshes 5 min before expiry.                                 | `GET /installation/repositories`                                 | `github.Client.installationToken` |
+| User access token         | web application flow with `state` + PKCE S256                                             | 8 hours when expiring tokens are on. Refresh token 6 months. Else no expiry. | `GET /user`, `GET /user/installations`                           | `github.Client.ExchangeCode`      |
 
 - **Verified** (JWT): "set this 60 seconds in the past" and "no more than 10 minutes into the future". <https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-json-web-token-jwt-for-a-github-app>
 - **Verified** (installation token): "The installation access token will expire after 1 hour." <https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app>
@@ -26,15 +26,15 @@ Pinned API description: `github/rest-api-description` release v2.1.0, file `desc
 
 **Verified**: all requests send `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`, and `User-Agent: gitorgasm` (`client.go` `do`).
 
-| Method and path | operationId | Credential | Pagination | Caller |
-|---|---|---|---|---|
-| `GET /app/installations/{installation_id}` | `apps/get-installation` | App JWT | none | `SyncWorker.Work` |
-| `POST /app/installations/{installation_id}/access_tokens` | `apps/create-installation-access-token` | App JWT | none | `installationToken` |
-| `GET /installation/repositories` | `apps/list-repos-accessible-to-installation` | installation | `Link`, `per_page=100` | `SyncWorker.Work` |
-| `GET /user` | `users/get-authenticated` | user | none | login `callback` |
-| `GET /user/installations` | `apps/list-installations-for-authenticated-user` | user | `Link`, `per_page=100` | login `callback` |
-| `POST https://github.com/login/oauth/access_token` | not in REST description (OAuth endpoint) | client id + secret + `code_verifier` | none | login `callback` |
-| `GET https://github.com/login/oauth/authorize` | browser redirect | none | none | `login` |
+| Method and path                                           | operationId                                      | Credential                           | Pagination             | Caller              |
+| --------------------------------------------------------- | ------------------------------------------------ | ------------------------------------ | ---------------------- | ------------------- |
+| `GET /app/installations/{installation_id}`                | `apps/get-installation`                          | App JWT                              | none                   | `SyncWorker.Work`   |
+| `POST /app/installations/{installation_id}/access_tokens` | `apps/create-installation-access-token`          | App JWT                              | none                   | `installationToken` |
+| `GET /installation/repositories`                          | `apps/list-repos-accessible-to-installation`     | installation                         | `Link`, `per_page=100` | `SyncWorker.Work`   |
+| `GET /user`                                               | `users/get-authenticated`                        | user                                 | none                   | login `callback`    |
+| `GET /user/installations`                                 | `apps/list-installations-for-authenticated-user` | user                                 | `Link`, `per_page=100` | login `callback`    |
+| `POST https://github.com/login/oauth/access_token`        | not in REST description (OAuth endpoint)         | client id + secret + `code_verifier` | none                   | login `callback`    |
+| `GET https://github.com/login/oauth/authorize`            | browser redirect                                 | none                                 | none                   | `login`             |
 
 - **Verified**: `per_page` max is 100 (`components.parameters.per-page`: "The number of results per page (max 100)").
 - **Verified**: OAuth errors return HTTP 200 with an `error` field. `ExchangeCode` maps that to `KindInvalid`.
@@ -43,13 +43,13 @@ Pinned API description: `github/rest-api-description` release v2.1.0, file `desc
 
 **Verified** against <https://docs.github.com/en/rest/authentication/permissions-required-for-github-apps>.
 
-| Stage | Permission | Access | Why |
-|---|---|---|---|
-| 1 (slice) | Repository "Metadata" | read | Mandatory for every App. Required to subscribe to the `repository` event: "a GitHub App must have at least read-level access for the "Metadata" repository permission" (<https://docs.github.com/en/webhooks/webhook-events-and-payloads#repository>). |
-| 2 | Organization "Members" | read | `GET /user/memberships/orgs/{org}` (`orgs/get-membership-for-authenticated-user`) is listed under "Members" read, token type UAT only. Needed for admin role checks. |
-| 3 | Organization "Members" | read | `GET /orgs/{org}/members`, `GET /orgs/{org}/invitations`, `GET /orgs/{org}/teams/{team_slug}/members` (all "Members" read, UAT and IAT). Also required to subscribe to `organization`, `member`, `membership`, `team` events. |
-| 4 | Organization "Members" | write | `POST /orgs/{org}/invitations`, `PUT /orgs/{org}/memberships/{username}`, `PUT /orgs/{org}/teams/{team_slug}/memberships/{username}` (all "Members" write, UAT and IAT). |
-| 5 | Repository "Contents", "Issues", "Pull requests" | read | Leaderboard signal ingest (legacy permission set, `legacy-audit.md` §5.1). Re-verify per GraphQL query before Stage 5. |
+| Stage     | Permission                                       | Access | Why                                                                                                                                                                                                                                                    |
+| --------- | ------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1 (slice) | Repository "Metadata"                            | read   | Mandatory for every App. Required to subscribe to the `repository` event: "a GitHub App must have at least read-level access for the "Metadata" repository permission" (<https://docs.github.com/en/webhooks/webhook-events-and-payloads#repository>). |
+| 2         | Organization "Members"                           | read   | `GET /user/memberships/orgs/{org}` (`orgs/get-membership-for-authenticated-user`) is listed under "Members" read, token type UAT only. Needed for admin role checks.                                                                                   |
+| 3         | Organization "Members"                           | read   | `GET /orgs/{org}/members`, `GET /orgs/{org}/invitations`, `GET /orgs/{org}/teams/{team_slug}/members` (all "Members" read, UAT and IAT). Also required to subscribe to `organization`, `member`, `membership`, `team` events.                          |
+| 4         | Organization "Members"                           | write  | `POST /orgs/{org}/invitations`, `PUT /orgs/{org}/memberships/{username}`, `PUT /orgs/{org}/teams/{team_slug}/memberships/{username}` (all "Members" write, UAT and IAT).                                                                               |
+| 5         | Repository "Contents", "Issues", "Pull requests" | read   | Leaderboard signal ingest (legacy permission set, `legacy-audit.md` §5.1). Re-verify per GraphQL query before Stage 5.                                                                                                                                 |
 
 `GET /installation/repositories`, `GET /user`, and `GET /user/installations` do not appear under any permission heading on the permissions page. **Verified** by search of the page. **Assumption**: they need no extra permission beyond the token type.
 
@@ -59,15 +59,15 @@ Pinned API description: `github/rest-api-description` release v2.1.0, file `desc
 
 **Verified** against <https://docs.github.com/en/webhooks/webhook-events-and-payloads>.
 
-| Event | Subscription | Handling now (`jobs.WebhookWorker.apply`) |
-|---|---|---|
-| `installation` | "All GitHub Apps receive this event by default. You cannot manually subscribe to this event." Actions: `created`, `deleted`, `new_permissions_accepted`, `suspend`, `unsuspend`. | `deleted`: forget token, mark deleted, revoke grants. Other actions: upsert installation, enqueue sync. |
-| `installation_repositories` | Received by default. | Enqueue sync. |
-| `repository` | Subscribe. Needs "Metadata" read. | Enqueue sync. |
-| `github_app_authorization` | "A GitHub App receives this webhook by default and cannot unsubscribe from this event." | `revoked`: `store.RevokeGitHubUser` deletes all sessions and installation grants of `sender.id` in one transaction, then audits `session.revoked_by_github`. |
-| `ping` and others | n/a | Acknowledge, no action. |
-| `organization`, `member`, `membership`, `team` | Subscribe. Needs "Members" read. | **Planned** (Stage 3). |
-| `push`, `pull_request`, `pull_request_review`, `issues` | Subscribe. | **Planned** (Stage 5), as ingest hints. |
+| Event                                                   | Subscription                                                                                                                                                                     | Handling now (`jobs.WebhookWorker.apply`)                                                                                                                    |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `installation`                                          | "All GitHub Apps receive this event by default. You cannot manually subscribe to this event." Actions: `created`, `deleted`, `new_permissions_accepted`, `suspend`, `unsuspend`. | `deleted`: forget token, mark deleted, revoke grants. Other actions: upsert installation, enqueue sync.                                                      |
+| `installation_repositories`                             | Received by default.                                                                                                                                                             | Enqueue sync.                                                                                                                                                |
+| `repository`                                            | Subscribe. Needs "Metadata" read.                                                                                                                                                | Enqueue sync.                                                                                                                                                |
+| `github_app_authorization`                              | "A GitHub App receives this webhook by default and cannot unsubscribe from this event."                                                                                          | `revoked`: `store.RevokeGitHubUser` deletes all sessions and installation grants of `sender.id` in one transaction, then audits `session.revoked_by_github`. |
+| `ping` and others                                       | n/a                                                                                                                                                                              | Acknowledge, no action.                                                                                                                                      |
+| `organization`, `member`, `membership`, `team`          | Subscribe. Needs "Members" read.                                                                                                                                                 | **Planned** (Stage 3).                                                                                                                                       |
+| `push`, `pull_request`, `pull_request_review`, `issues` | Subscribe.                                                                                                                                                                       | **Planned** (Stage 5), as ingest hints.                                                                                                                      |
 
 ## 5. Webhook ingestion
 
@@ -141,11 +141,11 @@ Cost estimate (**Assumption**, from decisions workload numbers): one full sync =
 
 Primary limits. **Verified**: <https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api>
 
-| Credential | REST limit |
-|---|---|
-| Installation token | 5,000 req/h minimum. Plus 50 per repo above 20 and 50 per user above 20. Max 12,500 req/h. GitHub Enterprise Cloud org: 15,000 req/h. |
-| User access token | 5,000 req/h, shared with the user's other tokens. 15,000 req/h if the App is owned by a GHEC org. |
-| GraphQL (Stage 5) | 5,000 points/h per user. Installations 5,000 to 12,500 points/h. GHEC 10,000. <https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api> |
+| Credential         | REST limit                                                                                                                                                                   |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Installation token | 5,000 req/h minimum. Plus 50 per repo above 20 and 50 per user above 20. Max 12,500 req/h. GitHub Enterprise Cloud org: 15,000 req/h.                                        |
+| User access token  | 5,000 req/h, shared with the user's other tokens. 15,000 req/h if the App is owned by a GHEC org.                                                                            |
+| GraphQL (Stage 5)  | 5,000 points/h per user. Installations 5,000 to 12,500 points/h. GHEC 10,000. <https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api> |
 
 Secondary limits (**Verified**, same REST page): at most 100 concurrent requests (shared REST and GraphQL). At most 900 points per minute per REST endpoint. In general at most 80 content-generating requests per minute and 500 per hour. Too many requests can lead to "banning of your integration".
 
@@ -153,14 +153,14 @@ Documented retry rule (**Verified**, same page): honor `retry-after`. Else if `x
 
 Classification (**Verified**, `client.go` `classify`):
 
-| Response | Kind | Job outcome (`retryDecision`) | API outcome (`githubError`) |
-|---|---|---|---|
-| 429, or 403 with `x-ratelimit-remaining: 0`, `retry-after`, or "rate limit" in message | `KindRateLimited`, `RetryAfter` = `retry-after` → reset + 1 s → 60 s | `JobSnooze(RetryAfter)` | 503 `github_rate_limited` + `Retry-After` |
-| 401 | `KindUnauthorized` | `JobCancel` | 400 `github_auth_failed` |
-| other 403 | `KindForbidden` | `JobCancel` | 502 `github_unavailable` |
-| 404 | `KindNotFound` | installation: mark deleted. Else retried with backoff. | 502 `github_unavailable` |
-| 5xx, network error, read error | `KindTransient` | River backoff retry | 502 `github_unavailable` |
-| other 4xx, decode error, OAuth `error` | `KindInvalid` | `JobCancel` | 400 `github_auth_failed` |
+| Response                                                                               | Kind                                                                 | Job outcome (`retryDecision`)                          | API outcome (`githubError`)               |
+| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------ | ----------------------------------------- |
+| 429, or 403 with `x-ratelimit-remaining: 0`, `retry-after`, or "rate limit" in message | `KindRateLimited`, `RetryAfter` = `retry-after` → reset + 1 s → 60 s | `JobSnooze(RetryAfter)`                                | 503 `github_rate_limited` + `Retry-After` |
+| 401                                                                                    | `KindUnauthorized`                                                   | `JobCancel`                                            | 400 `github_auth_failed`                  |
+| other 403                                                                              | `KindForbidden`                                                      | `JobCancel`                                            | 502 `github_unavailable`                  |
+| 404                                                                                    | `KindNotFound`                                                       | installation: mark deleted. Else retried with backoff. | 502 `github_unavailable`                  |
+| 5xx, network error, read error                                                         | `KindTransient`                                                      | River backoff retry                                    | 502 `github_unavailable`                  |
+| other 4xx, decode error, OAuth `error`                                                 | `KindInvalid`                                                        | `JobCancel`                                            | 400 `github_auth_failed`                  |
 
 Concurrency (**Verified**, `jobs.NewWorkerClient`): queue `github` has `MaxWorkers = WORKER_CONCURRENCY` (default 4). With one worker replica, at most 4 GitHub-bound jobs run at once. Each sync is sequential. This stays far below 100 concurrent requests.
 
@@ -224,18 +224,18 @@ Rules:
 
 Source: `legacy-audit.md` §5.3. operationIds **Verified** in `/tmp/gh-rest.json`.
 
-| Legacy call | operationId | Target stage | Note |
-|---|---|---|---|
-| `GET /users/{username}` | `users/get-by-username` | 4 | resolve login to id for invites |
-| `POST /orgs/{org}/invitations` | `orgs/create-invitation` | 4 | Members write. Use `invitee_id`. |
-| `GET /orgs/{org}/members/{username}` | `orgs/check-membership-for-user` | 4 | prefer `orgs/get-membership-for-user` (`GET /orgs/{org}/memberships/{username}`) for role and state |
-| `PUT /orgs/{org}/memberships/{username}` | `orgs/set-membership-for-user` | 4 | only for existing members |
-| `PUT /orgs/{org}/teams/{team_slug}/memberships/{username}` | `teams/add-or-update-membership-for-user-in-org` | 4 | |
-| `GET /user/orgs` | `orgs/list-for-authenticated-user` | not ported | replaced by `GET /user/installations` + membership check |
-| GraphQL `OrgTeamsData` | n/a | 3 | replace with REST `teams/list` + `teams/list-members-in-org` with full pagination (legacy dropped members above 100) |
-| GraphQL `OrgRepositories` | n/a | not ported | replaced by `apps/list-repos-accessible-to-installation` |
-| GraphQL `RepoScoring*` (4 queries) | n/a | 5 | port with cost accounting. Remove the 20-page cap that ignored `since`. |
-| GraphQL `ViewerProfile`, `SearchUsers` | n/a | 2 / 4 | re-evaluate; avoid a generic GraphQL proxy |
+| Legacy call                                                | operationId                                      | Target stage | Note                                                                                                                 |
+| ---------------------------------------------------------- | ------------------------------------------------ | ------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `GET /users/{username}`                                    | `users/get-by-username`                          | 4            | resolve login to id for invites                                                                                      |
+| `POST /orgs/{org}/invitations`                             | `orgs/create-invitation`                         | 4            | Members write. Use `invitee_id`.                                                                                     |
+| `GET /orgs/{org}/members/{username}`                       | `orgs/check-membership-for-user`                 | 4            | prefer `orgs/get-membership-for-user` (`GET /orgs/{org}/memberships/{username}`) for role and state                  |
+| `PUT /orgs/{org}/memberships/{username}`                   | `orgs/set-membership-for-user`                   | 4            | only for existing members                                                                                            |
+| `PUT /orgs/{org}/teams/{team_slug}/memberships/{username}` | `teams/add-or-update-membership-for-user-in-org` | 4            |                                                                                                                      |
+| `GET /user/orgs`                                           | `orgs/list-for-authenticated-user`               | not ported   | replaced by `GET /user/installations` + membership check                                                             |
+| GraphQL `OrgTeamsData`                                     | n/a                                              | 3            | replace with REST `teams/list` + `teams/list-members-in-org` with full pagination (legacy dropped members above 100) |
+| GraphQL `OrgRepositories`                                  | n/a                                              | not ported   | replaced by `apps/list-repos-accessible-to-installation`                                                             |
+| GraphQL `RepoScoring*` (4 queries)                         | n/a                                              | 5            | port with cost accounting. Remove the 20-page cap that ignored `since`.                                              |
+| GraphQL `ViewerProfile`, `SearchUsers`                     | n/a                                              | 2 / 4        | re-evaluate; avoid a generic GraphQL proxy                                                                           |
 
 New calls planned: `GET /user/memberships/orgs/{org}` (`orgs/get-membership-for-authenticated-user`), `GET /orgs/{org}/members` (`orgs/list-members`), `GET /orgs/{org}/invitations` (`orgs/list-pending-invitations`), `GET /orgs/{org}/teams` (`teams/list`), `GET /orgs/{org}/teams/{team_slug}/members` (`teams/list-members-in-org`). All **Verified** present in the pinned description.
 

@@ -8,18 +8,18 @@ This benchmark compares Go and Rust on two workloads that Gitorgasm runs. It als
 
 ## Layout
 
-| Path | Content |
-| --- | --- |
-| `go/lb/` | Go workloads, fixture generator, PRNG, `testing.B` benchmarks |
-| `go/cmd/standalone/` | Go one-shot runner for peak RSS. Also writes the fixture (`gen` mode). |
-| `go/cmd/hello/` | Go `net/http` hello service |
-| `go/cmd/loadclient/` | Go HTTP client. Sends N sequential requests on one keep-alive connection. |
-| `rust/src/lib.rs` | Rust workloads and PRNG (same logic as `go/lb/`) |
-| `rust/src/bin/bench.rs` | Rust timing harness |
-| `rust/src/bin/standalone.rs` | Rust one-shot runner for peak RSS |
-| `rust/src/bin/hello.rs` | Rust `axum` + `tokio` hello service |
-| `run.sh` | Builds everything and runs all measurements. Prints a raw log. |
-| `fixtures/repos.json` | Generated fixture. Not committed. |
+| Path                         | Content                                                                   |
+| ---------------------------- | ------------------------------------------------------------------------- |
+| `go/lb/`                     | Go workloads, fixture generator, PRNG, `testing.B` benchmarks             |
+| `go/cmd/standalone/`         | Go one-shot runner for peak RSS. Also writes the fixture (`gen` mode).    |
+| `go/cmd/hello/`              | Go `net/http` hello service                                               |
+| `go/cmd/loadclient/`         | Go HTTP client. Sends N sequential requests on one keep-alive connection. |
+| `rust/src/lib.rs`            | Rust workloads and PRNG (same logic as `go/lb/`)                          |
+| `rust/src/bin/bench.rs`      | Rust timing harness                                                       |
+| `rust/src/bin/standalone.rs` | Rust one-shot runner for peak RSS                                         |
+| `rust/src/bin/hello.rs`      | Rust `axum` + `tokio` hello service                                       |
+| `run.sh`                     | Builds everything and runs all measurements. Prints a raw log.            |
+| `fixtures/repos.json`        | Generated fixture. Not committed.                                         |
 
 ## Workloads
 
@@ -47,13 +47,13 @@ Both languages print checksums of their output (`RepoChecksum`, `ScoreChecksum`)
 
 ## Measurements
 
-| Metric | Go method | Rust method |
-| --- | --- | --- |
-| Time per op | `go test -bench . -benchmem -cpu 1,16 -count 8`. Median of the 8 `ns/op` values. | `bench` binary: 5 warmup runs, then 100 timed runs. Median and p95 of per-run times. |
-| Allocations per op | `-benchmem` (`B/op`, `allocs/op`) | Counting global allocator, active only for one extra untimed run |
-| Peak RSS | `/usr/bin/time -v` "Maximum resident set size" of `standalone`, 5 runs, median | Same |
-| Binary size | `go build` default and `-ldflags='-s -w'` | `cargo build --release` default profile, and `strip` of the same binary |
-| Idle service RSS | `VmRSS`/`VmHWM` from `/proc/<pid>/status` 1 s after start, and 1 s after 10,000 sequential keep-alive requests from `loadclient` | Same |
+| Metric             | Go method                                                                                                                        | Rust method                                                                          |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Time per op        | `go test -bench . -benchmem -cpu 1,16 -count 8`. Median of the 8 `ns/op` values.                                                 | `bench` binary: 5 warmup runs, then 100 timed runs. Median and p95 of per-run times. |
+| Allocations per op | `-benchmem` (`B/op`, `allocs/op`)                                                                                                | Counting global allocator, active only for one extra untimed run                     |
+| Peak RSS           | `/usr/bin/time -v` "Maximum resident set size" of `standalone`, 5 runs, median                                                   | Same                                                                                 |
+| Binary size        | `go build` default and `-ldflags='-s -w'`                                                                                        | `cargo build --release` default profile, and `strip` of the same binary              |
+| Idle service RSS   | `VmRSS`/`VmHWM` from `/proc/<pid>/status` 1 s after start, and 1 s after 10,000 sequential keep-alive requests from `loadclient` | Same                                                                                 |
 
 Notes on method:
 

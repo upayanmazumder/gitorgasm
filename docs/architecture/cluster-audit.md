@@ -70,11 +70,11 @@ flowchart TB
 
 **Verified** (`kubectl describe node vps`, section "Allocated resources"):
 
-| Resource | Allocatable | Requests | Free requests | Limits |
-| --- | --- | --- | --- | --- |
-| CPU | 4000m | 2880m (72%) | **1120m** | 14560m (364%) |
-| Memory | 7932600Ki = 7746Mi | 6238Mi (80%) | **1508Mi** | 16558Mi (213%) |
-| Pods | 110 | 47 running | 63 | n/a |
+| Resource | Allocatable        | Requests     | Free requests | Limits         |
+| -------- | ------------------ | ------------ | ------------- | -------------- |
+| CPU      | 4000m              | 2880m (72%)  | **1120m**     | 14560m (364%)  |
+| Memory   | 7932600Ki = 7746Mi | 6238Mi (80%) | **1508Mi**    | 16558Mi (213%) |
+| Pods     | 110                | 47 running   | 63            | n/a            |
 
 **Verified** (`kubectl top node`): actual use is 1564m CPU (39%) and 5335Mi memory (68%). Real free memory is about 2411Mi.
 
@@ -90,26 +90,26 @@ Memory requests are the binding constraint. CPU is not.
 
 ## 3. Reusable infrastructure
 
-| Component | State | Evidence |
-| --- | --- | --- |
-| Ingress | Traefik in `kube-system`, `ingressClassName: traefik`, entrypoint `websecure`. TLS is the Cloudflare Origin CA default certificate for `*.upayan.dev`. | **Verified** `k8s/platform/traefik/`, `k8s/apps/upayan-api/ingress.yaml`, `kubectl get ingress -A` |
-| Gateway API | CRDs installed. No Gateway or HTTPRoute objects. | **Verified** `kubectl get gateway,httproute -A` returns "No resources found" |
-| IngressRoute | One: `kube-system/meghmitra-to-radar-redirect`. | **Verified** `kubectl get ingressroute -A` |
-| Registry | `ghcr.io/upayanmazumder/<repo>[/<component>]`. | **Verified** `k8s/argocd/applicationsets/apps.yaml` |
-| Image updates | argocd-image-updater, strategy `digest`, git write-back to `main` with secret `argocd/git-creds-updater` (SSH deploy key). | **Verified** `k8s/argocd/applications/apps/status-page.yaml` |
-| Secrets | SOPS + age, `ksops` generator. Two recipients in `.sops.yaml` (`age-ops` workstation key, `age-cluster` in `argocd/sops-age`). Rule `k8s/.*secrets\.sops\.ya?ml$`, `encrypted_regex: ^(data\|stringData)$`. | **Verified** `.sops.yaml`, `.claude/skills/secrets-tls/SKILL.md` |
-| Autoscaling | KEDA 2.15.1 plus HTTP add-on. ScaledObjects with `redis` and `external-push` triggers. | **Verified** `kubectl get scaledobject,httpscaledobject -A` |
-| Priority | `low-priority` (value -1). Only system classes beside it. | **Verified** `kubectl get priorityclass` |
-| PSA | `namespace-baseline` component: enforce `baseline`, warn `restricted`. | **Verified** `k8s/components/namespace-baseline/namespace.yaml` |
-| NetworkPolicy | 49 policies live. Pattern: default-deny ingress plus allow from Traefik pods in `kube-system`. | **Verified** `k8s/apps/upayan-api/networkpolicy.yaml`, `kubectl get networkpolicy -A` |
-| Metrics | Plain Prometheus. Pod discovery by annotation `prometheus.io/scrape: "true"`, `prometheus.io/path`, `prometheus.io/port`. No Prometheus Operator, no ServiceMonitor CRD. | **Verified** `k8s/monitoring/prometheus-configmap.yaml` lines 56-80 |
-| Logs | Promtail DaemonSet to Loki. Grafana at `grafana.upayan.dev`. | **Verified** `k8s/monitoring/` |
-| PostgreSQL | No shared instance. No operator. The only live Postgres is `vcap-v1/vcap-backend-v1-postgres` (`postgres:16`, plain Deployment, owned by vcap). | **Verified** `kubectl get pods -A` image filter |
-| Redis | No shared instance. `vcap-v1/vcap-backend-v1-redis` (`redis:7-alpine`) and `argocd-redis` are app-private. | **Verified** same command |
-| CloudNativePG | **Not present.** No `postgresql.cnpg.io` CRDs. | **Verified** `kubectl get crd` |
-| NATS | **Not present.** No pods, no CRDs. | **Verified** `kubectl get crd`, pod image filter |
-| Valkey | **Not present.** | **Verified** pod image filter |
-| DNS | Cloudflare, manual (click-ops). Terraform manages zone settings and R2 buckets only. | **Verified** `terraform/cloudflare.tf` lines 1-7 |
+| Component     | State                                                                                                                                                                                                       | Evidence                                                                                           |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Ingress       | Traefik in `kube-system`, `ingressClassName: traefik`, entrypoint `websecure`. TLS is the Cloudflare Origin CA default certificate for `*.upayan.dev`.                                                      | **Verified** `k8s/platform/traefik/`, `k8s/apps/upayan-api/ingress.yaml`, `kubectl get ingress -A` |
+| Gateway API   | CRDs installed. No Gateway or HTTPRoute objects.                                                                                                                                                            | **Verified** `kubectl get gateway,httproute -A` returns "No resources found"                       |
+| IngressRoute  | One: `kube-system/meghmitra-to-radar-redirect`.                                                                                                                                                             | **Verified** `kubectl get ingressroute -A`                                                         |
+| Registry      | `ghcr.io/upayanmazumder/<repo>[/<component>]`.                                                                                                                                                              | **Verified** `k8s/argocd/applicationsets/apps.yaml`                                                |
+| Image updates | argocd-image-updater, strategy `digest`, git write-back to `main` with secret `argocd/git-creds-updater` (SSH deploy key).                                                                                  | **Verified** `k8s/argocd/applications/apps/status-page.yaml`                                       |
+| Secrets       | SOPS + age, `ksops` generator. Two recipients in `.sops.yaml` (`age-ops` workstation key, `age-cluster` in `argocd/sops-age`). Rule `k8s/.*secrets\.sops\.ya?ml$`, `encrypted_regex: ^(data\|stringData)$`. | **Verified** `.sops.yaml`, `.claude/skills/secrets-tls/SKILL.md`                                   |
+| Autoscaling   | KEDA 2.15.1 plus HTTP add-on. ScaledObjects with `redis` and `external-push` triggers.                                                                                                                      | **Verified** `kubectl get scaledobject,httpscaledobject -A`                                        |
+| Priority      | `low-priority` (value -1). Only system classes beside it.                                                                                                                                                   | **Verified** `kubectl get priorityclass`                                                           |
+| PSA           | `namespace-baseline` component: enforce `baseline`, warn `restricted`.                                                                                                                                      | **Verified** `k8s/components/namespace-baseline/namespace.yaml`                                    |
+| NetworkPolicy | 49 policies live. Pattern: default-deny ingress plus allow from Traefik pods in `kube-system`.                                                                                                              | **Verified** `k8s/apps/upayan-api/networkpolicy.yaml`, `kubectl get networkpolicy -A`              |
+| Metrics       | Plain Prometheus. Pod discovery by annotation `prometheus.io/scrape: "true"`, `prometheus.io/path`, `prometheus.io/port`. No Prometheus Operator, no ServiceMonitor CRD.                                    | **Verified** `k8s/monitoring/prometheus-configmap.yaml` lines 56-80                                |
+| Logs          | Promtail DaemonSet to Loki. Grafana at `grafana.upayan.dev`.                                                                                                                                                | **Verified** `k8s/monitoring/`                                                                     |
+| PostgreSQL    | No shared instance. No operator. The only live Postgres is `vcap-v1/vcap-backend-v1-postgres` (`postgres:16`, plain Deployment, owned by vcap).                                                             | **Verified** `kubectl get pods -A` image filter                                                    |
+| Redis         | No shared instance. `vcap-v1/vcap-backend-v1-redis` (`redis:7-alpine`) and `argocd-redis` are app-private.                                                                                                  | **Verified** same command                                                                          |
+| CloudNativePG | **Not present.** No `postgresql.cnpg.io` CRDs.                                                                                                                                                              | **Verified** `kubectl get crd`                                                                     |
+| NATS          | **Not present.** No pods, no CRDs.                                                                                                                                                                          | **Verified** `kubectl get crd`, pod image filter                                                   |
+| Valkey        | **Not present.**                                                                                                                                                                                            | **Verified** pod image filter                                                                      |
+| DNS           | Cloudflare, manual (click-ops). Terraform manages zone settings and R2 buckets only.                                                                                                                        | **Verified** `terraform/cloudflare.tf` lines 1-7                                                   |
 
 ## 4. Onboarding procedure for `gitorgasm`
 
@@ -143,15 +143,15 @@ The ApplicationSet template carries exactly one image. **Verified** `k8s/argocd/
 
 ## 5. Declared vs live drift
 
-| Item | Declared | Live | Evidence |
-| --- | --- | --- | --- |
-| `argocd-image-updater` Application | Synced | `OutOfSync Healthy` | `kubectl get applications -n argocd` |
-| `seaweedfs-it` Application | in `k8s/argocd/applications/apps/` | `OutOfSync Missing` | same |
-| Namespaces `bandit`, `bitvault`, `kirro`, `rankstack`, `upayan-v5`, `jwt-key-persist-verify`, `seaweedfs-fixtest-live`, `seaweedfs-fixtest2` | not in `k8s/argocd/projects/apps.yaml` | exist, no PSA labels | `kubectl get ns --show-labels`. Retired workloads keep namespaces and PVCs by design (`docs/storage.md`). The two `seaweedfs-fixtest*` and `jwt-key-persist-verify` look like leftovers. **Assumption**. |
-| `upayan-web` namespace | not in the `apps` project | exists with PSA labels | same |
-| `default/smart-home-system-pvc` | not referenced by any app | Bound, 1Gi, Retain | `kubectl get pvc -A`. Orphan of an earlier layout. **Assumption** |
-| Onboarding skill | `namespace.yaml`, push to `main` | component and PR flow | section 4 |
-| Low-priority apps ingress | per-app ingress | one shared `keda/low-priority-apps` Ingress routes `api-cas`, `html-nodejs-web-dj`, `bots` to the KEDA interceptor | `kubectl get ingress -A` |
+| Item                                                                                                                                         | Declared                               | Live                                                                                                               | Evidence                                                                                                                                                                                                 |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `argocd-image-updater` Application                                                                                                           | Synced                                 | `OutOfSync Healthy`                                                                                                | `kubectl get applications -n argocd`                                                                                                                                                                     |
+| `seaweedfs-it` Application                                                                                                                   | in `k8s/argocd/applications/apps/`     | `OutOfSync Missing`                                                                                                | same                                                                                                                                                                                                     |
+| Namespaces `bandit`, `bitvault`, `kirro`, `rankstack`, `upayan-v5`, `jwt-key-persist-verify`, `seaweedfs-fixtest-live`, `seaweedfs-fixtest2` | not in `k8s/argocd/projects/apps.yaml` | exist, no PSA labels                                                                                               | `kubectl get ns --show-labels`. Retired workloads keep namespaces and PVCs by design (`docs/storage.md`). The two `seaweedfs-fixtest*` and `jwt-key-persist-verify` look like leftovers. **Assumption**. |
+| `upayan-web` namespace                                                                                                                       | not in the `apps` project              | exists with PSA labels                                                                                             | same                                                                                                                                                                                                     |
+| `default/smart-home-system-pvc`                                                                                                              | not referenced by any app              | Bound, 1Gi, Retain                                                                                                 | `kubectl get pvc -A`. Orphan of an earlier layout. **Assumption**                                                                                                                                        |
+| Onboarding skill                                                                                                                             | `namespace.yaml`, push to `main`       | component and PR flow                                                                                              | section 4                                                                                                                                                                                                |
+| Low-priority apps ingress                                                                                                                    | per-app ingress                        | one shared `keda/low-priority-apps` Ingress routes `api-cas`, `html-nodejs-web-dj`, `bots` to the KEDA interceptor | `kubectl get ingress -A`                                                                                                                                                                                 |
 
 ## 6. Storage and backups
 
@@ -191,12 +191,12 @@ This gives 30-minute RPO locally and about 1.5 h RPO offsite (**Assumption**: wo
 
 **Proposal**. The budget keeps the free memory request headroom above 900Mi after Gitorgasm lands.
 
-| Workload | Replicas | CPU request | CPU limit | Memory request | Memory limit | Priority |
-| --- | --- | --- | --- | --- | --- | --- |
-| API | 1 | 50m | 500m | 128Mi | 256Mi | default |
-| Worker (sync, scoring, webhooks) | 1 | 50m | 500m | 128Mi | 256Mi | default |
-| PostgreSQL 18 | 1 | 100m | 1000m | 256Mi | 512Mi | default |
-| **Total** | | **200m** | 2000m | **512Mi** | 1024Mi | |
+| Workload                         | Replicas | CPU request | CPU limit | Memory request | Memory limit | Priority |
+| -------------------------------- | -------- | ----------- | --------- | -------------- | ------------ | -------- |
+| API                              | 1        | 50m         | 500m      | 128Mi          | 256Mi        | default  |
+| Worker (sync, scoring, webhooks) | 1        | 50m         | 500m      | 128Mi          | 256Mi        | default  |
+| PostgreSQL 18                    | 1        | 100m        | 1000m     | 256Mi          | 512Mi        | default  |
+| **Total**                        |          | **200m**    | 2000m     | **512Mi**      | 1024Mi       |          |
 
 After Gitorgasm: CPU requests 3080m (77%), free 920m. Memory requests 6750Mi (87%), free about 996Mi. Before KEDA apps wake, that is enough. If all five scale-to-zero apps wake, free memory requests fall to about 360Mi (**Assumption** from section 2).
 

@@ -4,7 +4,8 @@ SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
 
 CORE := core
-WEB := apps/web
+WEB := web
+SCORING := scoring
 BENCH := tests/performance/lang-bench
 GOBIN := $(shell go env GOPATH)/bin
 GOLANGCI := $(GOBIN)/golangci-lint
@@ -18,10 +19,11 @@ help: ## Show targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
 
 .PHONY: tools
-tools: ## Install pinned Go tools (golangci-lint, kubeconform, govulncheck)
+tools: ## Install pinned tools (golangci-lint, kubeconform, govulncheck, cargo-deny)
 	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
 	go install github.com/yannh/kubeconform/cmd/kubeconform@v0.8.0
 	go install golang.org/x/vuln/cmd/govulncheck@latest
+	cargo install --locked cargo-deny
 
 # ---- local stack -----------------------------------------------------------------------------
 .PHONY: up
@@ -56,14 +58,18 @@ fmt: ## Format all code
 	cd $(CORE) && $(GOLANGCI) fmt ./...
 	cd $(BENCH)/go && gofmt -w .
 	cd $(BENCH)/rust && cargo fmt
+	cd $(SCORING) && cargo fmt
 	cd $(WEB) && pnpm format
+	pnpm format
 
 .PHONY: lint
 lint: ## Lint and format-check all code
 	cd $(CORE) && test -z "$$(gofmt -l .)" && go vet ./... && $(GOLANGCI) run ./...
 	cd $(BENCH)/go && test -z "$$(gofmt -l .)" && go vet ./...
 	cd $(BENCH)/rust && cargo fmt --check && cargo clippy --all-targets --locked -- -D warnings
+	cd $(SCORING) && cargo fmt --check && cargo clippy --all-targets --locked -- -D warnings
 	cd $(WEB) && pnpm lint && pnpm typecheck && pnpm format:check
+	pnpm format:check
 
 .PHONY: test-go
 test-go: db ## Go tests against an isolated database per test
@@ -72,6 +78,7 @@ test-go: db ## Go tests against an isolated database per test
 .PHONY: test
 test: test-go ## Run all tests
 	cd $(BENCH)/rust && cargo test --locked
+	cd $(SCORING) && cargo test --locked
 	cd $(WEB) && SKIP_ENV_VALIDATION=true pnpm test
 
 .PHONY: build
@@ -79,6 +86,7 @@ build: ## Build binaries, the web app, and the container image
 	cd $(CORE) && CGO_ENABLED=0 go build -trimpath -o bin/gitorgasm ./cmd/gitorgasm
 	cd $(BENCH)/go && go build ./...
 	cd $(BENCH)/rust && cargo build --release --locked
+	cd $(SCORING) && cargo build --release --locked
 	cd $(WEB) && SKIP_ENV_VALIDATION=true pnpm build
 	docker build -t gitorgasm-core:dev $(CORE)
 
@@ -87,11 +95,13 @@ manifests: ## Render and schema-validate Kubernetes manifests
 	kustomize build deploy/kustomize/overlays/production | $(KUBECONFORM) -strict -summary -kubernetes-version 1.34.0 -
 
 .PHONY: vuln
-vuln: ## Check Go dependencies for known vulnerabilities
+vuln: ## Check dependencies for known vulnerabilities and license policy
 	cd $(CORE) && $(GOVULNCHECK) ./...
+	cd $(SCORING) && cargo deny check
 
 .PHONY: web-install
-web-install:
+web-install: ## Install root tooling (git hooks) and web dependencies
+	pnpm install --frozen-lockfile
 	cd $(WEB) && pnpm install --frozen-lockfile
 
 .PHONY: verify

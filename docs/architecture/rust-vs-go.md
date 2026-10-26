@@ -4,14 +4,14 @@ This document selects a language per logical service. It uses measured benchmark
 
 ## 1. Summary
 
-| Service | Language | State |
-|---|---|---|
-| core api | Go | **Verified** implemented: `core` (`api` role) |
-| worker / sync | Go | **Verified** implemented: `core` (`worker` role) |
-| webhook ingest | Go (inside core api) | **Verified** implemented: `POST /webhooks/github` in `core/internal/httpapi/orgs.go` |
-| operations (bulk mutations) | Go (inside core worker) | Planned, Stage 4 |
-| scoring engine | Rust | **Hypothesis**. Planned, Stage 5. Re-verify before building (section 5). |
-| analytics | Go + SQL rollups | Planned, Stage 5+ |
+| Service                     | Language                | State                                                                                |
+| --------------------------- | ----------------------- | ------------------------------------------------------------------------------------ |
+| core api                    | Go                      | **Verified** implemented: `core` (`api` role)                                        |
+| worker / sync               | Go                      | **Verified** implemented: `core` (`worker` role)                                     |
+| webhook ingest              | Go (inside core api)    | **Verified** implemented: `POST /webhooks/github` in `core/internal/httpapi/orgs.go` |
+| operations (bulk mutations) | Go (inside core worker) | Planned, Stage 4                                                                     |
+| scoring engine              | Rust                    | **Hypothesis**. Planned, Stage 5. Re-verify before building (section 5).             |
+| analytics                   | Go + SQL rollups        | Planned, Stage 5+                                                                    |
 
 ## 2. Measured benchmark
 
@@ -26,15 +26,15 @@ Source: [`tests/performance/lang-bench/RESULTS.md`](../../tests/performance/lang
 
 ### 2.2 Results
 
-| Workload | Go | Rust | Rust / Go |
-|---|---|---|---|
-| Parse 10k repos (median, A / B) | 42.5–60.4 ms (`encoding/json` v1 and v2, `GOMAXPROCS` 1 and 16) | 20.1 / 24.6 ms | ~0.4–0.5× |
-| Score 1M events + top 100 (A / B) | 27.2–35.7 ms | 13.6 / 14.8 ms | ~0.4–0.5× |
-| Score allocations per op | 47,704 | 16 | — |
-| Hello service RSS at 1 s | 11.4 MB | 3.7 MB | ~0.32× |
-| Hello service RSS after 10k requests | 16.1–16.8 MB | 3.9–4.0 MB | ~0.24× |
-| Stripped binary, hello service | 5.9 MB | 1.2 MB | ~0.2× |
-| 10k sequential requests p50/p99 | Runs A and B disagree | Runs A and B disagree | No conclusion |
+| Workload                             | Go                                                              | Rust                  | Rust / Go     |
+| ------------------------------------ | --------------------------------------------------------------- | --------------------- | ------------- |
+| Parse 10k repos (median, A / B)      | 42.5–60.4 ms (`encoding/json` v1 and v2, `GOMAXPROCS` 1 and 16) | 20.1 / 24.6 ms        | ~0.4–0.5×     |
+| Score 1M events + top 100 (A / B)    | 27.2–35.7 ms                                                    | 13.6 / 14.8 ms        | ~0.4–0.5×     |
+| Score allocations per op             | 47,704                                                          | 16                    | —             |
+| Hello service RSS at 1 s             | 11.4 MB                                                         | 3.7 MB                | ~0.32×        |
+| Hello service RSS after 10k requests | 16.1–16.8 MB                                                    | 3.9–4.0 MB            | ~0.24×        |
+| Stripped binary, hello service       | 5.9 MB                                                          | 1.2 MB                | ~0.2×         |
+| 10k sequential requests p50/p99      | Runs A and B disagree                                           | Runs A and B disagree | No conclusion |
 
 ### 2.3 Limitations (from RESULTS.md)
 
@@ -56,37 +56,37 @@ Scale: ++ strong advantage, + advantage, 0 neutral, − disadvantage. Each cell 
 
 ### 3.1 Per-service dominant workload
 
-| Service | Dominant workload | CPU | I/O | Memory | Tail latency driver |
-|---|---|---|---|---|---|
-| core api | DB reads, session lookup, JSON | Low | Postgres | Small | Postgres query time and pool |
-| worker / sync | GitHub REST pages, upserts | Low | GitHub network, Postgres | Small | GitHub latency, rate limits |
-| webhook ingest | HMAC + 1 insert transaction | Low | Postgres | Bounded by 25 MiB cap | Postgres commit |
-| operations | Paced GitHub mutations | Very low | GitHub, paced at ≤ 80/min | Small | Secondary limits |
-| scoring engine | Aggregation over signals | **High per run** | Postgres bulk read/write | Grows with signals | Batch duration |
-| analytics | SQL rollups | In Postgres | Postgres | In Postgres | Query plans |
+| Service        | Dominant workload              | CPU              | I/O                       | Memory                | Tail latency driver          |
+| -------------- | ------------------------------ | ---------------- | ------------------------- | --------------------- | ---------------------------- |
+| core api       | DB reads, session lookup, JSON | Low              | Postgres                  | Small                 | Postgres query time and pool |
+| worker / sync  | GitHub REST pages, upserts     | Low              | GitHub network, Postgres  | Small                 | GitHub latency, rate limits  |
+| webhook ingest | HMAC + 1 insert transaction    | Low              | Postgres                  | Bounded by 25 MiB cap | Postgres commit              |
+| operations     | Paced GitHub mutations         | Very low         | GitHub, paced at ≤ 80/min | Small                 | Secondary limits             |
+| scoring engine | Aggregation over signals       | **High per run** | Postgres bulk read/write  | Grows with signals    | Batch duration               |
+| analytics      | SQL rollups                    | In Postgres      | Postgres                  | In Postgres           | Query plans                  |
 
 ### 3.2 Criteria (Go column relative to Rust)
 
-| Criterion | core api | worker/sync | webhook | operations | scoring | analytics |
-|---|---|---|---|---|---|---|
-| CPU efficiency | 0 | 0 | 0 | 0 | − (Rust ~2×) | 0 |
-| I/O handling | 0 | 0 | 0 | 0 | 0 | 0 |
-| Memory footprint | − | − | − | − | − | − |
-| Tail latency (GC) | 0 (DB dominates) | 0 | 0 | 0 | − (47k allocs/op vs 16) | 0 |
-| Runtime overhead | − (~11 MB vs ~4 MB idle) | − | − | − | − | − |
-| Concurrency model | + goroutines, simple | + | + | + | 0 | 0 |
-| GitHub client maturity | + `go-github` mature; Gitorgasm uses a narrow hand-written client | + | 0 | + | n/a | n/a |
-| Queue library | ++ River is Go-only | ++ | ++ | ++ | − (Rust must consume rows without River client) | + |
-| DB library | + pgx (used); sqlc optional | + | + | + | 0 (SQLx mature) | + |
-| Dev productivity | + | + | + | + | 0 | + |
-| Build time | + | + | + | + | 0 | + |
-| Testing | + stdlib `testing`, real Postgres per test (`internal/testdb`) | + | + | + | 0 (golden tests in either) | + |
-| Debugging | + delve, pprof | + | + | + | 0 | + |
-| Container footprint | − (5.9 MB vs 1.2 MB stripped) | − | − | − | − | − |
-| Contributor familiarity | + (legacy team writes TypeScript; Go is closer) | + | + | + | − | + |
-| Maintenance | + one toolchain | + | + | + | − second toolchain | + |
-| Ops complexity | + one image, three roles | + | + | + | − second image, second CI | + |
-| **Verdict** | **Go** | **Go** | **Go** | **Go** | **Rust (hypothesis)** | **Go + SQL** |
+| Criterion               | core api                                                          | worker/sync | webhook | operations | scoring                                         | analytics    |
+| ----------------------- | ----------------------------------------------------------------- | ----------- | ------- | ---------- | ----------------------------------------------- | ------------ |
+| CPU efficiency          | 0                                                                 | 0           | 0       | 0          | − (Rust ~2×)                                    | 0            |
+| I/O handling            | 0                                                                 | 0           | 0       | 0          | 0                                               | 0            |
+| Memory footprint        | −                                                                 | −           | −       | −          | −                                               | −            |
+| Tail latency (GC)       | 0 (DB dominates)                                                  | 0           | 0       | 0          | − (47k allocs/op vs 16)                         | 0            |
+| Runtime overhead        | − (~11 MB vs ~4 MB idle)                                          | −           | −       | −          | −                                               | −            |
+| Concurrency model       | + goroutines, simple                                              | +           | +       | +          | 0                                               | 0            |
+| GitHub client maturity  | + `go-github` mature; Gitorgasm uses a narrow hand-written client | +           | 0       | +          | n/a                                             | n/a          |
+| Queue library           | ++ River is Go-only                                               | ++          | ++      | ++         | − (Rust must consume rows without River client) | +            |
+| DB library              | + pgx (used); sqlc optional                                       | +           | +       | +          | 0 (SQLx mature)                                 | +            |
+| Dev productivity        | +                                                                 | +           | +       | +          | 0                                               | +            |
+| Build time              | +                                                                 | +           | +       | +          | 0                                               | +            |
+| Testing                 | + stdlib `testing`, real Postgres per test (`internal/testdb`)    | +           | +       | +          | 0 (golden tests in either)                      | +            |
+| Debugging               | + delve, pprof                                                    | +           | +       | +          | 0                                               | +            |
+| Container footprint     | − (5.9 MB vs 1.2 MB stripped)                                     | −           | −       | −          | −                                               | −            |
+| Contributor familiarity | + (legacy team writes TypeScript; Go is closer)                   | +           | +       | +          | −                                               | +            |
+| Maintenance             | + one toolchain                                                   | +           | +       | +          | − second toolchain                              | +            |
+| Ops complexity          | + one image, three roles                                          | +           | +       | +          | − second image, second CI                       | +            |
+| **Verdict**             | **Go**                                                            | **Go**      | **Go**  | **Go**     | **Rust (hypothesis)**                           | **Go + SQL** |
 
 Library facts:
 
@@ -98,21 +98,21 @@ Library facts:
 
 These rules apply when the first non-Go service exists. They apply now to any new process.
 
-| Topic | Rule |
-|---|---|
-| Boundaries | One service owns a domain's tables for writing. Other services read through views or documented tables only. Scoring writes `computed_scores` and reads `signals`. |
+| Topic           | Rule                                                                                                                                                                                                                                                                          |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Boundaries      | One service owns a domain's tables for writing. Other services read through views or documented tables only. Scoring writes `computed_scores` and reads `signals`.                                                                                                            |
 | Contract format | Postgres tables and job rows are the contract between core and scoring. Schema changes go through the goose migrations in `core/internal/db/migrations`. If a synchronous RPC is ever needed: ConnectRPC with protobuf (D6). Public API: OpenAPI `contracts/openapi/v1.yaml`. |
-| Serialization | JSON in `jsonb` and job args. Field names `snake_case`. Unknown fields are ignored by readers. Fields are added, never renamed or retyped in place. Integers that may exceed 2^53 travel as strings in JSON. |
-| Compatibility | Expand then contract: add the column or field, deploy readers, deploy writers, remove old fields one release later. Every job row carries a `version` in args when its shape changes. |
-| Job handoff | Core enqueues work for scoring as rows the Rust service can claim with `SELECT … FOR UPDATE SKIP LOCKED`, or as a simple jobs table. Rust does not link the River client. |
-| Logging | JSON to stdout. Keys: `time`, `level`, `msg`, `service`, `component`, `app_version`, `request_id`, `trace_id`, `span_id`. Same as `core/internal/obs/obs.go` and `cmd/gitorgasm/main.go`. |
-| Tracing | W3C Trace Context. OTLP/HTTP export only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. Job rows carry `traceparent` in metadata so a job span links to its request span (Planned). |
-| Metrics | Prometheus on `:9090`, prefix `gitorgasm_`, labels with bounded cardinality. |
-| Health | `/healthz`: process alive, no dependency check. `/readyz`: Postgres reachable. Same semantics as `obs.MetricsServer` and `httpapi.Server`. |
-| Auth context | Background services do not receive user sessions. Job rows carry `actor_user_id` and `installation_id`. The enqueuing service already checked authorization. The consumer re-checks tenant scope in SQL. |
-| Images | One image per service, distroless, non-root, read-only root filesystem. Independent versions and release tags. |
-| FFI | None. No cgo, no Rust linked into Go, no Go linked into Rust. |
-| CI | Each language has its own job. Rust CI is added only when the Rust service exists (D16). |
+| Serialization   | JSON in `jsonb` and job args. Field names `snake_case`. Unknown fields are ignored by readers. Fields are added, never renamed or retyped in place. Integers that may exceed 2^53 travel as strings in JSON.                                                                  |
+| Compatibility   | Expand then contract: add the column or field, deploy readers, deploy writers, remove old fields one release later. Every job row carries a `version` in args when its shape changes.                                                                                         |
+| Job handoff     | Core enqueues work for scoring as rows the Rust service can claim with `SELECT … FOR UPDATE SKIP LOCKED`, or as a simple jobs table. Rust does not link the River client.                                                                                                     |
+| Logging         | JSON to stdout. Keys: `time`, `level`, `msg`, `service`, `component`, `app_version`, `request_id`, `trace_id`, `span_id`. Same as `core/internal/obs/obs.go` and `cmd/gitorgasm/main.go`.                                                                                     |
+| Tracing         | W3C Trace Context. OTLP/HTTP export only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. Job rows carry `traceparent` in metadata so a job span links to its request span (Planned).                                                                                               |
+| Metrics         | Prometheus on `:9090`, prefix `gitorgasm_`, labels with bounded cardinality.                                                                                                                                                                                                  |
+| Health          | `/healthz`: process alive, no dependency check. `/readyz`: Postgres reachable. Same semantics as `obs.MetricsServer` and `httpapi.Server`.                                                                                                                                    |
+| Auth context    | Background services do not receive user sessions. Job rows carry `actor_user_id` and `installation_id`. The enqueuing service already checked authorization. The consumer re-checks tenant scope in SQL.                                                                      |
+| Images          | One image per service, distroless, non-root, read-only root filesystem. Independent versions and release tags.                                                                                                                                                                |
+| FFI             | None. No cgo, no Rust linked into Go, no Go linked into Rust.                                                                                                                                                                                                                 |
+| CI              | Each language has its own job. Rust CI is added only when the Rust service exists (D16).                                                                                                                                                                                      |
 
 ## 5. Rust scoring: hypothesis and benchmark plan
 

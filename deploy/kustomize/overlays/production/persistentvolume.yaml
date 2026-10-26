@@ -14,7 +14,7 @@ spec:
   accessModes: [ReadWriteOnce]
   volumeMode: Filesystem
   persistentVolumeReclaimPolicy: Retain
-  storageClassName: ""
+  storageClassName: ''
   hostPath:
     path: /srv/data/gitorgasm-postgres
     type: Directory
@@ -24,4 +24,4 @@ spec:
         - matchExpressions:
             - key: kubernetes.io/hostname
               operator: In
-              values: ["vps"]
+              values: ['vps']

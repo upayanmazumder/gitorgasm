@@ -12,7 +12,7 @@ Labels: **Verified** (file path, command, or official URL), **Assumption**, **De
 sequenceDiagram
   autonumber
   actor B as Browser
-  participant V as Vercel (apps/web)<br/>/api/* rewrite
+  participant V as Vercel (web)<br/>/api/* rewrite
   participant API as core api
   participant GH as github.com / api.github.com
   participant PG as PostgreSQL
@@ -47,14 +47,14 @@ sequenceDiagram
 
 ## 2. Session model
 
-| Property | Value | Evidence |
-|---|---|---|
-| Session id | 256-bit random, base64url | `secure.RandomToken` |
-| Stored form | `SHA-256(id)` as `sessions.id_hash` | `secure.Hash`, `00001_core.sql` |
-| Cookie | `__Host-gitorgasm_session`, HttpOnly, Secure, SameSite=Lax, Path=/ | `setCookie` |
-| TTL | `SESSION_TTL`, default 168 h, absolute | `config.go`, `createSession` |
-| Activity | `last_seen_at` updated at most once per minute | `store.LookupSession` |
-| Transport | cookie only. No bearer header. Never returned in a body. | `authed` |
+| Property    | Value                                                              | Evidence                        |
+| ----------- | ------------------------------------------------------------------ | ------------------------------- |
+| Session id  | 256-bit random, base64url                                          | `secure.RandomToken`            |
+| Stored form | `SHA-256(id)` as `sessions.id_hash`                                | `secure.Hash`, `00001_core.sql` |
+| Cookie      | `__Host-gitorgasm_session`, HttpOnly, Secure, SameSite=Lax, Path=/ | `setCookie`                     |
+| TTL         | `SESSION_TTL`, default 168 h, absolute                             | `config.go`, `createSession`    |
+| Activity    | `last_seen_at` updated at most once per minute                     | `store.LookupSession`           |
+| Transport   | cookie only. No bearer header. Never returned in a body.           | `authed`                        |
 
 - A database leak does not reveal usable session ids. Only hashes are stored.
 - **Decision**: absolute expiry, no sliding renewal. The user logs in again after 7 days.
@@ -100,15 +100,15 @@ flowchart LR
 
 ### Gaps (Planned, Stage 2)
 
-| Gap | Risk | Plan |
-|---|---|---|
-| Grants are refreshed only at login. | A user removed from an org keeps read access to the mirror until the session expires (≤ 168 h). | Periodic job: for each active session with a usable token, call `GET /user/installations` and replace grants. Also run on `organization` `member_removed` and `membership` webhooks (Stage 3). |
-| No org role check. | Any member with access to the installation can call `POST …/sync`. Impact now: an extra deduplicated sync. | Before any mutation: `GET /user/memberships/orgs/{org}` with the user token (`orgs/get-membership-for-authenticated-user`, "Members" read, UAT). Require `role = admin` and `state = active`. Do not cache the result for mutations. |
-| Refresh tokens are stored but never used. | User token expires after 8 h (if expiring tokens are on). Stage 2 re-verification would fail after 8 h. | Refresh with `grant_type=refresh_token` under a row lock (`SELECT … FOR UPDATE` on the session) because refresh tokens are single-use. On `bad_refresh_token`, delete the session. |
+| Gap                                       | Risk                                                                                                       | Plan                                                                                                                                                                                                                                 |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Grants are refreshed only at login.       | A user removed from an org keeps read access to the mirror until the session expires (≤ 168 h).            | Periodic job: for each active session with a usable token, call `GET /user/installations` and replace grants. Also run on `organization` `member_removed` and `membership` webhooks (Stage 3).                                       |
+| No org role check.                        | Any member with access to the installation can call `POST …/sync`. Impact now: an extra deduplicated sync. | Before any mutation: `GET /user/memberships/orgs/{org}` with the user token (`orgs/get-membership-for-authenticated-user`, "Members" read, UAT). Require `role = admin` and `state = active`. Do not cache the result for mutations. |
+| Refresh tokens are stored but never used. | User token expires after 8 h (if expiring tokens are on). Stage 2 re-verification would fail after 8 h.    | Refresh with `grant_type=refresh_token` under a row lock (`SELECT … FOR UPDATE` on the session) because refresh tokens are single-use. On `bad_refresh_token`, delete the session.                                                   |
 
 ## 5. Frontend proxy and cookies
 
-**Decision** (decisions item 7): the Vercel app rewrites `/api/:path*` to `https://api-gitorgasm.upayan.dev/:path*`. **Planned** (Stage 1.5): the rewrite config in `apps/web`. **Verified**: `apps/web` has no rewrite and no API integration yet.
+**Decision** (decisions item 7): the Vercel app rewrites `/api/:path*` to `https://api-gitorgasm.upayan.dev/:path*`. **Planned** (Stage 1.5): the rewrite config in `web`. **Verified**: `web` has no rewrite and no API integration yet.
 
 - The browser sees one origin. The session cookie is first-party and host-only for the Vercel host. No CORS headers are needed. **Verified**: the server sends no `Access-Control-*` headers (`server.go`).
 - `GITHUB_OAUTH_CALLBACK_URL` must be the Vercel URL. **Verified** production value: `https://gitorgasm.vercel.app/api/v1/auth/callback` (`deploy/kustomize/overlays/production/config.yaml`). Then GitHub redirects the browser to the same origin that holds the oauth cookie. The Ingress routes `/v1` to the API, so the rewritten path `/v1/auth/callback` reaches the handler.
@@ -128,12 +128,12 @@ flowchart LR
 
 ## 7. Logout and revocation
 
-| Trigger | Effect | Evidence |
-|---|---|---|
-| `POST /v1/auth/logout` | delete the session row, clear the cookie, 204 | `auth.go` `logout` |
-| Session expiry | `LookupSession` ignores rows with `expires_at <= now()`. The handler clears the cookie. | `authed` |
+| Trigger                        | Effect                                                                                                                                                                                                               | Evidence                                             |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `POST /v1/auth/logout`         | delete the session row, clear the cookie, 204                                                                                                                                                                        | `auth.go` `logout`                                   |
+| Session expiry                 | `LookupSession` ignores rows with `expires_at <= now()`. The handler clears the cookie.                                                                                                                              | `authed`                                             |
 | User revokes the App on GitHub | `github_app_authorization` `revoked` webhook calls `store.RevokeGitHubUser`: deletes all sessions and all `user_installations` grants of that GitHub user in one transaction, and audits `session.revoked_by_github` | `jobs.WebhookWorker.apply`, `store.RevokeGitHubUser` |
-| Installation deleted | grants deleted, so org routes return 404 | `store.MarkInstallationDeleted` |
+| Installation deleted           | grants deleted, so org routes return 404                                                                                                                                                                             | `store.MarkInstallationDeleted`                      |
 
 - **Verified**: GitHub delivers `github_app_authorization` to every App and the App cannot unsubscribe. <https://docs.github.com/en/webhooks/webhook-events-and-payloads#github_app_authorization>
 - **Planned**: logout does not revoke the GitHub user token. Add `DELETE /applications/{client_id}/token` (`apps/delete-token`, verified in the pinned description) at logout, so a stolen sealed token is useless after logout.

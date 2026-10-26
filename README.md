@@ -9,7 +9,7 @@ It mirrors GitHub App installations and repositories into PostgreSQL, serves the
 
 ```mermaid
 flowchart LR
-  B[Browser] --> V[Vercel: apps/web]
+  B[Browser] --> V[Vercel: web]
   V -- "/api/* rewrite (same origin)" --> CF[Cloudflare] --> T[Traefik]
   T --> API[core api]
   GH[GitHub] -- signed webhooks --> T
@@ -19,16 +19,17 @@ flowchart LR
   API -- user token at sign-in --> GH
 ```
 
-| Part | Path | Technology |
-|---|---|---|
-| Core backend (api, worker, migrate roles) | `core` | Go, net/http, pgx, River (Postgres job queue), goose |
-| Public API contract | `contracts/openapi/v1.yaml` | OpenAPI 3.0, checked against live responses in tests |
-| Frontend | `apps/web` | Next.js, TypeScript, TanStack Query, shadcn/ui (Vercel) |
-| Kubernetes manifests | `deploy/kustomize` | Kustomize, deployed by the cluster's Argo CD |
-| Go vs Rust measurements | `tests/performance/lang-bench` | Go and Rust benchmark harness with recorded results |
-| Architecture docs and ADRs | `docs/architecture`, `docs/adr` | |
+| Part                                      | Path                            | Technology                                                          |
+| ----------------------------------------- | ------------------------------- | ------------------------------------------------------------------- |
+| Core backend (api, worker, migrate roles) | `core`                          | Go, net/http, pgx, River (Postgres job queue), goose                |
+| Public API contract                       | `contracts/openapi/v1.yaml`     | OpenAPI 3.0, checked against live responses in tests                |
+| Frontend                                  | `web`                           | Next.js, TypeScript, TanStack Query, shadcn/ui (Vercel)             |
+| Scoring engine                            | `scoring`                       | Rust library crate; port of legacy scoring, checked by golden tests |
+| Kubernetes manifests                      | `deploy/kustomize`              | Kustomize, deployed by the cluster's Argo CD                        |
+| Go vs Rust measurements                   | `tests/performance/lang-bench`  | Go and Rust benchmark harness with recorded results                 |
+| Architecture docs and ADRs                | `docs/architecture`, `docs/adr` |                                                                     |
 
-Go runs the core because the work is bound by network and GitHub rate limits. Rust is reserved for the CPU-bound scoring engine (Stage 5). [rust-vs-go.md](docs/architecture/rust-vs-go.md) gives the measurements and the reasons.
+Go runs the core because the work is bound by network and GitHub rate limits. Rust runs the CPU-bound scoring engine. [rust-vs-go.md](docs/architecture/rust-vs-go.md) gives the measurements and the reasons.
 
 ## What the slice does
 
@@ -41,7 +42,7 @@ Go runs the core because the work is bound by network and GitHub rate limits. Ru
 
 ## Quick start
 
-Requirements: Go 1.27, Docker with Compose, Node.js 22 with pnpm, Rust stable (benchmark code only), `kustomize`.
+Requirements: Go 1.27, Docker with Compose, Node.js 22 with pnpm, Rust stable, `kustomize`.
 
 ```bash
 make tools      # golangci-lint, kubeconform, govulncheck

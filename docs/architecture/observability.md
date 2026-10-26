@@ -8,13 +8,13 @@ Scope: the Go core in `core`. The cluster stack is plain Prometheus with pod-ann
 
 **Verified** (`internal/obs/obs.go` `NewLogger`): `log/slog` JSON handler to stdout, level `info`. Every record has these fields:
 
-| Field | Source | Example |
-| --- | --- | --- |
-| `time`, `level`, `msg` | slog | `"msg":"request"` |
-| `service` | constant | `gitorgasm` |
-| `component` | process role (`os.Args[1]`) | `api`, `worker`, `migrate` |
-| `app_version` | build flag `-X main.version`, attached by `obs.NewLogger(role).With("app_version", version)` (`cmd/gitorgasm/main.go`) | commit SHA, `dev` locally |
-| `trace_id`, `span_id` | added by `traceHandler` when the context has a valid span | 32 / 16 hex chars |
+| Field                  | Source                                                                                                                 | Example                    |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| `time`, `level`, `msg` | slog                                                                                                                   | `"msg":"request"`          |
+| `service`              | constant                                                                                                               | `gitorgasm`                |
+| `component`            | process role (`os.Args[1]`)                                                                                            | `api`, `worker`, `migrate` |
+| `app_version`          | build flag `-X main.version`, attached by `obs.NewLogger(role).With("app_version", version)` (`cmd/gitorgasm/main.go`) | commit SHA, `dev` locally  |
+| `trace_id`, `span_id`  | added by `traceHandler` when the context has a valid span                                                              | 32 / 16 hex chars          |
 
 Access log (**Verified** `internal/httpapi/server.go` `accessLog`): one `info` record `request` per request with `method`, `route` (the `net/http` pattern, for example `GET /v1/organizations/{login}/repositories`, or `unmatched`), `status`, `duration_ms`, `request_id`. `/healthz` and `/readyz` are not logged. Errors: `request failed` with `error`, `route`, `request_id` (`internalError`). Panics: `panic` with `value` and `stack` (`recoverer`).
 
@@ -37,13 +37,13 @@ Access log (**Verified** `internal/httpapi/server.go` `accessLog`): one `info` r
 
 **Verified** (`internal/obs/obs.go` `MetricsServer`): `/metrics` is served on `METRICS_ADDR` (default `:9090`) by `promhttp.Handler()`. This port is separate from the API port and is not routed by the Ingress. The default Go and process collectors are registered.
 
-| Metric | Type | Labels | Source |
-| --- | --- | --- | --- |
-| `gitorgasm_http_requests_total` | counter | `route`, `method`, `status` | `httpapi/server.go` |
-| `gitorgasm_http_request_duration_seconds` | histogram, buckets 5 ms to 5 s | `route` | `httpapi/server.go` |
-| `gitorgasm_github_requests_total` | counter | `operation`, `status` (`2xx`, `4xx`, `5xx`, `error`) | `github/client.go` |
-| `gitorgasm_github_rate_limit_remaining` | gauge | `credential` (credential kind, not per installation) | `github/client.go` |
-| `go_*`, `process_*` | default collectors | none | `client_golang` |
+| Metric                                    | Type                           | Labels                                               | Source              |
+| ----------------------------------------- | ------------------------------ | ---------------------------------------------------- | ------------------- |
+| `gitorgasm_http_requests_total`           | counter                        | `route`, `method`, `status`                          | `httpapi/server.go` |
+| `gitorgasm_http_request_duration_seconds` | histogram, buckets 5 ms to 5 s | `route`                                              | `httpapi/server.go` |
+| `gitorgasm_github_requests_total`         | counter                        | `operation`, `status` (`2xx`, `4xx`, `5xx`, `error`) | `github/client.go`  |
+| `gitorgasm_github_rate_limit_remaining`   | gauge                          | `credential` (credential kind, not per installation) | `github/client.go`  |
+| `go_*`, `process_*`                       | default collectors             | none                                                 | `client_golang`     |
 
 **Decision**: label values stay bounded. Use the route pattern, never the raw path. Never use installation ids, user ids, or logins as labels. Per-tenant detail goes to logs and to the `sync_state` table.
 
@@ -61,9 +61,9 @@ Access log (**Verified** `internal/httpapi/server.go` `accessLog`): one `info` r
 Pod annotations on `api` and `worker` (**Verified** in `deploy/kustomize/base/api.yaml` and `base/worker.yaml`. Cluster convention: `cluster-audit.md` §3, `k8s/monitoring/prometheus-configmap.yaml` lines 56-80):
 
 ```yaml
-prometheus.io/scrape: "true"
-prometheus.io/port: "9090"
-prometheus.io/path: "/metrics"
+prometheus.io/scrape: 'true'
+prometheus.io/port: '9090'
+prometheus.io/path: '/metrics'
 ```
 
 **Verified** (`deploy/kustomize/base/networkpolicies.yaml`): the NetworkPolicy `metrics-ingress` allows TCP 9090 to `api` and `worker` from namespace `monitoring`. The Ingress does not route port 9090 or the health paths (`deployment-topology.md` §2).
@@ -83,20 +83,20 @@ prometheus.io/path: "/metrics"
 
 ## 4. Health and readiness
 
-| Endpoint | Process | Meaning | Source |
-| --- | --- | --- | --- |
+| Endpoint       | Process                     | Meaning                                               | Source                                       |
+| -------------- | --------------------------- | ----------------------------------------------------- | -------------------------------------------- |
 | `GET /healthz` | api `:8080`, worker `:9090` | process is up. No dependency checks. Use for liveness | **Verified** `server.go` `healthz`, `obs.go` |
-| `GET /readyz` | api `:8080`, worker `:9090` | PostgreSQL answers `Ping` within 2 s. 503 otherwise | **Verified** `server.go` `readyz`, `obs.go` |
+| `GET /readyz`  | api `:8080`, worker `:9090` | PostgreSQL answers `Ping` within 2 s. 503 otherwise   | **Verified** `server.go` `readyz`, `obs.go`  |
 
 **Decision**: liveness never checks Postgres or GitHub. A database outage must not restart every pod in a loop. Readiness removes the api pod from the Service during a database outage. GitHub health is not part of readiness. GitHub failures are handled per job.
 
 **Verified** (probe settings, `deploy/kustomize/base/api.yaml`, `base/worker.yaml`):
 
-| Process | Startup | Liveness | Readiness |
-| --- | --- | --- | --- |
-| api | `GET /healthz` on `http`, every 2 s, 30 failures allowed (60 s) | `GET /healthz`, every 20 s, default 3 failures | `GET /readyz`, every 5 s, 2 failures |
-| worker | none | `GET /healthz` on `metrics`, every 20 s | `GET /readyz` on `metrics`, every 10 s |
-| postgres | none | `pg_isready`, every 20 s, 6 failures | `pg_isready`, every 5 s |
+| Process  | Startup                                                         | Liveness                                       | Readiness                              |
+| -------- | --------------------------------------------------------------- | ---------------------------------------------- | -------------------------------------- |
+| api      | `GET /healthz` on `http`, every 2 s, 30 failures allowed (60 s) | `GET /healthz`, every 20 s, default 3 failures | `GET /readyz`, every 5 s, 2 failures   |
+| worker   | none                                                            | `GET /healthz` on `metrics`, every 20 s        | `GET /readyz` on `metrics`, every 10 s |
+| postgres | none                                                            | `pg_isready`, every 20 s, 6 failures           | `pg_isready`, every 5 s                |
 
 The api readiness only gates the Service. The worker has no Service, so its readiness is informational (rollout progress only).
 

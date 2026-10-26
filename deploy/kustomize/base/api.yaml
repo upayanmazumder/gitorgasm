@@ -34,8 +34,8 @@ spec:
       labels:
         app.kubernetes.io/name: api
       annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "9090"
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9090'
         prometheus.io/path: /metrics
     spec:
       automountServiceAccountToken: false
@@ -53,7 +53,7 @@ spec:
       initContainers:
         - name: migrate
           image: gitorgasm-core
-          args: ["migrate"]
+          args: ['migrate']
           env:
             - name: DATABASE_URL
               valueFrom:
@@ -71,11 +71,11 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
-              drop: ["ALL"]
+              drop: ['ALL']
       containers:
         - name: api
           image: gitorgasm-core
-          args: ["api"]
+          args: ['api']
           envFrom:
             - configMapRef:
                 name: gitorgasm-core

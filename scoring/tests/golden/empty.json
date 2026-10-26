@@ -1,0 +1,61 @@
+{
+  "name": "empty",
+  "generator": "scoring/tests/golden/generate.ts",
+  "ruleset": {
+    "basePoints": [
+      { "type": "commit", "points": 10 },
+      { "type": "pr_merge", "points": 50 },
+      { "type": "review", "points": 20 },
+      { "type": "review_comment", "points": 5 },
+      { "type": "issue_open", "points": 10 },
+      { "type": "issue_close", "points": 10 },
+      { "type": "comment", "points": 3 }
+    ],
+    "multipliers": [
+      { "kind": "merged_pr_commit", "factor": 1.2, "appliesTo": ["commit"] },
+      {
+        "kind": "pr_linked_to_issue",
+        "factor": 1.1,
+        "appliesTo": ["pr_merge", "commit"]
+      },
+      {
+        "kind": "first_activity",
+        "factor": 1.5,
+        "appliesTo": [
+          "commit",
+          "pr_merge",
+          "review",
+          "issue_open",
+          "issue_close",
+          "comment"
+        ]
+      }
+    ],
+    "reviewStateWeights": [
+      { "state": "approved", "weight": 1.25 },
+      { "state": "changes_requested", "weight": 1 },
+      { "state": "commented", "weight": 0.5 }
+    ],
+    "dailyQuotas": [
+      { "type": "commit", "limit": 4 },
+      { "type": "comment", "limit": 4 }
+    ],
+    "diminishingReturns": {
+      "weeklyThreshold": 9,
+      "decayFactor": 0.11,
+      "floorFraction": 0.2
+    },
+    "zeroPointConditions": [
+      { "kind": "self_review", "enabled": true },
+      { "kind": "self_merge", "enabled": true },
+      { "kind": "bot_activity", "enabled": true },
+      { "kind": "issue_closed_no_pr", "enabled": true },
+      { "kind": "pr_closed_no_merge", "enabled": true }
+    ],
+    "spamPenalty": -12,
+    "prClosedNoMergePenalty": -10
+  },
+  "signals": [],
+  "teamMemberships": [],
+  "expected": { "contributors": [], "repositories": [], "teams": [] }
+}

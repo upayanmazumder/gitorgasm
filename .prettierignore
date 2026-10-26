@@ -1,0 +1,18 @@
+# web/ has its own Prettier config and plugins. Its CI job and hooks format it.
+web/
+
+# Other languages use their own formatters (gofmt, rustfmt).
+core/
+scoring/src/
+tests/performance/lang-bench/go/
+tests/performance/lang-bench/rust/src/
+
+# Generated or vendored data
+pnpm-lock.yaml
+**/Cargo.lock
+**/go.sum
+scoring/tests/golden/*.json
+tests/performance/lang-bench/results/
+tests/performance/lang-bench/fixtures/
+**/target/
+node_modules/

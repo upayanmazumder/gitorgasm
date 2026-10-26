@@ -53,18 +53,18 @@ Categories:
 
 Source: `core/internal/db/migrations/00001_core.sql`. **Verified**.
 
-| Table | Class | Writer (code) | Reader (code) | Notes |
-|---|---|---|---|---|
-| `users` | Mirror (GitHub identity) + internal id | `store.UpsertUser` at login (`httpapi/auth.go` `callback`) | `store.LookupSession` | `id` is internal. `github_id` is unique. |
-| `sessions` | Authoritative, ephemeral | `store.CreateSession`, `store.DeleteSession`, `store.DeleteSessionsForGitHubUser` | `store.LookupSession` | Stores `SHA-256(session id)` and sealed GitHub tokens. Loss = users log in again. |
-| `accounts` | Mirror | `store.UpsertInstallation` | `store.ListOrganizations`, `store.AccessibleInstallation` | Unique index on `lower(login)`. |
-| `installations` | Mirror | `store.UpsertInstallation`, `store.MarkInstallationDeleted` | list and access queries | Soft delete with `deleted_at`. |
-| `user_installations` | Authoritative grant, sourced from GitHub | `store.ReplaceUserInstallations` (login), `store.MarkInstallationDeleted` | every org-scoped query | The tenant boundary. See section 6. |
-| `repositories` | Mirror | `store.UpsertRepositories`, `store.TombstoneUnseenRepositories` | `store.ListRepositories`, repo count in `ListOrganizations` | Tombstoned with `deleted_at`. |
-| `sync_state` | Derived (sync metadata) | `store.SyncStarted`, `store.SyncFinished` | `ListOrganizations` (`last_succeeded_at`) | Safe to drop. Next sync recreates it. |
-| `webhook_deliveries` | Authoritative inbox (short-lived) | `store.InsertWebhookDelivery`, `store.FinishWebhookDelivery` | `store.GetWebhookDelivery` | Raw signed body as `BYTEA`. Dedupe key = `X-GitHub-Delivery`. |
-| `audit_events` | Authoritative, append-only | `store.Audit` | none yet | Actions in use: `session.created`, `installation.sync_requested`, `session.revoked_by_github`. |
-| `river_*` | Authoritative work state | River client (`jobs` package, `httpapi`) | River worker | Job kinds: `sync_installation`, `process_webhook`, `reconcile_installations` (`internal/jobs/jobs.go`). |
+| Table                | Class                                    | Writer (code)                                                                     | Reader (code)                                               | Notes                                                                                                   |
+| -------------------- | ---------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `users`              | Mirror (GitHub identity) + internal id   | `store.UpsertUser` at login (`httpapi/auth.go` `callback`)                        | `store.LookupSession`                                       | `id` is internal. `github_id` is unique.                                                                |
+| `sessions`           | Authoritative, ephemeral                 | `store.CreateSession`, `store.DeleteSession`, `store.DeleteSessionsForGitHubUser` | `store.LookupSession`                                       | Stores `SHA-256(session id)` and sealed GitHub tokens. Loss = users log in again.                       |
+| `accounts`           | Mirror                                   | `store.UpsertInstallation`                                                        | `store.ListOrganizations`, `store.AccessibleInstallation`   | Unique index on `lower(login)`.                                                                         |
+| `installations`      | Mirror                                   | `store.UpsertInstallation`, `store.MarkInstallationDeleted`                       | list and access queries                                     | Soft delete with `deleted_at`.                                                                          |
+| `user_installations` | Authoritative grant, sourced from GitHub | `store.ReplaceUserInstallations` (login), `store.MarkInstallationDeleted`         | every org-scoped query                                      | The tenant boundary. See section 6.                                                                     |
+| `repositories`       | Mirror                                   | `store.UpsertRepositories`, `store.TombstoneUnseenRepositories`                   | `store.ListRepositories`, repo count in `ListOrganizations` | Tombstoned with `deleted_at`.                                                                           |
+| `sync_state`         | Derived (sync metadata)                  | `store.SyncStarted`, `store.SyncFinished`                                         | `ListOrganizations` (`last_succeeded_at`)                   | Safe to drop. Next sync recreates it.                                                                   |
+| `webhook_deliveries` | Authoritative inbox (short-lived)        | `store.InsertWebhookDelivery`, `store.FinishWebhookDelivery`                      | `store.GetWebhookDelivery`                                  | Raw signed body as `BYTEA`. Dedupe key = `X-GitHub-Delivery`.                                           |
+| `audit_events`       | Authoritative, append-only               | `store.Audit`                                                                     | none yet                                                    | Actions in use: `session.created`, `installation.sync_requested`, `session.revoked_by_github`.          |
+| `river_*`            | Authoritative work state                 | River client (`jobs` package, `httpapi`)                                          | River worker                                                | Job kinds: `sync_installation`, `process_webhook`, `reconcile_installations` (`internal/jobs/jobs.go`). |
 
 **Verified**: the migration comment says "GitHub-owned data (accounts, installations, repositories) is a mirror. GitHub stays the source of truth."
 
@@ -74,13 +74,13 @@ Source: `core/internal/db/migrations/00001_core.sql`. **Verified**.
 
 Every boundary below is in code. **Verified** by the cited function.
 
-| Use case | One transaction contains | Code |
-|---|---|---|
-| Login callback | upsert user, upsert each installation and account, replace grants, create session, `InsertManyTx` of `sync_installation` jobs, audit `session.created` | `httpapi/auth.go` `callback` (`pgx.BeginFunc`) |
-| Manual sync request | `InsertTx` of `sync_installation`, audit `installation.sync_requested` | `httpapi/orgs.go` `requestSync` |
-| Webhook receive | insert `webhook_deliveries` row, `InsertTx` of `process_webhook` | `httpapi/orgs.go` `webhook` |
-| Webhook apply | event-specific writes, `InsertTx` of follow-up `sync_installation` | `jobs/jobs.go` `WebhookWorker.apply` |
-| Repository page | one multi-row `INSERT … ON CONFLICT` per page of 100 | `store.UpsertRepositories` |
+| Use case            | One transaction contains                                                                                                                               | Code                                           |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
+| Login callback      | upsert user, upsert each installation and account, replace grants, create session, `InsertManyTx` of `sync_installation` jobs, audit `session.created` | `httpapi/auth.go` `callback` (`pgx.BeginFunc`) |
+| Manual sync request | `InsertTx` of `sync_installation`, audit `installation.sync_requested`                                                                                 | `httpapi/orgs.go` `requestSync`                |
+| Webhook receive     | insert `webhook_deliveries` row, `InsertTx` of `process_webhook`                                                                                       | `httpapi/orgs.go` `webhook`                    |
+| Webhook apply       | event-specific writes, `InsertTx` of follow-up `sync_installation`                                                                                     | `jobs/jobs.go` `WebhookWorker.apply`           |
+| Repository page     | one multi-row `INSERT … ON CONFLICT` per page of 100                                                                                                   | `store.UpsertRepositories`                     |
 
 Not in one transaction (**Verified**, `jobs/jobs.go` `SyncWorker.Work`):
 
@@ -102,13 +102,13 @@ Not in one transaction (**Verified**, `jobs/jobs.go` `SyncWorker.Work`):
 
 No purge job exists in the slice. **Verified**: no periodic job other than `reconcile_installations` is registered in `jobs.NewWorkerClient`.
 
-| Data | Growth driver | Retention | Mechanism |
-|---|---|---|---|
-| `sessions` | one row per login | delete rows with `expires_at < now()` | **Planned**: periodic River job `purge_sessions` (daily). Index `sessions_expires_at_idx` exists. |
-| `webhook_deliveries` | one row per delivery | keep processed rows 14 days. Keep unprocessed rows until they succeed or 30 days. | **Planned**: periodic job `purge_webhook_deliveries` (daily). Index `webhook_deliveries_unprocessed_idx` covers unprocessed rows only. A `received_at` index is needed for the purge. Add it in the same migration. |
-| `audit_events` | one row per security action | keep 400 days | **Planned**: periodic job `purge_audit_events` (weekly). **Alternative considered**: monthly partitions with `DROP PARTITION`. Defer until the table exceeds about 10 M rows. |
-| `river_job` (completed, cancelled, discarded) | every job | River job cleaner retention | **Assumption**: River's built-in job cleaner deletes finalized jobs with its default retention. `river.Config` in `jobs.NewWorkerClient` sets no retention values. Verify the defaults for the pinned River version before production. |
-| `repositories` tombstones | deleted repos | keep 30 days, then hard delete | **Planned**: part of `purge_*` maintenance. |
+| Data                                          | Growth driver               | Retention                                                                         | Mechanism                                                                                                                                                                                                                              |
+| --------------------------------------------- | --------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sessions`                                    | one row per login           | delete rows with `expires_at < now()`                                             | **Planned**: periodic River job `purge_sessions` (daily). Index `sessions_expires_at_idx` exists.                                                                                                                                      |
+| `webhook_deliveries`                          | one row per delivery        | keep processed rows 14 days. Keep unprocessed rows until they succeed or 30 days. | **Planned**: periodic job `purge_webhook_deliveries` (daily). Index `webhook_deliveries_unprocessed_idx` covers unprocessed rows only. A `received_at` index is needed for the purge. Add it in the same migration.                    |
+| `audit_events`                                | one row per security action | keep 400 days                                                                     | **Planned**: periodic job `purge_audit_events` (weekly). **Alternative considered**: monthly partitions with `DROP PARTITION`. Defer until the table exceeds about 10 M rows.                                                          |
+| `river_job` (completed, cancelled, discarded) | every job                   | River job cleaner retention                                                       | **Assumption**: River's built-in job cleaner deletes finalized jobs with its default retention. `river.Config` in `jobs.NewWorkerClient` sets no retention values. Verify the defaults for the pinned River version before production. |
+| `repositories` tombstones                     | deleted repos               | keep 30 days, then hard delete                                                    | **Planned**: part of `purge_*` maintenance.                                                                                                                                                                                            |
 
 **Decision**: each purge job deletes in batches of at most 10,000 rows per statement and logs the row count. This avoids long locks on the single node.
 
@@ -178,17 +178,17 @@ River stores job args as JSON in `river_job.args`. A job inserted by release N m
 
 All rows below are **Planned**. Column lists are proposals. Mapping from legacy tables is in `migration-plan.md`.
 
-| Table | Class | Key | Source | Stage |
-|---|---|---|---|---|
-| `teams` | Mirror | `github_id` | `GET /orgs/{org}/teams` (`teams/list`) | 3 |
-| `team_members` | Mirror | `(team_id, user_github_id)` | `GET /orgs/{org}/teams/{team_slug}/members` (`teams/list-members-in-org`) | 3 |
-| `org_members` | Mirror | `(installation_id, user_github_id)` with `role` | `GET /orgs/{org}/members` (`orgs/list-members`) | 3 |
-| `org_invitations` | Mirror | `github_id` | `GET /orgs/{org}/invitations` (`orgs/list-pending-invitations`) | 3 |
-| `operations`, `operation_items` | Authoritative | `id`, `(operation_id, item_key)` | bulk operation plans and per-item results | 4 |
-| `idempotency_keys` | Authoritative, ephemeral | `(user_id, key)` | `Idempotency-Key` header | 4 |
-| `scoring_presets` + 7 child tables | Authoritative | `(installation_id, name)` | seed or legacy import | 5 |
-| `signals` | Derived from GitHub events | dedup tuple `(user_id, type, repository_id, event_timestamp, content_hash)` | GraphQL ingest | 5 |
-| `computed_scores`, `leaderboard_materializations` | Derived | see `database-audit.md` §7.2 | Rust `scoring` | 5 |
-| `legacy_import_map` | Authoritative, audit | `(source_table, legacy_id)` | preset import | 5 |
+| Table                                             | Class                      | Key                                                                         | Source                                                                    | Stage |
+| ------------------------------------------------- | -------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ----- |
+| `teams`                                           | Mirror                     | `github_id`                                                                 | `GET /orgs/{org}/teams` (`teams/list`)                                    | 3     |
+| `team_members`                                    | Mirror                     | `(team_id, user_github_id)`                                                 | `GET /orgs/{org}/teams/{team_slug}/members` (`teams/list-members-in-org`) | 3     |
+| `org_members`                                     | Mirror                     | `(installation_id, user_github_id)` with `role`                             | `GET /orgs/{org}/members` (`orgs/list-members`)                           | 3     |
+| `org_invitations`                                 | Mirror                     | `github_id`                                                                 | `GET /orgs/{org}/invitations` (`orgs/list-pending-invitations`)           | 3     |
+| `operations`, `operation_items`                   | Authoritative              | `id`, `(operation_id, item_key)`                                            | bulk operation plans and per-item results                                 | 4     |
+| `idempotency_keys`                                | Authoritative, ephemeral   | `(user_id, key)`                                                            | `Idempotency-Key` header                                                  | 4     |
+| `scoring_presets` + 7 child tables                | Authoritative              | `(installation_id, name)`                                                   | seed or legacy import                                                     | 5     |
+| `signals`                                         | Derived from GitHub events | dedup tuple `(user_id, type, repository_id, event_timestamp, content_hash)` | GraphQL ingest                                                            | 5     |
+| `computed_scores`, `leaderboard_materializations` | Derived                    | see `database-audit.md` §7.2                                                | Rust `scoring`                                                            | 5     |
+| `legacy_import_map`                               | Authoritative, audit       | `(source_table, legacy_id)`                                                 | preset import                                                             | 5     |
 
 **Decision**: `signals` starts unpartitioned. Revisit partitioning above about 10 M rows (`database-audit.md` §7.2). The Rust scoring service reads `signals` and writes `computed_scores`. It talks to core only through tables and job rows (decisions item 3).
