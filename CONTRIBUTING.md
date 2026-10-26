@@ -6,7 +6,8 @@
 2. Create a branch from `main`. Use a short name such as `feat/team-sync` or `fix/cursor-decode`.
 3. Keep each pull request to one concern.
 4. Run `make verify` before you push. CI runs the same checks.
-5. Get one approving review. The code owner reviews changes to security-sensitive paths.
+5. Open a pull request. The `main` ruleset requires a pull request, resolved review threads, and green CI checks. It blocks force pushes and branch deletion.
+6. Request a review from the code owner for security-sensitive paths (`.github/CODEOWNERS`). Required approvals are 0 while the project has one maintainer. Raise the count when a second maintainer joins.
 
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`.
 

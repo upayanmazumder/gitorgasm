@@ -2,6 +2,10 @@ module github.com/upayanmazumder/gitorgasm/services/core
 
 go 1.27.1
 
+// go1.27.3 fixes stdlib vulnerabilities GO-2026-6809, GO-2026-6617, GO-2026-6613 and others
+// reported by govulncheck against go1.27.1.
+toolchain go1.27.3
+
 require (
 	github.com/getkin/kin-openapi v0.152.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
