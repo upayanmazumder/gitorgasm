@@ -32,20 +32,20 @@ Outcome: legacy data worth migrating is limited to scoring presets (186 rows, al
 | Item                                                                                                                                              | Status at time of writing                                                                                   |
 | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | Go core `core` with roles `api`, `worker`, `migrate`                                                                                              | **Verified** exists (`cmd/gitorgasm/main.go`)                                                               |
-| Immutable deployed baseline `00001_core.sql`, additive `00002_schema_hardening.sql` and `00003_concurrent_indexes.sql`, River migrations | **Verified** in `core/internal/db/migrations` and `internal/db` |
+| Immutable deployed baseline `00001_core.sql`, additive `00002_schema_hardening.sql` and `00003_concurrent_indexes.sql`, River migrations          | **Verified** in `core/internal/db/migrations` and `internal/db`                                             |
 | GitHub App login (state + PKCE), sessions, sealed tokens                                                                                          | **Verified** exists (`internal/httpapi/auth.go`, `internal/secure`)                                         |
 | `GET /v1/me`, `/v1/organizations`, repositories (keyset), `POST …/sync`, `POST /webhooks/github`                                                  | **Verified** routes in `internal/httpapi/server.go`                                                         |
 | Jobs `sync_installation` (unique by args per 1 minute, 64-bit advisory lock per installation), `process_webhook`, `reconcile_installations`       | **Verified** `internal/jobs/jobs.go`                                                                        |
 | App authorization revocation deletes sessions and grants                                                                                          | **Verified** `store.RevokeGitHubUser`                                                                       |
 | OpenAPI contract `contracts/openapi/v1.yaml` with a shared `default` Error response on every non-probe operation                                  | **Verified** exists                                                                                         |
 | Docker Compose local stack and Makefile (`up`, `up-github`, `down`, `db`, `smoke`, `fmt`, `lint`, `test`, `build`, `manifests`, `vuln`, `verify`) | **Verified** `compose.yaml`, `Makefile`                                                                     |
-| `web` from template (Next.js 16.4.3, pnpm 11.28.6 pinned by `packageManager`)                                                                    | **Verified** `web/package.json`; `/api/v1` rewrite in `web/next.config.ts`                            |
-| CI `.github/workflows/ci.yml` orchestrator with reusable `core.yml`, `web.yml`, `scoring.yml`, `bench.yml`, `manifests.yml`, `image.yml` | **Verified** files exist; run the required `CI` check on each pull request |
+| `web` from template (Next.js 16.4.3, pnpm 11.28.6 pinned by `packageManager`)                                                                     | **Verified** `web/package.json`; `/api/v1` rewrite in `web/next.config.ts`                                  |
+| CI `.github/workflows/ci.yml` orchestrator with reusable `core.yml`, `web.yml`, `scoring.yml`, `bench.yml`, `manifests.yml`, `image.yml`          | **Verified** files exist; run the required `CI` check on each pull request                                  |
 | Dependabot, CODEOWNERS, PR and issue templates                                                                                                    | **Verified** `.github/`                                                                                     |
 | Kustomize `deploy/kustomize` (base + `overlays/production`)                                                                                       | **Verified** exists. The integrator validated the render with kustomize and kubeconform: 15 resources valid |
 | Architecture docs and ADRs                                                                                                                        | **Verified** `docs/architecture/`, `docs/adr/`                                                              |
 
-The first core image and cluster deployment are recorded under Stage 1.5. For further changes, require a green `CI` status and deploy only through a reviewed cluster-repository pull request.
+The first core image and cluster deployment are recorded under Stage 1.5. Argo CD now deploys every merge to `main` (ADR 0012). Each change needs a green `CI` status and a reviewed pull request in this repository.
 
 Acceptance criteria:
 
@@ -70,7 +70,7 @@ Status:
 Deliverables:
 
 - GHCR package public (done; keep cluster pull access and immutable tag pinning, R20).
-- Cluster repository PR `upayanmazumder/cluster#77` merged with `k8s/apps/gitorgasm`, Application, AppProject destination, and SOPS Secrets. All later production changes require another cluster-repository PR (`deployment-topology.md` §4).
+- Cluster repository PR `upayanmazumder/cluster#77` merged with `k8s/apps/gitorgasm`, Application, AppProject destination, and SOPS Secrets. Later production changes are pull requests in this repository (ADR 0012, `deployment-topology.md` §4).
 - Host directory `/srv/data/gitorgasm-postgres` owned by UID/GID 70.
 - GitHub App `gitorgasm` registered for the callback `https://gitorgasm.upayan.dev/api/v1/auth/callback` and webhook `https://api-gitorgasm.upayan.dev/webhooks/github` (see Stage 1.5 status).
 - Vercel project for `web` at `gitorgasm.upayan.dev` with the rewrite `/api/v1/:path*` → `https://api-gitorgasm.upayan.dev/v1/:path*`. Login requires the callback on the Vercel origin.

@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Argo CD renders this path for production. It adds the SOPS-encrypted Secrets to the
+# validated overlay. Only Argo CD's repo-server can decrypt them (ksops, age key in the cluster).
+# Image digests come from argocd-image-updater as an Application override, not from git.
+namespace: gitorgasm
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: gitorgasm
+    includeSelectors: false
+resources:
+  - ../kustomize/overlays/production
+generators:
+  # Secrets gitorgasm-core and gitorgasm-postgres.
+  - secret-generator.yaml

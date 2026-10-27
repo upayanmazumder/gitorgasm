@@ -13,9 +13,9 @@ The worker overrides `DB_MAX_CONNS` in `base/worker.yaml`. The value must be at 
 
 The API init container runs goose before River. Existing production databases already have goose version 1 (`core/internal/db/migrations/00001_core.sql`); new releases apply `00002_schema_hardening.sql` and `00003_concurrent_indexes.sql` forward, then later versions in order. Never replace or renumber version 1. If a migration fails, the new API pod does not start and the old replica continues serving; do not run a down migration in production.
 
-## Secrets (not in this repository)
+## Secrets
 
-The cluster repository provides two Secrets, encrypted with SOPS and age:
+`deploy/argocd/secrets.sops.yaml` holds two Secrets, encrypted with SOPS and age to the two cluster recipients in the root `.sops.yaml`. The ksops generator in `deploy/argocd` adds them. Only the Argo CD repo-server decrypts them. `deploy/argocd/check-encrypted.sh` (run by `make manifests` and CI) fails if a value is not `ENC[...]`.
 
 | Secret               | Keys                                                                                                                                                                  |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -26,7 +26,7 @@ The cluster repository provides two Secrets, encrypted with SOPS and age:
 
 ## Image
 
-`base/kustomization.yaml` sets the tag `latest` as a placeholder. `.github/workflows/image.yml` pushes `ghcr.io/upayanmazumder/gitorgasm/core:sha-<full commit SHA>` on every push to `main`. The cluster repository must pin `images[].newTag` to one of these tags. Argo CD then deploys a known build, and a rollback is a revert of one line.
+`base/kustomization.yaml` sets the tag `latest`. `.github/workflows/image.yml` pushes `ghcr.io/upayanmazumder/gitorgasm/core:latest` and `sha-<full commit SHA>` on every push to `main`. Argo CD Image Updater tracks the digest of `latest` with write-back method `argocd`. It sets the image override on the Application and makes no git commit. To roll back an image, revert the code commit on `main`. CI then pushes a new `latest`.
 
 ## Network
 
@@ -41,17 +41,21 @@ An OTLP collector inside the cluster is not reachable. Add an egress rule before
 
 ## Deployment
 
-Production runs from `k8s/apps/gitorgasm/` in the cluster repository (`upayanmazumder/cluster#77`). Argo CD syncs it. Status and open items are in `docs/architecture/implementation-roadmap.md` (Stage 1.5).
+Argo CD Application `gitorgasm` (registered in `upayanmazumder/cluster`) reads `deploy/argocd` from `main` of this repository. Sync is automatic with prune and selfHeal. The first deploy was `upayanmazumder/cluster#77`. Status and open items are in `docs/architecture/implementation-roadmap.md` (Stage 1.5). The decision is ADR 0012.
 
 To change production:
 
 1. Change the manifests here and run `make manifests`.
-2. Copy the change into `k8s/apps/gitorgasm/` in the cluster repository. Pin the immutable image tag. Open a pull request and wait for its checks and review; Argo CD syncs after merge.
-3. Do not apply manifests to the live cluster by hand or bypass the cluster PR with automatic image write-back.
+2. Open a pull request in this repository. Wait for the `CI` check and review.
+3. Merge to `main`. Argo CD syncs manifest changes in approximately 3 minutes. A new image rolls api and worker in approximately 2 minutes.
+4. To roll back, revert the commit on `main`.
+5. Never apply manifests to the live cluster by hand.
+
+To edit a secret, run `sops deploy/argocd/secrets.sops.yaml`. You need one of the age keys. Commit only the encrypted file.
 
 The first deploy needed these steps. A rebuild of the node needs them again:
 
 1. Create `/srv/data/gitorgasm-postgres` on the node, owned by UID/GID 70.
-2. Add the SOPS Secrets, the Argo CD Application, and the namespace in the `apps` AppProject.
+2. Add the Argo CD Application, the `gitorgasm` AppProject, and the ImageUpdater entry in the cluster repository.
 3. Make the GHCR package readable by the cluster. The package is public.
 4. Add a restic backup target for a `pg_dump` of the database.

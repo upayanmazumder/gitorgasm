@@ -1,6 +1,6 @@
 # ADR 0010: Kustomize manifests deployed by the existing Argo CD through the cluster repository
 
-- Status: Accepted
+- Status: Superseded by [ADR 0012](0012-argocd-deploys-from-this-repository.md)
 - Date: 2026-10-26
 
 ## Context

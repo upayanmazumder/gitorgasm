@@ -1,6 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-# The cluster repository supplies the encrypted Secrets for this overlay.
+# deploy/argocd adds the encrypted Secrets to this overlay. CI validates this tree.
+namespace: gitorgasm
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: gitorgasm
+    includeSelectors: false
 resources:
   - ../../base
   - ingress.yaml

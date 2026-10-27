@@ -116,7 +116,8 @@ score-bench: ## Measure 100,000 scored contributions within 60 seconds
 	cd $(SCORING) && cargo run --release --locked --bin score-bench -- --limit-seconds 60
 
 .PHONY: manifests
-manifests: ## Render and schema-validate Kubernetes manifests
+manifests: ## Render and schema-validate Kubernetes manifests; check that Secrets stay encrypted
+	deploy/argocd/check-encrypted.sh
 	kustomize build deploy/kustomize/overlays/production | $(KUBECONFORM) -strict -summary -kubernetes-version 1.34.0 -
 
 .PHONY: vuln

@@ -1,6 +1,6 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-# Secrets come from the cluster repository, not this base.
+# Secrets come from deploy/argocd, which only Argo CD can render.
 namespace: gitorgasm
 labels:
   - pairs:
@@ -16,7 +16,7 @@ resources:
 configMapGenerator:
   - name: gitorgasm-core
     envs: [config.env]
-# The cluster repository replaces this tag with an immutable sha-<commit> tag.
+# Argo CD Image Updater sets the digest of `latest` as an Application override.
 images:
   - name: gitorgasm-core
     newName: ghcr.io/upayanmazumder/gitorgasm/core

@@ -4,7 +4,7 @@ Status date: 2026-10-26. Labels: **Verified** (with source), **Assumption**, **D
 
 The manifests live in `deploy/kustomize` (`base/` and `overlays/production/`, see `deploy/kustomize/README.md`). The reusable `.github/workflows/manifests.yml` renders the overlay and validates it with kubeconform (`-strict`, Kubernetes 1.34.0) when deployment files change; locally, run `make manifests`.
 
-The production copy was deployed through `upayanmazumder/cluster#77` to `k8s/apps/gitorgasm/`. The frontend and API hostnames are live according to `implementation-roadmap.md` (Stage 1.5). All subsequent production changes require a cluster-repository PR; this repository's CI has no cluster credentials.
+The first production deploy was `upayanmazumder/cluster#77`. The frontend and API hostnames are live according to `implementation-roadmap.md` (Stage 1.5). Argo CD now deploys `deploy/argocd` from `main` of this repository (ADR 0012). Every production change is a pull request in this repository. This repository's CI has no cluster credentials.
 
 ## 1. Target topology
 
@@ -24,7 +24,7 @@ flowchart TB
       api --> svcpg
       worker --> svcpg
       np{{NetworkPolicies<br/>default deny ingress + egress}}
-      sec[(Secrets gitorgasm-core, gitorgasm-postgres<br/>ksops / SOPS age, cluster repo)]
+      sec[(Secrets gitorgasm-core, gitorgasm-postgres<br/>ksops / SOPS age, deploy/argocd)]
     end
     pv[(static PV gitorgasm-postgres-vps, Retain<br/>hostPath /srv/data/gitorgasm-postgres)]
     pg --- pv
@@ -36,7 +36,7 @@ flowchart TB
   api -->|HTTPS 443| gh
   worker -->|HTTPS 443| gh
   restic -->|hourly restic copy| r2[(Cloudflare R2<br/>vps-backups)]
-  argocd[Argo CD<br/>cluster repo] -->|sync k8s/apps/gitorgasm after PR merge| ns
+  argocd[Argo CD + Image Updater<br/>repo gitorgasm, main] -->|sync deploy/argocd after merge| ns
   ghcr[(GHCR<br/>ghcr.io/upayanmazumder/gitorgasm/core)] -->|pull| api
   ghcr -->|pull| worker
 ```
@@ -45,16 +45,16 @@ flowchart TB
 
 **Verified** in `deploy/kustomize/base/*.yaml` and `overlays/production/*.yaml`. All objects carry the label `app.kubernetes.io/name` (`api`, `worker`, `postgres`) and `app.kubernetes.io/part-of: gitorgasm`.
 
-| Object                                                         | Role                                                                                           | Command              | Ports                       | Probes                                                                                                       |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | -------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Deployment `api`                                               | HTTP API, OAuth, webhooks                                                                      | `/gitorgasm api`     | 8080 `http`, 9090 `metrics` | startup `GET /healthz` (2 s × 30), liveness `GET /healthz` (20 s), readiness `GET /readyz` (5 s, 2 failures) |
-| initContainer `migrate` on `api`                               | goose + River migrations                                                                       | `/gitorgasm migrate` | none                        | none                                                                                                         |
-| Deployment `worker`                                            | River jobs (sync, webhooks, reconcile)                                                         | `/gitorgasm worker`  | 9090 `metrics`              | liveness `GET /healthz :9090` (20 s), readiness `GET /readyz :9090` (10 s)                                   |
-| StatefulSet `postgres`                                         | only stateful store                                                                            | `postgres:18.6-alpine` | 5432                        | startup, readiness and liveness `pg_isready -U gitorgasm -d gitorgasm`                         |
-| Service `api`                                                  | ClusterIP                                                                                      | n/a                  | 80 → `http`                 | n/a                                                                                                          |
-| Service `postgres`                                             | headless                                                                                       | n/a                  | 5432                        | n/a                                                                                                          |
-| Ingress `api` (production overlay)                             | host `api-gitorgasm.upayan.dev`, paths `/v1` (Prefix) and `/webhooks/github` (Exact)           | n/a                  | 443 → Service `api` `http`  | n/a                                                                                                          |
-| PersistentVolume `gitorgasm-postgres-vps` (production overlay) | 2Gi, `Retain`, hostPath `/srv/data/gitorgasm-postgres` (type `Directory`), node affinity `vps` | n/a                  | n/a                         | n/a                                                                                                          |
+| Object                                                         | Role                                                                                           | Command                | Ports                       | Probes                                                                                                       |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Deployment `api`                                               | HTTP API, OAuth, webhooks                                                                      | `/gitorgasm api`       | 8080 `http`, 9090 `metrics` | startup `GET /healthz` (2 s × 30), liveness `GET /healthz` (20 s), readiness `GET /readyz` (5 s, 2 failures) |
+| initContainer `migrate` on `api`                               | goose + River migrations                                                                       | `/gitorgasm migrate`   | none                        | none                                                                                                         |
+| Deployment `worker`                                            | River jobs (sync, webhooks, reconcile)                                                         | `/gitorgasm worker`    | 9090 `metrics`              | liveness `GET /healthz :9090` (20 s), readiness `GET /readyz :9090` (10 s)                                   |
+| StatefulSet `postgres`                                         | only stateful store                                                                            | `postgres:18.6-alpine` | 5432                        | startup, readiness and liveness `pg_isready -U gitorgasm -d gitorgasm`                                       |
+| Service `api`                                                  | ClusterIP                                                                                      | n/a                    | 80 → `http`                 | n/a                                                                                                          |
+| Service `postgres`                                             | headless                                                                                       | n/a                    | 5432                        | n/a                                                                                                          |
+| Ingress `api` (production overlay)                             | host `api-gitorgasm.upayan.dev`, paths `/v1` (Prefix) and `/webhooks/github` (Exact)           | n/a                    | 443 → Service `api` `http`  | n/a                                                                                                          |
+| PersistentVolume `gitorgasm-postgres-vps` (production overlay) | 2Gi, `Retain`, hostPath `/srv/data/gitorgasm-postgres` (type `Directory`), node affinity `vps` | n/a                    | n/a                         | n/a                                                                                                          |
 
 **Verified** (code): one image serves all roles (`core/cmd/gitorgasm/main.go`, `core/Dockerfile`, `ENTRYPOINT ["/gitorgasm"]`). The image is distroless static and runs as UID 65532. The worker refuses to start without the `GITHUB_*` configuration. The API starts without it and returns 503 `github_not_configured` on auth, sync, and webhook routes.
 
@@ -106,17 +106,19 @@ Fit (**Verified** inputs, arithmetic here):
 
 Connection budget (**Verified** values, arithmetic here): the api uses `DB_MAX_CONNS=8` from the generated ConfigMap `gitorgasm-core` (`base/config.env`). The worker overrides it to 13 (`base/worker.yaml`). The worker minimum and default is 2 × `WORKER_CONCURRENCY` + 5 (`config.minWorkerConns`): two queues, one scoring job, and River headroom. The worker refuses to start below it. A sync job runs every statement on its advisory-lock connection, so each job uses one pool connection. In steady state the total is 21. During a rollout with one surge pod of each Deployment it is 2 × (8 + 13) = 42, plus 2 for `migrate` (`main.go` `db.Open(..., 2)`), so 44. This stays below `max_connections=60` and leaves room for `pg_dump` and `psql`. Postgres also sets `log_lock_waits=on` and a server-wide `idle_in_transaction_session_timeout=5min` as a backstop for those sessions. River uses the same pool.
 
-## 4. Cluster repository and change path
+## 4. Argo CD and change path
 
-The cluster repository is `upayanmazumder/cluster`. Its `k8s/apps/gitorgasm/` directory owns the production copy, the SOPS-encrypted Secrets, and the Argo CD Application. The `deploy/kustomize/overlays/production` tree here is the manifest source to copy into a cluster-repository pull request; it is not a live deployment target.
+The Argo CD Application `gitorgasm` is registered in `upayanmazumder/cluster` (`k8s/argocd/applications/apps/gitorgasm.yaml`). Its source is this repository, `targetRevision: main`, path `deploy/argocd`. Sync is automatic with prune and selfHeal. `deploy/argocd/kustomization.yaml` uses `../kustomize/overlays/production` and a ksops generator for `secrets.sops.yaml`.
 
-To change production, update this overlay and run `make manifests`; copy the change to `k8s/apps/gitorgasm/`, pin an immutable image tag (`sha-<full commit SHA>`), and open a cluster-repository pull request. Argo CD syncs only after that PR merges. Do not apply manifests directly or enable an automatic image-updater write-back that bypasses PR review. Node storage, backup settings, AppProject membership, and SOPS Secrets also belong in the cluster repository and need their own reviewed changes.
+The AppProject `gitorgasm` allows only this repository as a source and only namespace `gitorgasm` as a destination. Cluster-scoped kinds are limited to Namespace and PersistentVolume.
 
-The initial node setup requires `/srv/data/gitorgasm-postgres` owned by UID/GID 70, Secrets `gitorgasm-core` and `gitorgasm-postgres`, image pull access, and a PostgreSQL backup target; track any missing item in the cluster repository rather than changing the live cluster by hand.
+To change production, update the manifests and run `make manifests`. Open a pull request in this repository. `main` is protected and requires the `CI` check. After merge, Argo CD syncs manifest changes (polling, approximately 3 minutes). Image Updater rolls a new `latest` image in approximately 2 minutes. To roll back, revert the commit on `main`. Never apply manifests by hand.
+
+The cluster repository keeps the Application, the AppProject, the ImageUpdater entry, node storage (`/srv/data/gitorgasm-postgres`, owned by UID/GID 70), backup targets, and DNS. Change these by pull request in the cluster repository.
 
 **Decision**: the source of truth for source manifests is `deploy/kustomize` in this repository. CI validates changes under `deploy/` on pull requests.
 
-**Alternative considered**: Argo CD Application pointing at this repository directly. Rejected for now. The cluster repository owns the AppProject, SOPS keys, and deployment reviews.
+**Alternative considered**: keep a production copy and the Secrets in the cluster repository (ADR 0010). Rejected. Two copies drift, and each deploy needs a manual step. See ADR 0012.
 
 **Decision**: one image, `ghcr.io/upayanmazumder/gitorgasm/core`, for all roles. `cluster-audit.md` §4 proposed two images (`gitorgasm/api`, `gitorgasm/worker`). The code and `base/kustomization.yaml` (`images: name: gitorgasm-core`) use one image. ADR 0002 records this.
 
@@ -126,7 +128,7 @@ The initial node setup requires `/srv/data/gitorgasm-postgres` owned by UID/GID 
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
 | local       | **Verified**: `compose.yaml` (postgres:18-alpine on 127.0.0.1:55432, migrate, api, worker under profile `github`). `make up`, `make up-github`, `make smoke` | developer machine                                                                                                        |
 | CI          | **Verified**: `.github/workflows/core.yml` job `test` runs `go test -race` with a `postgres:18` service container                                            | GitHub Actions                                                                                                           |
-| production  | **Verified** manifests in `overlays/production`. **Deployed** 2026-10-26 via `upayanmazumder/cluster` `k8s/apps/gitorgasm`                                   | namespace `gitorgasm` on node `vps`, API host `api-gitorgasm.upayan.dev`, frontend origin `https://gitorgasm.upayan.dev` |
+| production  | **Verified** manifests in `overlays/production`. **Deployed** from `deploy/argocd` on `main` by Argo CD (ADR 0012)                                           | namespace `gitorgasm` on node `vps`, API host `api-gitorgasm.upayan.dev`, frontend origin `https://gitorgasm.upayan.dev` |
 | staging     | **Proposal**, not now                                                                                                                                        | namespace `gitorgasm-staging` on the same node                                                                           |
 
 **Verified** (`overlays/production/config.env`): `APP_ORIGIN=https://gitorgasm.upayan.dev` and `GITHUB_OAUTH_CALLBACK_URL=https://gitorgasm.upayan.dev/api/v1/auth/callback`. The callback goes through the Vercel rewrite, so the OAuth cookie stays on the frontend origin.
@@ -139,13 +141,13 @@ Staging cost note: a second copy of the budget costs 200m CPU and 512Mi memory r
 
 1. The job runs after job `core` passes. It builds `core/Dockerfile` with buildx when core, contracts, or its workflows change. It does not push on PRs.
 2. On a qualifying push to `main`, it logs in to GHCR with `GITHUB_TOKEN` (`packages: write` on the image job) and pushes `ghcr.io/upayanmazumder/gitorgasm/core`. Tags: `sha-<full commit SHA>` and `latest`. `VERSION` build arg = commit SHA (visible in the `app_version` log field). Provenance (`mode=max`) and SBOM are attached.
-3. A cluster-repository pull request pins the immutable `sha-<full commit SHA>` tag in `images[].newTag`. Argo CD syncs after merge. Image publishing alone never changes production.
+3. Argo CD Image Updater tracks the digest of `latest` with write-back method `argocd`. It sets the kustomize image override on the Application and makes no git commit. A push to `main` rolls api and worker in approximately 2 minutes.
 
-The cluster needs pull access to GHCR. If package visibility changes to private, the cluster repository must supply a SOPS-encrypted image pull secret and reference it in both Deployments before a rollout; otherwise image pulls fail. Risk R20 in `risk-register.md` tracks availability.
+The cluster needs pull access to GHCR. If package visibility changes to private, add a SOPS-encrypted image pull secret in `deploy/argocd` and reference it in both Deployments before a rollout; otherwise image pulls fail. Risk R20 in `risk-register.md` tracks availability.
 
 ## 7. Secrets
 
-**Verified** (`deploy/kustomize/README.md`, `base/api.yaml`, `base/postgres.yaml`): the cluster repository provides two Secrets, encrypted with SOPS and age. They are not in this repository.
+**Verified** (`deploy/kustomize/README.md`, `base/api.yaml`, `base/postgres.yaml`): `deploy/argocd/secrets.sops.yaml` holds two Secrets, encrypted with SOPS and age to the two cluster recipients (root `.sops.yaml`). Only the Argo CD repo-server decrypts them.
 
 | Secret               | Keys                                                                                                                                                                                     | Used by                                                   |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
@@ -172,7 +174,7 @@ Never put secret values in this repository. Compose uses local development value
 - `worker` (**Verified**): no explicit strategy, so the Kubernetes default `RollingUpdate` (25% / 25%) applies. With one replica, the new pod starts before the old pod stops. For a short time two workers run. River claims each job once, and the per-installation advisory lock in `SyncWorker` prevents two passes on one installation. `terminationGracePeriodSeconds: 40`.
 - `postgres` (**Verified**): `terminationGracePeriodSeconds: 60` for a clean shutdown.
 - Graceful shutdown (**Verified** `main.go` `serve`): on SIGTERM the process stops HTTP servers, then stops River (`client.Stop`) and flushes traces within `SHUTDOWN_TIMEOUT` (`25s` in the ConfigMap). Both grace periods are longer than 25 s.
-- Rollback: revert the image tag or manifest change through a cluster-repository pull request. Because of expand/contract, the previous binary must work on the new schema. Never roll back with a down migration in production.
+- Rollback: revert the commit on `main`. For an image, revert the code commit so that CI pushes a new `latest`. Because of expand/contract, the previous binary must work on the new schema. Never roll back with a down migration in production.
 
 ## 10. Autoscaling
 
