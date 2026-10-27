@@ -40,6 +40,8 @@ type fakeGitHub struct {
 	rateLimitPage int // when > 0, this repository page answers with a primary rate limit
 	gone          bool
 	tokenMints    atomic.Int32
+	contributions bool
+	failEvents    atomic.Bool
 }
 
 func (f *fakeGitHub) handler(t *testing.T) http.Handler {
@@ -106,6 +108,26 @@ func (f *fakeGitHub) handler(t *testing.T) http.Handler {
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"total_count": 3, "repository_selection": "all", "repositories": repos})
 	})
+	if f.contributions {
+		mux.HandleFunc("GET /repos/{owner}/{repo}/commits", func(w http.ResponseWriter, r *http.Request) {
+			if f.failEvents.Load() {
+				w.WriteHeader(http.StatusBadGateway)
+				return
+			}
+			now := time.Now().UTC().Add(-time.Hour).Format(time.RFC3339)
+			_ = json.NewEncoder(w).Encode([]map[string]any{{
+				"sha":    r.PathValue("repo") + "-sha",
+				"author": map[string]any{"id": 7, "login": "alice", "type": "User"},
+				"commit": map[string]any{"committer": map[string]any{"date": now}},
+			}})
+		})
+		mux.HandleFunc("GET /repos/{owner}/{repo}/pulls", func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte("[]"))
+		})
+		mux.HandleFunc("GET /repos/{owner}/{repo}/issues", func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte("[]"))
+		})
+	}
 	return mux
 }
 

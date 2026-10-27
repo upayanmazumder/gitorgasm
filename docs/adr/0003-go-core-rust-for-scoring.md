@@ -1,6 +1,6 @@
 # ADR 0003: Go for the core, Rust reserved for the scoring engine
 
-- Status: Accepted
+- Status: Superseded by [ADR 0004](0004-daily-organization-scoring.md)
 - Date: 2026-10-26
 
 ## Context

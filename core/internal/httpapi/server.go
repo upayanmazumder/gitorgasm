@@ -61,6 +61,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/organizations", s.authed(s.listOrganizations))
 	mux.HandleFunc("GET /v1/organizations/{login}/repositories", s.authed(s.listRepositories))
 	mux.HandleFunc("POST /v1/organizations/{login}/sync", s.authed(s.requestSync))
+	mux.HandleFunc("GET /v1/organizations/{login}/scores", s.authed(s.getScores))
+	mux.HandleFunc("POST /v1/organizations/{login}/scores/query", s.authed(s.queryScores))
+	mux.HandleFunc("GET /v1/organizations/{login}/scores/presets", s.authed(s.listScorePresets))
+	mux.HandleFunc("PUT /v1/organizations/{login}/scores/presets/{name}", s.authed(s.saveScorePreset))
+	mux.HandleFunc("DELETE /v1/organizations/{login}/scores/presets/{name}", s.authed(s.deleteScorePreset))
 
 	mux.HandleFunc("POST /webhooks/github", s.requireGitHub(limitConcurrent(maxWebhookReads, s.webhook)))
 

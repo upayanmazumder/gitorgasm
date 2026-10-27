@@ -57,12 +57,15 @@ jobs:
     env:
       CI: 'true'
       TEST_DATABASE_URL: postgres://gitorgasm:gitorgasm@localhost:5432/gitorgasm?sslmode=disable
+      SCORING_BIN: ${{ github.workspace }}/scoring/target/debug/score
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: core/go.mod
           cache-dependency-path: core/go.sum
+      - run: cargo build --locked --bin score
+        working-directory: scoring
       - run: go test -race -count=1 ./...
 
   build:

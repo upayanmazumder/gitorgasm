@@ -21,6 +21,8 @@ import (
 // QueueGitHub limits GitHub concurrency per worker replica.
 const QueueGitHub = "github"
 
+const QueueScoring = "scoring"
+
 // SyncInstallationArgs requests a full repository sync of one installation.
 type SyncInstallationArgs struct {
 	InstallationID int64 `json:"installation_id"`
@@ -82,6 +84,8 @@ type WorkerOptions struct {
 func NewWorkerClient(pool *pgxpool.Pool, gh *github.Client, opts WorkerOptions) (*river.Client[pgx.Tx], error) {
 	workers := river.NewWorkers()
 	river.AddWorker(workers, &SyncWorker{Pool: pool, GitHub: gh, Now: time.Now})
+	river.AddWorker(workers, &IngestWorker{Pool: pool, GitHub: gh, Now: time.Now})
+	river.AddWorker(workers, &ScoreWorker{Pool: pool})
 	river.AddWorker(workers, &WebhookWorker{Pool: pool, GitHub: gh})
 	river.AddWorker(workers, &ReconcileWorker{Pool: pool})
 	river.AddWorker(workers, &PurgeSessionsWorker{Pool: pool, Now: time.Now, Log: opts.Logger})
@@ -92,6 +96,7 @@ func NewWorkerClient(pool *pgxpool.Pool, gh *github.Client, opts WorkerOptions) 
 		Queues: map[string]river.QueueConfig{
 			river.QueueDefault: {MaxWorkers: opts.Concurrency},
 			QueueGitHub:        {MaxWorkers: opts.Concurrency},
+			QueueScoring:       {MaxWorkers: 1},
 		},
 		PeriodicJobs: []*river.PeriodicJob{
 			river.NewPeriodicJob(river.PeriodicInterval(opts.ReconcileEvery),
@@ -169,10 +174,20 @@ func (w *SyncWorker) Work(ctx context.Context, job *river.Job[SyncInstallationAr
 		}
 		return retryDecision(err)
 	}
-	if _, err := store.TombstoneUnseenRepositories(ctx, conn, id, started); err != nil {
+	client, err := NewInsertClient(w.Pool)
+	if err != nil {
 		return err
 	}
-	return store.SyncFinished(ctx, conn, id, seen, "")
+	return pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+		if _, err := store.TombstoneUnseenRepositories(ctx, tx, id, started); err != nil {
+			return err
+		}
+		if err := store.SyncFinished(ctx, tx, id, seen, ""); err != nil {
+			return err
+		}
+		_, err := client.InsertTx(ctx, tx, IngestContributionsArgs{InstallationID: id}, nil)
+		return err
+	})
 }
 
 // retryDecision delays rate limits, stops on permission errors, and otherwise lets River back off.

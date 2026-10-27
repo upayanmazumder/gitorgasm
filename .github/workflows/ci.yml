@@ -43,6 +43,7 @@ jobs:
               - .github/workflows/image.yml
               - core/**
               - contracts/**
+              - scoring/**
             web:
               - .github/workflows/ci.yml
               - .github/workflows/web.yml

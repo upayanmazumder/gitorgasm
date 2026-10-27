@@ -155,6 +155,89 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+  /v1/organizations/{login}/scores:
+    get:
+      summary: Get the latest daily organization scores and their freshness.
+      parameters:
+        - { name: login, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Stored scores
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Scores' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /v1/organizations/{login}/scores/query:
+    post:
+      summary: Score an organization with a time period, filters, and rules.
+      parameters:
+        - { name: login, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ScoreQuery' }
+      responses:
+        '200':
+          description: Scores for the requested options
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Scores' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /v1/organizations/{login}/scores/presets:
+    get:
+      summary: List saved scoring options for an organization.
+      parameters:
+        - { name: login, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Saved scoring options
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/ScorePreset' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /v1/organizations/{login}/scores/presets/{name}:
+    put:
+      summary: Save scoring options for an organization.
+      parameters:
+        - { name: login, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string, maxLength: 80 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ScoreQuery' }
+      responses:
+        '200':
+          description: Saved options
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScorePreset' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+    delete:
+      summary: Remove saved scoring options.
+      parameters:
+        - { name: login, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Removed }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
   /webhooks/github:
     post:
       summary: GitHub App webhook receiver (HMAC-SHA256 signed)
@@ -282,3 +365,55 @@ components:
         stargazers: { type: integer }
         pushed_at: { type: string, format: date-time, nullable: true }
         synced_at: { type: string, format: date-time }
+    ScoreQuery:
+      type: object
+      additionalProperties: false
+      properties:
+        period:
+          type: object
+          description: All time, a custom RFC3339 range, or a named period with as_of.
+          properties:
+            kind: { type: string, enum: [all, custom, preset] }
+            start: { type: string, format: date-time }
+            end: { type: string, format: date-time }
+            preset: { type: string, enum: [today, this_week, this_month, last7_days, last30_days] }
+            as_of: { type: string, format: date-time }
+        filter:
+          type: object
+          properties:
+            preset: { type: string, enum: [all, code, reviews, issues] }
+            users: { type: array, items: { type: integer, format: int64 } }
+            repositories: { type: array, items: { type: string } }
+            kinds: { type: array, items: { type: string } }
+            excludeBots: { type: boolean }
+            search: { type: string, nullable: true }
+        rules:
+          type: object
+          description: A complete custom scoring ruleset.
+    ScorePreset:
+      type: object
+      required: [name, query]
+      properties:
+        name: { type: string }
+        query: { $ref: '#/components/schemas/ScoreQuery' }
+    Scores:
+      type: object
+      required: [data, state, fresh]
+      properties:
+        data:
+          type: object
+          required: [contributors, repositories, teams]
+          properties:
+            contributors: { type: array, items: { type: object } }
+            repositories: { type: array, items: { type: object } }
+            teams: { type: array, items: { type: object } }
+        state:
+          type: object
+          required: [generation, scored_generation, last_ingested_at, last_scored_at, ingestion_failed]
+          properties:
+            generation: { type: integer, format: int64 }
+            scored_generation: { type: integer, format: int64 }
+            last_ingested_at: { type: string, format: date-time, nullable: true }
+            last_scored_at: { type: string, format: date-time, nullable: true }
+            ingestion_failed: { type: boolean }
+        fresh: { type: boolean }

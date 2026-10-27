@@ -1,4 +1,4 @@
-//! Scoring types serialized with legacy camelCase field names.
+//! Contribution events, configurable scoring rules, and leaderboard rows.
 
 use serde::{Deserialize, Serialize};
 
@@ -16,7 +16,7 @@ pub enum SignalType {
     PrCloseNoMerge,
     /// Issue opened.
     IssueOpen,
-    /// Issue closed. Legacy credits the issue author.
+    /// Issue closed, credited to the actor who closed it.
     IssueClose,
     /// Pull request review.
     Review,
@@ -24,7 +24,7 @@ pub enum SignalType {
     ReviewComment,
     /// Pull request conversation comment.
     Comment,
-    /// Spam marker. Legacy never emits it.
+    /// Explicit spam marker.
     Spam,
 }
 
@@ -76,7 +76,7 @@ pub struct Signal {
     pub kind: SignalType,
     /// Repository name.
     pub repo: String,
-    /// RFC 3339 timestamp. The day key is its first 10 characters, as in legacy.
+    /// RFC 3339 event timestamp. Calendar quotas use UTC days and ISO weeks.
     pub event_timestamp: String,
     /// Scoring flags.
     #[serde(default)]
@@ -109,7 +109,7 @@ pub enum MultiplierKind {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MultiplierRule {
-    /// Kind. Only the first rule of each kind is used.
+    /// Kind. Rules of the same kind are combined multiplicatively.
     pub kind: MultiplierKind,
     /// Factor.
     pub factor: f64,
@@ -175,7 +175,7 @@ pub struct ZeroPointCondition {
 
 /// A complete scoring preset.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Ruleset {
     /// Base points per type. Types without a rule score 0.
     pub base_points: Vec<BasePointRule>,
@@ -196,43 +196,26 @@ pub struct Ruleset {
 }
 
 impl Ruleset {
-    /// The legacy default preset (`lib/scoring/rules.ts`).
+    /// Balanced, activity-based defaults. Low-cost events cannot overwhelm reviews or PRs.
     #[must_use]
-    pub fn legacy_default() -> Self {
-        use SignalType::{Comment, Commit, IssueClose, IssueOpen, PrMerge, Review, ReviewComment};
+    pub fn balanced_default() -> Self {
+        use SignalType::{Commit, IssueClose, IssueOpen, PrMerge, PrOpen, Review};
         let base = |kind, points| BasePointRule { kind, points };
-        let zero = |kind| ZeroPointCondition { kind, enabled: true };
+        let quota = |kind, limit| DailyQuota { kind, limit };
         Self {
             base_points: vec![
-                base(Commit, 10.0),
-                base(PrMerge, 50.0),
-                base(Review, 20.0),
-                base(ReviewComment, 5.0),
-                base(IssueOpen, 10.0),
-                base(IssueClose, 10.0),
-                base(Comment, 3.0),
+                base(Commit, 1.0),
+                base(PrOpen, 4.0),
+                base(PrMerge, 4.0),
+                base(Review, 3.0),
+                base(IssueOpen, 2.0),
+                base(IssueClose, 1.0),
             ],
-            multipliers: vec![
-                MultiplierRule {
-                    kind: MultiplierKind::MergedPrCommit,
-                    factor: 1.2,
-                    applies_to: vec![Commit],
-                },
-                MultiplierRule {
-                    kind: MultiplierKind::PrLinkedToIssue,
-                    factor: 1.1,
-                    applies_to: vec![PrMerge, Commit],
-                },
-                MultiplierRule {
-                    kind: MultiplierKind::FirstActivity,
-                    factor: 1.5,
-                    applies_to: vec![Commit, PrMerge, Review, IssueOpen, IssueClose, Comment],
-                },
-            ],
+            multipliers: vec![],
             review_state_weights: vec![
                 ReviewStateWeight {
                     state: "approved".into(),
-                    weight: 1.25,
+                    weight: 1.0,
                 },
                 ReviewStateWeight {
                     state: "changes_requested".into(),
@@ -240,30 +223,34 @@ impl Ruleset {
                 },
                 ReviewStateWeight {
                     state: "commented".into(),
-                    weight: 0.5,
+                    weight: 1.0,
                 },
             ],
             daily_quotas: vec![
-                DailyQuota { kind: Commit, limit: 4 },
-                DailyQuota {
-                    kind: Comment,
-                    limit: 4,
-                },
+                quota(Commit, 10),
+                quota(PrOpen, 10),
+                quota(PrMerge, 10),
+                quota(Review, 10),
+                quota(IssueOpen, 10),
+                quota(IssueClose, 10),
             ],
             diminishing_returns: DiminishingReturns {
-                weekly_threshold: 9,
-                decay_factor: 0.11,
-                floor_fraction: 0.2,
+                weekly_threshold: 20,
+                decay_factor: 0.05,
+                floor_fraction: 0.25,
             },
             zero_point_conditions: vec![
-                zero(ZeroPointKind::SelfReview),
-                zero(ZeroPointKind::SelfMerge),
-                zero(ZeroPointKind::BotActivity),
-                zero(ZeroPointKind::IssueClosedNoPr),
-                zero(ZeroPointKind::PrClosedNoMerge),
+                ZeroPointCondition {
+                    kind: ZeroPointKind::BotActivity,
+                    enabled: true,
+                },
+                ZeroPointCondition {
+                    kind: ZeroPointKind::SelfReview,
+                    enabled: true,
+                },
             ],
-            spam_penalty: -12.0,
-            pr_closed_no_merge_penalty: -10.0,
+            spam_penalty: 0.0,
+            pr_closed_no_merge_penalty: 0.0,
         }
     }
 }
@@ -310,7 +297,7 @@ pub struct ContributionCounts {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Totals {
-    /// `max(0, points + penalties)`.
+    /// Sum of points and penalties, floored at zero for each leaderboard row.
     pub score: f64,
     /// Points per category.
     pub breakdown: ScoreBreakdown,
@@ -328,12 +315,12 @@ pub struct Totals {
 pub struct ContributorScore {
     /// GitHub user id.
     pub user_id: i64,
-    /// Login from the user's first signal in input order.
+    /// Most recently observed login for this user by UTC event time.
     pub user_login: String,
     /// Totals.
     #[serde(flatten)]
     pub totals: Totals,
-    /// 1-based rank. Ties keep input order (legacy behavior).
+    /// 1-based rank; ties retain first appearance order.
     pub rank: u32,
 }
 

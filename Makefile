@@ -88,7 +88,8 @@ lint: ## Lint and format-check all code
 
 .PHONY: test-go
 test-go: db ## Go tests against an isolated database per test
-	cd $(CORE) && go test -race -count=1 ./...
+	cd $(SCORING) && cargo build --locked --bin score
+	cd $(CORE) && SCORING_BIN="$(abspath $(SCORING))/target/debug/score" go test -race -count=1 ./...
 
 .PHONY: test
 test: test-go ## Run all tests
@@ -103,7 +104,11 @@ build: ## Build binaries, the web app, and the container image
 	cd $(BENCH)/rust && cargo build --release --locked
 	cd $(SCORING) && cargo build --release --locked
 	cd $(WEB) && SKIP_ENV_VALIDATION=true pnpm build
-	docker build -t gitorgasm-core:dev $(CORE)
+	docker build -f $(CORE)/Dockerfile -t gitorgasm-core:dev .
+
+.PHONY: score-bench
+score-bench: ## Measure 100,000 scored contributions within 60 seconds
+	cd $(SCORING) && cargo run --release --locked --bin score-bench -- --limit-seconds 60
 
 .PHONY: manifests
 manifests: ## Render and schema-validate Kubernetes manifests

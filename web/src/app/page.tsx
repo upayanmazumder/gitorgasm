@@ -9,15 +9,15 @@ export default function Home() {
             Gitorgasm
           </h1>
           <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            This is the Gitorgasm web app.
+            View activity scores for the organizations you can access.
           </p>
         </div>
         <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
           <Link
             className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] md:w-[158px] dark:border-white/[.145] dark:hover:bg-[#1a1a1a]"
-            href="/motion"
+            href="/organizations"
           >
-            Motion demo
+            View organizations
           </Link>
         </div>
       </main>

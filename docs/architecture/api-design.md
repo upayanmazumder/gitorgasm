@@ -175,6 +175,6 @@ Status values: `planned`, `dry_run`, `ready`, `running`, `cancelling`, `complete
 **Decision** (decisions items 3, 6):
 
 - One service now. No internal network API exists.
-- The Rust scoring service (Stage 5) communicates only through PostgreSQL tables (`signals`, `computed_scores`) and job rows. No FFI and no synchronous Go-to-Rust call.
+- The Go worker runs the Rust scoring binary as a local process. River and PostgreSQL coordinate ingestion and stored scores.
 - If a synchronous internal call becomes necessary, use ConnectRPC with protobuf, defined under `contracts/`. Not now.
 - Metrics (`:9090/metrics`) and probes are not public API. The ingress does not route port 9090.
