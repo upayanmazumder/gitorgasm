@@ -4,21 +4,22 @@ Guide for coding agents and new engineers. Read [CONTRIBUTING.md](CONTRIBUTING.m
 
 ## Layout
 
-| Path                            | What it is                                                                                                                                                                     |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `core`                          | Go module. One binary, three roles: `gitorgasm api`, `gitorgasm worker`, `gitorgasm migrate`.                                                                                  |
-| `core/internal/config`          | Environment loading and validation. All variables are documented in `.env.example`.                                                                                            |
-| `core/internal/db`              | pgx pool, goose migrations (`migrations/`), River migrations.                                                                                                                  |
-| `core/internal/github`          | Narrow GitHub REST client. Every endpoint was checked against the pinned REST description.                                                                                     |
-| `core/internal/store`           | All SQL.                                                                                                                                                                       |
-| `core/internal/jobs`            | River jobs: `sync_installation`, `process_webhook`, `reconcile_installations`.                                                                                                 |
-| `core/internal/httpapi`         | HTTP handlers and middleware. The contract is `contracts/openapi/v1.yaml`.                                                                                                     |
-| `core/internal/testdb`          | Gives each test an isolated, migrated database.                                                                                                                                |
-| `web`                           | Next.js frontend (Vercel). It has its own `AGENTS.md`.                                                                                                                         |
+| Path                            | What it is                                                                                                                                                                                                  |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core`                          | Go module. One binary, three roles: `gitorgasm api`, `gitorgasm worker`, `gitorgasm migrate`.                                                                                                               |
+| `core/internal/config`          | Environment loading and validation. All variables are documented in `.env.example`.                                                                                                                         |
+| `core/internal/db`              | pgx pool, goose migrations (`migrations/`), River migrations.                                                                                                                                               |
+| `core/internal/github`          | Narrow GitHub REST client. Every endpoint was checked against the pinned REST description.                                                                                                                  |
+| `core/internal/store`           | All SQL.                                                                                                                                                                                                    |
+| `core/internal/jobs`            | River jobs: `sync_installation`, `process_webhook`, `reconcile_installations`.                                                                                                                              |
+| `core/internal/httpapi`         | HTTP handlers and middleware. The contract is `contracts/openapi/v1.yaml`.                                                                                                                                  |
+| `core/internal/testdb`          | Gives each test an isolated, migrated database.                                                                                                                                                             |
+| `web`                           | Next.js frontend (Vercel). It has its own `AGENTS.md`.                                                                                                                                                      |
 | `scoring`                       | Rust crate and `score` binary: contributor, repository, and team scoring. The worker runs the binary as a local process. `scoring/tests/golden` holds legacy fixtures that no test reads. Do not edit them. |
-| `deploy/kustomize`              | Kubernetes base and production overlay.                                                                                                                                        |
-| `docs/architecture`, `docs/adr` | Architecture, audits, decisions.                                                                                                                                               |
-| `tests/performance/lang-bench`  | Go vs Rust benchmark harness and recorded results.                                                                                                                             |
+| `deploy/kustomize`              | Kubernetes base and production overlay.                                                                                                                                                                     |
+| `deploy/argocd`                 | Argo CD entry point: production overlay plus SOPS-encrypted Secrets (ksops).                                                                                                                                |
+| `docs/architecture`, `docs/adr` | Architecture, audits, decisions.                                                                                                                                                                            |
+| `tests/performance/lang-bench`  | Go vs Rust benchmark harness and recorded results.                                                                                                                                                          |
 
 ## Commands
 
@@ -39,4 +40,4 @@ make manifests # render and validate Kubernetes manifests
 - Never log or commit tokens, cookies, webhook payloads, or data exports.
 - Change `contracts/openapi/v1.yaml` together with handlers. Tests enforce the contract.
 - Do not add a new service, database, or broker without an ADR.
-- Production deployment goes through the cluster repository (`upayanmazumder/cluster`) with a pull request. Do not apply manifests to the live cluster by hand.
+- Production deploys from `main` of this repository through Argo CD. Change `deploy/` only by pull request. Never apply manifests to the live cluster by hand. Put Secrets only as SOPS-encrypted files in `deploy/argocd`.

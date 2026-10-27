@@ -81,10 +81,10 @@ This document records each technology option, the verdict, and the reason. Each 
 
 ### 2.8 GitOps controller
 
-| Option             | Verdict      | Reason                                                                                                                                                                           |
-| ------------------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Argo CD (existing) | **Selected** | Already runs the app-of-apps from `upayanmazumder/cluster` with SOPS/ksops and image updater (**Verified**: cluster-audit.md). Deployment = PR to that repo (Planned Stage 1.5). |
-| Flux               | Rejected     | A second GitOps controller duplicates Argo CD and its memory.                                                                                                                    |
+| Option             | Verdict      | Reason                                                                                                                                                                                                          |
+| ------------------ | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Argo CD (existing) | **Selected** | Already runs the app-of-apps from `upayanmazumder/cluster` with SOPS/ksops and image updater (**Verified**: cluster-audit.md). The Application reads `deploy/argocd` from `main` of this repository (ADR 0012). |
+| Flux               | Rejected     | A second GitOps controller duplicates Argo CD and its memory.                                                                                                                                                   |
 
 ### 2.9 API style
 

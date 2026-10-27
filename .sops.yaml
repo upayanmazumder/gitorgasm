@@ -1,0 +1,9 @@
+# SOPS rules for the production Secrets in deploy/argocd. These are the public age recipients
+# of the cluster repository: the owner's offline key and the key Argo CD's repo-server uses.
+# Only data and stringData are encrypted, so names and keys stay reviewable.
+creation_rules:
+  - path_regex: deploy/argocd/secrets\.sops\.ya?ml$
+    encrypted_regex: ^(data|stringData)$
+    age: >-
+      age1c5wsguw34gmnnllle8qzcjvjkl22e88em3a0lseqs0l9lscmr5pqsg6gyn,
+      age13yvwrz6cvg8cwq78m6jvy9mndjdyuv0k3kh0du72v28puqcuafms8p28gr
