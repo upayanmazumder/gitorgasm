@@ -1,0 +1,9 @@
+.git
+**/node_modules
+**/target
+**/.next
+**/.env*
+core/bin
+scoring/tests
+web
+node_modules

@@ -1,6 +1,6 @@
 # web
 
-The Gitorgasm web app is a Next.js App Router frontend. It proxies the v1 API on the same origin; the starter UI does not yet use it.
+Gitorgasm shows organization activity and scores. The website connects to the app server.
 
 ## Requirements
 

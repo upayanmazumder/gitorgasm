@@ -33,10 +33,10 @@ flowchart TB
 ```mermaid
 flowchart LR
   subgraph browser["Browser"]
-    ui[Next.js UI<br/>Planned]
+    ui[Next.js UI]
   end
   subgraph vercel["Vercel"]
-    web[web<br/>Next.js 16 template exists<br/>rewrite /api/:path* Planned]
+    web[web<br/>same-origin API rewrite]
   end
   subgraph edge["Cloudflare"]
     cfp[Proxy, Origin CA *.upayan.dev]
@@ -46,9 +46,9 @@ flowchart LR
     subgraph ns["namespace gitorgasm (Planned deploy)"]
       api[core api<br/>:8080 HTTP, :9090 metrics<br/>Exists]
       worker[core worker<br/>River, :9090<br/>Exists]
+      scorer[Rust score binary<br/>local worker process]
       migrate[core migrate<br/>initContainer of api<br/>role exists, manifest exists]
       pg[(PostgreSQL 18<br/>app tables + river_job)]
-      scoring[scoring service<br/>Rust, Planned Stage 5]
     end
     prom[Prometheus]
     loki[Loki via Promtail]
@@ -60,7 +60,8 @@ flowchart LR
   api --> pg
   worker --> pg
   migrate --> pg
-  scoring -. Planned .-> pg
+  worker -->|event JSON| scorer
+  scorer -->|score JSON| worker
   worker --> gh
   api --> gh
   prom -->|scrape :9090| api
@@ -73,17 +74,17 @@ flowchart LR
 
 | Component           | Responsibility                                                                                                                                    | State                                                                                                    | Evidence                                                                            |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `gitorgasm api`     | Auth (login, callback, install redirect, logout), `/v1/me`, org and repository lists, sync request, webhook intake, health                        | Exists                                                                                                   | `core/internal/httpapi/server.go` routes                                            |
-| `gitorgasm worker`  | Runs River jobs: `sync_installation`, `process_webhook`, `reconcile_installations`                                                                | Exists                                                                                                   | `core/internal/jobs/jobs.go`                                                        |
+| `gitorgasm api`     | Sign-in, organization and repository lists, scores, saved presets, sync requests, and webhook intake.                                 | Exists                                                                                                   | `core/internal/httpapi/server.go` routes                                            |
+| `gitorgasm worker`  | Runs River sync, contribution ingest, and scoring jobs.                                                                                 | Exists                                                                                                   | `core/internal/jobs/jobs.go`, `core/internal/jobs/scoring.go`                        |
 | `gitorgasm migrate` | Applies goose and River migrations                                                                                                                | Exists                                                                                                   | `core/cmd/gitorgasm/main.go` (`runMigrate`), `core/internal/db/db.go`               |
 | GitHub client       | App JWT, installation token cache, narrow REST calls, rate-limit classification, metrics                                                          | Exists                                                                                                   | `core/internal/github/client.go`                                                    |
 | Store               | All SQL                                                                                                                                           | Exists                                                                                                   | `core/internal/store/store.go`                                                      |
 | Secure              | Random tokens, AES-256-GCM sealing                                                                                                                | Exists                                                                                                   | `core/internal/secure/secure.go`                                                    |
 | Obs                 | slog JSON, Prometheus, OTel                                                                                                                       | Exists                                                                                                   | `core/internal/obs/obs.go`                                                          |
 | PostgreSQL          | Only stateful service. App tables and River tables.                                                                                               | Local Compose and production StatefulSet (`postgres:18.6-alpine`, cluster PR #77).                     | `core/internal/db/migrations/`, `deploy/kustomize/base/postgres.yaml`               |
-| Web app             | UI, same-origin rewrite                                                                                                                           | Deployed on Vercel; rewrite exists in `web/next.config.ts`. UI/API integration is planned for Stage 2.  | `web/package.json`, `web/next.config.ts`, roadmap Stage 1.5                         |
+| Web app             | UI, same-origin rewrite                                                                                                                           | Organization scores and filters exist in `web/src/app/organizations`.                                 | `web/package.json`, `web/next.config.ts`                                          |
 | Kustomize manifests | Namespace, ConfigMap, Deployments (api with `migrate` initContainer, worker), postgres StatefulSet, Services, NetworkPolicies, Ingress, static PV | Production copy deployed through `upayanmazumder/cluster#77`; future changes require a cluster PR.      | `deploy/kustomize`, `implementation-roadmap.md` Stage 1.5                          |
-| Scoring service     | Rust scoring engine                                                                                                                               | Planned, hypothesis                                                                                      | [rust-vs-go.md](./rust-vs-go.md) §5                                                 |
+| Scoring binary      | Calculates scores from completed events.                                                                                                          | Built into the core image.                                                                             | `scoring/src/bin/score.rs`, `core/Dockerfile`                                     |
 
 **Decision**: one image serves all three roles so versions cannot drift (comment in `core/cmd/gitorgasm/main.go`).
 
@@ -148,9 +149,9 @@ Job semantics (**Verified** in `jobs.go`): sync dedupes per installation per 1-m
 
 | Area             | Exists now                                                                                                                             | Planned                                                                                                            |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Backend roles    | api, worker, migrate                                                                                                                   | scoring service (Rust, Stage 5)                                                                                    |
-| Data             | users, sessions, accounts, installations, user_installations, repositories, sync_state, webhook_deliveries, audit_events, River tables | members, teams, invitations (Stage 3); operations and items (Stage 4); signals, presets, computed_scores (Stage 5) |
-| Jobs             | sync_installation, process_webhook, reconcile_installations, purge_sessions, purge_webhook_deliveries                                  | membership/team sync, bulk operations, ingest, scoring, audit and tombstone purge                                  |
+| Backend roles    | api, worker, migrate. The worker runs the local Rust scoring binary.                                                                           | No separate scoring service.                                                                                           |
+| Data             | users, sessions, installations, repositories, contribution events, scoring state and presets, snapshots, River tables                       | members and teams (Stage 3); operations (Stage 4)                                                                      |
+| Jobs             | sync_installation, ingest_contributions, score_organization, process_webhook, reconcile_installations, purge jobs                             | membership/team sync and bulk operations                                                                                |
 | Webhooks handled | installation, installation_repositories, repository, github_app_authorization                                                          | organization, member, membership, team, push, pull_request, issues                                                 |
 | Observability    | HTTP and GitHub metrics, JSON logs, OTel instrumentation                                                                               | River job metrics, trace backend, alerts                                                                           |
 | Delivery         | Local compose, Makefile, CI (`.github/workflows/`), kustomize manifests, image build (push to GHCR on `main` only)                     | Cluster PR, GHCR access decision, DNS, Vercel project and rewrite                                                  |

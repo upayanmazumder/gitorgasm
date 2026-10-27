@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -40,6 +41,11 @@ type fakeGitHub struct {
 	rateLimitPage int // when > 0, this repository page answers with a primary rate limit
 	gone          bool
 	tokenMints    atomic.Int32
+	contributions bool
+	failEvents    atomic.Bool
+	mu            sync.Mutex
+	repoStatus    map[string]int // per repository commits status override, for example 404 or 403
+	commitCalls   map[string]int
 }
 
 func (f *fakeGitHub) handler(t *testing.T) http.Handler {
@@ -106,7 +112,61 @@ func (f *fakeGitHub) handler(t *testing.T) http.Handler {
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"total_count": 3, "repository_selection": "all", "repositories": repos})
 	})
+	if f.contributions {
+		mux.HandleFunc("GET /repos/{owner}/{repo}/commits", func(w http.ResponseWriter, r *http.Request) {
+			repo := r.PathValue("repo")
+			f.mu.Lock()
+			if f.commitCalls == nil {
+				f.commitCalls = map[string]int{}
+			}
+			f.commitCalls[repo]++
+			status := f.repoStatus[repo]
+			f.mu.Unlock()
+			switch {
+			case f.failEvents.Load():
+				w.WriteHeader(http.StatusBadGateway)
+				return
+			case status == http.StatusForbidden:
+				w.Header().Set("X-RateLimit-Remaining", "0")
+				w.Header().Set("X-RateLimit-Reset", strconv.FormatInt(time.Now().Add(time.Minute).Unix(), 10))
+				w.WriteHeader(status)
+				_, _ = w.Write([]byte(`{"message":"API rate limit exceeded"}`))
+				return
+			case status != 0:
+				w.WriteHeader(status)
+				_, _ = w.Write([]byte(`{"message":"Not Found"}`))
+				return
+			}
+			now := time.Now().UTC().Add(-time.Hour).Format(time.RFC3339)
+			_ = json.NewEncoder(w).Encode([]map[string]any{{
+				"sha":    repo + "-sha",
+				"author": map[string]any{"id": 7, "login": "alice", "type": "User"},
+				"commit": map[string]any{"committer": map[string]any{"date": now}},
+			}})
+		})
+		mux.HandleFunc("GET /repos/{owner}/{repo}/pulls", func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte("[]"))
+		})
+		mux.HandleFunc("GET /repos/{owner}/{repo}/issues", func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte("[]"))
+		})
+	}
 	return mux
+}
+
+func (f *fakeGitHub) setRepoStatus(repo string, status int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.repoStatus == nil {
+		f.repoStatus = map[string]int{}
+	}
+	f.repoStatus[repo] = status
+}
+
+func (f *fakeGitHub) calls(repo string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.commitCalls[repo]
 }
 
 func setup(t *testing.T, f *fakeGitHub) (*pgxpool.Pool, *github.Client) {

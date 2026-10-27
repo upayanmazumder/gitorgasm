@@ -1,103 +1,93 @@
-//! Legacy-compatible scoring (S1–S9); change scoring quirks only behind a ruleset version.
+//! Balanced event scoring shared by contributor, repository, and team views.
 
 use std::collections::{HashMap, HashSet};
-use std::hash::Hash;
 
-use chrono::{DateTime, Datelike, Days, Timelike};
+use chrono::{DateTime, Datelike, NaiveDate, Timelike};
 
 use crate::error::ScoringError;
 use crate::model::{
     ContributorScore, MultiplierKind, RepositoryScore, Ruleset, Signal, SignalType, TeamMembership, TeamScore, Totals,
     ZeroPointKind,
 };
+use crate::query::Scoreboards;
 
 const N: usize = SignalType::COUNT;
 
-/// A multiplier resolved to the first rule of its kind, as legacy `Array.find` does.
-#[derive(Clone, Copy)]
-struct Multiplier {
-    factor: f64,
-    applies: [bool; N],
-}
-
-struct Compiled<'r> {
-    rules: &'r Ruleset,
+struct Compiled<'a> {
+    rules: &'a Ruleset,
     base: [f64; N],
     quota: [Option<u32>; N],
-    first_activity: Option<Multiplier>,
-    merged_pr_commit: Option<Multiplier>,
-    pr_linked_to_issue: Option<Multiplier>,
+    zero: [bool; 5],
 }
 
-impl<'r> Compiled<'r> {
-    fn new(rules: &'r Ruleset, with_first_activity: bool) -> Result<Self, ScoringError> {
-        check_finite(rules)?;
-        let mut base = [0.0; N];
-        let mut base_set = [false; N];
-        for r in &rules.base_points {
-            if !base_set[r.kind.index()] {
-                base_set[r.kind.index()] = true;
-                base[r.kind.index()] = r.points;
+impl<'a> Compiled<'a> {
+    fn new(rules: &'a Ruleset) -> Result<Self, ScoringError> {
+        let d = &rules.diminishing_returns;
+        let numbers = rules
+            .base_points
+            .iter()
+            .map(|r| ("basePoints.points", r.points))
+            .chain(rules.multipliers.iter().map(|r| ("multipliers.factor", r.factor)))
+            .chain(
+                rules
+                    .review_state_weights
+                    .iter()
+                    .map(|r| ("reviewStateWeights.weight", r.weight)),
+            )
+            .chain([
+                ("diminishingReturns.decayFactor", d.decay_factor),
+                ("diminishingReturns.floorFraction", d.floor_fraction),
+                ("spamPenalty", rules.spam_penalty),
+                ("prClosedNoMergePenalty", rules.pr_closed_no_merge_penalty),
+            ]);
+        for (field, value) in numbers {
+            if !value.is_finite() {
+                return Err(ScoringError::NonFiniteRule(field));
+            }
+            if value < 0.0 && field != "spamPenalty" && field != "prClosedNoMergePenalty" {
+                return Err(ScoringError::InvalidRule(field));
             }
         }
-        let mut quota = [None; N];
-        for q in &rules.daily_quotas {
-            quota[q.kind.index()].get_or_insert(q.limit);
+        if d.decay_factor > 1.0 || d.floor_fraction > 1.0 {
+            return Err(ScoringError::InvalidRule("diminishingReturns"));
         }
-        let find = |kind| {
-            rules.multipliers.iter().find(|m| m.kind == kind).map(|m| {
-                let mut applies = [false; N];
-                for t in &m.applies_to {
-                    applies[t.index()] = true;
-                }
-                Multiplier {
-                    factor: m.factor,
-                    applies,
-                }
-            })
-        };
+        let mut base = [0.0; N];
+        for r in &rules.base_points {
+            base[r.kind.index()] = r.points;
+        }
+        let mut quota = [None; N];
+        for r in &rules.daily_quotas {
+            quota[r.kind.index()] = Some(r.limit);
+        }
+        let mut zero = [false; 5];
+        for condition in &rules.zero_point_conditions {
+            zero[condition.kind as usize] = condition.enabled;
+        }
         Ok(Self {
             rules,
             base,
             quota,
-            // Repository scoring removes every first_activity rule.
-            first_activity: if with_first_activity {
-                find(MultiplierKind::FirstActivity)
-            } else {
-                None
-            },
-            merged_pr_commit: find(MultiplierKind::MergedPrCommit),
-            pr_linked_to_issue: find(MultiplierKind::PrLinkedToIssue),
+            zero,
         })
     }
 
-    fn zero_point(&self, s: &Signal) -> bool {
+    fn excluded(&self, s: &Signal) -> bool {
         let m = &s.metadata;
-        self.rules
-            .zero_point_conditions
-            .iter()
-            .filter(|c| c.enabled)
-            .any(|c| match c.kind {
-                ZeroPointKind::SelfReview => s.kind == SignalType::Review && m.is_self_review == Some(true),
-                ZeroPointKind::SelfMerge => s.kind == SignalType::PrMerge && m.is_self_merge == Some(true),
-                ZeroPointKind::BotActivity => m.is_bot == Some(true),
-                ZeroPointKind::PrClosedNoMerge => s.kind == SignalType::PrCloseNoMerge,
-                ZeroPointKind::IssueClosedNoPr => s.kind == SignalType::IssueClose && m.has_linked_pr != Some(true),
-            })
+        (self.zero[ZeroPointKind::BotActivity as usize] && m.is_bot == Some(true))
+            || (self.zero[ZeroPointKind::SelfReview as usize]
+                && s.kind == SignalType::Review
+                && m.is_self_review == Some(true))
+            || (self.zero[ZeroPointKind::SelfMerge as usize]
+                && s.kind == SignalType::PrMerge
+                && m.is_self_merge == Some(true))
+            || (self.zero[ZeroPointKind::IssueClosedNoPr as usize]
+                && s.kind == SignalType::IssueClose
+                && m.has_linked_pr != Some(true))
+            || (self.zero[ZeroPointKind::PrClosedNoMerge as usize] && s.kind == SignalType::PrCloseNoMerge)
     }
 
-    fn diminishing(&self, occurrence: u32, base: f64) -> f64 {
-        let d = &self.rules.diminishing_returns;
-        if occurrence <= d.weekly_threshold {
-            return base;
-        }
-        let factor = 1.0 - f64::from(occurrence - d.weekly_threshold) * d.decay_factor;
-        (base * d.floor_fraction.max(factor)).max(0.0)
-    }
-
-    fn score<'s>(&self, s: &'s Signal, ctx: &mut Context<'s>, skip_quota: bool) -> (f64, f64) {
-        let t = s.kind.index();
-        if self.zero_point(s) {
+    fn points(&self, s: &Signal, state: &mut State, day: NaiveDate, week: (i32, u32)) -> (f64, f64) {
+        if self.excluded(s) {
             return (0.0, 0.0);
         }
         match s.kind {
@@ -105,175 +95,96 @@ impl<'r> Compiled<'r> {
             SignalType::PrCloseNoMerge => return (0.0, self.rules.pr_closed_no_merge_penalty),
             _ => {}
         }
-        let base = self.base[t];
-        if base == 0.0 {
+        let kind = s.kind.index();
+        if self.base[kind] == 0.0 {
             return (0.0, 0.0);
         }
-
-        let effective = if skip_quota {
-            base
-        } else {
-            // S5: the day key is the raw string prefix, which keeps the author's UTC offset.
-            let day = s.event_timestamp.get(..10).unwrap_or(&s.event_timestamp);
-            if ctx.current_day != Some(day) {
-                ctx.current_day = Some(day);
-                ctx.daily = [0; N];
-                ctx.first_seen = [false; N];
+        if state.day != Some(day) {
+            state.day = Some(day);
+            state.daily = [0; N];
+            state.first = [false; N];
+        }
+        if state.week != Some(week) {
+            state.week = Some(week);
+            state.weekly = [0; N];
+        }
+        state.daily[kind] = state.daily[kind].saturating_add(1);
+        if self.quota[kind].is_some_and(|limit| state.daily[kind] > limit) {
+            return (0.0, 0.0);
+        }
+        state.weekly[kind] = state.weekly[kind].saturating_add(1);
+        let d = &self.rules.diminishing_returns;
+        let excess = state.weekly[kind].saturating_sub(d.weekly_threshold);
+        let fraction = d.floor_fraction.max(1.0 - f64::from(excess) * d.decay_factor);
+        let mut points = self.base[kind] * fraction;
+        for multiplier in &self.rules.multipliers {
+            if !multiplier.applies_to.contains(&s.kind) {
+                continue;
             }
-            // S4: both counters grow before the quota test.
-            ctx.daily[t] += 1;
-            ctx.weekly[t] += 1;
-            match self.quota[t] {
-                Some(limit) if ctx.daily[t] > limit => 0.0,
-                _ => self.diminishing(ctx.weekly[t] - 1, base),
+            let applies = match multiplier.kind {
+                MultiplierKind::FirstActivity => !state.first[kind],
+                MultiplierKind::MergedPrCommit => {
+                    s.kind == SignalType::Commit && s.metadata.is_in_merged_pr == Some(true)
+                }
+                MultiplierKind::PrLinkedToIssue => {
+                    s.kind == SignalType::PrMerge && s.metadata.has_linked_issue == Some(true)
+                }
+            };
+            if applies {
+                points *= multiplier.factor;
             }
-        };
-
-        let mut multiplier = 1.0;
-        if let Some(m) = self.first_activity
-            && m.applies[t]
-            && !ctx.first_seen[t]
-        {
-            ctx.first_seen[t] = true;
-            multiplier *= m.factor;
         }
-        if let Some(m) = self.merged_pr_commit
-            && m.applies[t]
-            && s.metadata.is_in_merged_pr == Some(true)
-        {
-            multiplier *= m.factor;
-        }
-        if let Some(m) = self.pr_linked_to_issue
-            && m.applies[t]
-            && s.metadata.has_linked_issue == Some(true)
-        {
-            multiplier *= m.factor;
-        }
-        if s.kind == SignalType::Review {
-            let state = s.metadata.state.as_deref().unwrap_or("commented");
-            let weight = self
+        state.first[kind] = true;
+        if s.kind == SignalType::Review
+            && let Some(weight) = self
                 .rules
                 .review_state_weights
                 .iter()
-                .find(|w| w.state == state)
-                .map_or(1.0, |w| w.weight);
-            multiplier *= weight;
+                .find(|w| w.state == s.metadata.state.as_deref().unwrap_or("commented"))
+        {
+            points *= weight.weight;
         }
-        (effective * multiplier, 0.0)
+        (points, 0.0)
     }
 }
 
-fn check_finite(rules: &Ruleset) -> Result<(), ScoringError> {
-    let d = &rules.diminishing_returns;
-    let fixed = [
-        ("diminishingReturns.decayFactor", d.decay_factor),
-        ("diminishingReturns.floorFraction", d.floor_fraction),
-        ("spamPenalty", rules.spam_penalty),
-        ("prClosedNoMergePenalty", rules.pr_closed_no_merge_penalty),
-    ];
-    let bad = rules
-        .base_points
-        .iter()
-        .map(|r| ("basePoints.points", r.points))
-        .chain(rules.multipliers.iter().map(|m| ("multipliers.factor", m.factor)))
-        .chain(
-            rules
-                .review_state_weights
-                .iter()
-                .map(|w| ("reviewStateWeights.weight", w.weight)),
-        )
-        .chain(fixed)
-        .find(|(_, v)| !v.is_finite());
-    match bad {
-        Some((field, _)) => Err(ScoringError::NonFiniteRule(field)),
-        None => Ok(()),
-    }
-}
-
-struct Context<'s> {
-    first_seen: [bool; N],
-    weekly: [u32; N],
+#[derive(Default)]
+struct State {
+    day: Option<NaiveDate>,
+    week: Option<(i32, u32)>,
     daily: [u32; N],
-    current_day: Option<&'s str>,
-}
-
-impl Context<'_> {
-    fn new() -> Self {
-        Self {
-            first_seen: [false; N],
-            weekly: [0; N],
-            daily: [0; N],
-            current_day: None,
-        }
-    }
-}
-
-struct Timed<'s> {
-    signal: &'s Signal,
-    millis: i64,
-    /// Days since the epoch of the Monday (UTC) that starts the signal's week.
-    week: i32,
-}
-
-fn timed<'s>(signals: &[&'s Signal]) -> Result<Vec<Timed<'s>>, ScoringError> {
-    let mut out = Vec::with_capacity(signals.len());
-    for &signal in signals {
-        let ts = DateTime::parse_from_rfc3339(&signal.event_timestamp)
-            .ok()
-            // chrono accepts leap seconds; legacy `new Date()` rejects them.
-            .filter(|ts| ts.nanosecond() < 1_000_000_000)
-            .ok_or_else(|| ScoringError::InvalidTimestamp(signal.event_timestamp.clone()))?;
-        let utc = ts.to_utc();
-        let date = utc.date_naive();
-        let monday = date
-            .checked_sub_days(Days::new(u64::from(date.weekday().num_days_from_monday())))
-            .unwrap_or(date);
-        out.push(Timed {
-            signal,
-            millis: utc.timestamp_millis(),
-            week: monday.num_days_from_ce(),
-        });
-    }
-    // Stable sort, as legacy Array.prototype.sort: equal instants keep input order.
-    out.sort_by_key(|t| t.millis);
-    Ok(out)
+    weekly: [u32; N],
+    first: [bool; N],
 }
 
 impl Totals {
-    fn add_signal(&mut self, s: &Signal, points: f64, penalty: f64, running: &mut (f64, f64)) {
-        running.0 += points;
-        running.1 += penalty;
-        let (b, c) = (&mut self.breakdown, &mut self.counts);
+    fn record(&mut self, s: &Signal, points: f64, penalty: f64) {
+        self.breakdown.penalties += penalty;
         let (score, count) = match s.kind {
-            SignalType::Commit => (&mut b.commits, &mut c.commits),
+            SignalType::Commit => (&mut self.breakdown.commits, &mut self.counts.commits),
             SignalType::PrOpen | SignalType::PrMerge | SignalType::PrCloseNoMerge => {
-                (&mut b.pull_requests, &mut c.pull_requests)
+                (&mut self.breakdown.pull_requests, &mut self.counts.pull_requests)
             }
-            SignalType::Review => (&mut b.reviews, &mut c.reviews),
-            SignalType::ReviewComment => (&mut b.review_comments, &mut c.review_comments),
-            SignalType::IssueOpen | SignalType::IssueClose => (&mut b.issues, &mut c.issues),
-            SignalType::Comment => (&mut b.comments, &mut c.comments),
+            SignalType::Review => (&mut self.breakdown.reviews, &mut self.counts.reviews),
+            SignalType::ReviewComment => (&mut self.breakdown.review_comments, &mut self.counts.review_comments),
+            SignalType::IssueOpen | SignalType::IssueClose => (&mut self.breakdown.issues, &mut self.counts.issues),
+            SignalType::Comment => (&mut self.breakdown.comments, &mut self.counts.comments),
             SignalType::Spam => return,
         };
         *score += points;
-        *count += 1;
+        *count = count.saturating_add(1);
         if s.kind == SignalType::Commit {
-            // Line counts are untrusted input. Saturate instead of overflowing. Legacy summed f64 values.
             self.additions = self.additions.saturating_add(s.metadata.additions.unwrap_or(0));
             self.deletions = self.deletions.saturating_add(s.metadata.deletions.unwrap_or(0));
         }
     }
 
-    fn finish(&mut self, running: (f64, f64)) -> Result<(), ScoringError> {
-        self.breakdown.penalties = running.1;
-        self.score = 0f64.max(running.0 + running.1);
-        self.check_finite()
-    }
-
-    /// Rejects totals that overflowed. `f64::max` maps NaN to 0, so the parts are checked as well.
-    fn check_finite(&self) -> Result<(), ScoringError> {
+    fn finish(&mut self) -> Result<(), ScoringError> {
         let b = &self.breakdown;
-        let finite = [
+        self.score =
+            (b.commits + b.pull_requests + b.reviews + b.review_comments + b.issues + b.comments + b.penalties)
+                .max(0.0);
+        if [
             self.score,
             b.commits,
             b.pull_requests,
@@ -284,212 +195,173 @@ impl Totals {
             b.penalties,
         ]
         .iter()
-        .all(|v| v.is_finite());
-        if finite {
+        .all(|value| value.is_finite())
+        {
             Ok(())
         } else {
             Err(ScoringError::NonFiniteTotal)
         }
     }
-
-    fn absorb(&mut self, o: &Totals) {
-        let (b, ob) = (&mut self.breakdown, &o.breakdown);
-        self.score += o.score;
-        b.commits += ob.commits;
-        b.pull_requests += ob.pull_requests;
-        b.reviews += ob.reviews;
-        b.review_comments += ob.review_comments;
-        b.issues += ob.issues;
-        b.comments += ob.comments;
-        b.penalties += ob.penalties;
-        let (c, oc) = (&mut self.counts, &o.counts);
-        c.commits += oc.commits;
-        c.pull_requests += oc.pull_requests;
-        c.reviews += oc.reviews;
-        c.review_comments += oc.review_comments;
-        c.issues += oc.issues;
-        c.comments += oc.comments;
-        self.additions = self.additions.saturating_add(o.additions);
-        self.deletions = self.deletions.saturating_add(o.deletions);
-    }
 }
 
-/// Groups items by key in first-appearance order, as a JavaScript `Map` iterates.
-fn group_by<'a, T, K: Hash + Eq>(items: impl IntoIterator<Item = &'a T>, key: impl Fn(&'a T) -> K) -> Vec<Vec<&'a T>> {
-    let mut index = HashMap::new();
-    let mut groups: Vec<Vec<&T>> = Vec::new();
-    for item in items {
-        let i = *index.entry(key(item)).or_insert_with(|| {
-            groups.push(Vec::new());
-            groups.len() - 1
-        });
-        groups[i].push(item);
-    }
-    groups
-}
-
-/// Sorts by score descending (stable) and assigns 1-based ranks. S8: ties get distinct ranks.
-fn rank<T>(mut rows: Vec<T>, score: impl Fn(&T) -> f64, set_rank: impl Fn(&mut T, u32)) -> Vec<T> {
-    // Scores are finite and never -0.0 here, so `total_cmp` orders them as legacy `b - a` does.
+fn rank<T>(rows: &mut [T], score: impl Fn(&T) -> f64, set_rank: impl Fn(&mut T, u32)) {
     rows.sort_by(|a, b| score(b).total_cmp(&score(a)));
     for (i, row) in rows.iter_mut().enumerate() {
         set_rank(row, u32::try_from(i + 1).unwrap_or(u32::MAX));
     }
-    rows
 }
 
-/// Per-user totals in first-appearance order (legacy `computeScores`).
-fn user_totals<'s>(signals: &[&'s Signal], compiled: &Compiled) -> Result<Vec<(&'s Signal, Totals)>, ScoringError> {
-    let mut out = Vec::new();
-    for group in group_by(signals.iter().copied(), |s| s.user_id) {
-        let mut ctx = Context::new();
-        let mut totals = Totals::default();
-        let mut running = (0.0, 0.0);
-        let mut last_week = None;
-        for t in timed(&group)? {
-            if last_week != Some(t.week) {
-                last_week = Some(t.week);
-                ctx.weekly = [0; N];
-            }
-            let (points, penalty) = compiled.score(t.signal, &mut ctx, false);
-            totals.add_signal(t.signal, points, penalty, &mut running);
-        }
-        totals.finish(running)?;
-        out.push((group[0], totals));
-    }
-    Ok(out)
+struct TeamEntry {
+    row: TeamScore,
+    members: HashSet<i64>,
+    repositories: HashSet<String>,
 }
 
-/// Contributor leaderboard (legacy `buildLeaderboard(computeScores(...))`).
-///
-/// # Errors
-/// See [`ScoringError`]: an invalid timestamp, a non-finite ruleset number, or an overflowed total.
-pub fn contributor_leaderboard(signals: &[Signal], rules: &Ruleset) -> Result<Vec<ContributorScore>, ScoringError> {
-    let compiled = Compiled::new(rules, true)?;
-    let refs: Vec<&Signal> = signals.iter().collect();
-    let rows = user_totals(&refs, &compiled)?
-        .into_iter()
-        .map(|(first, totals)| ContributorScore {
-            user_id: first.user_id,
-            user_login: first.user_login.clone(),
-            totals,
-            rank: 0,
-        })
-        .collect();
-    Ok(rank(rows, |r| r.totals.score, |r, n| r.rank = n))
-}
-
-/// Repository leaderboard: unlike contributors, no quota, decay, or first-activity multiplier.
-///
-/// # Errors
-/// See [`ScoringError`]: an invalid timestamp, a non-finite ruleset number, or an overflowed total.
-pub fn repository_leaderboard(signals: &[Signal], rules: &Ruleset) -> Result<Vec<RepositoryScore>, ScoringError> {
-    let compiled = Compiled::new(rules, false)?;
-    let mut rows = Vec::new();
-    for group in group_by(signals, |s| s.repo.as_str()) {
-        let mut ctx = Context::new();
-        let mut totals = Totals::default();
-        let mut running = (0.0, 0.0);
-        for t in timed(&group)? {
-            let (points, penalty) = compiled.score(t.signal, &mut ctx, true);
-            totals.add_signal(t.signal, points, penalty, &mut running);
-        }
-        totals.finish(running)?;
-        rows.push(RepositoryScore {
-            repo_name: group[0].repo.clone(),
-            totals,
-            rank: 0,
+fn build_teams(memberships: &[TeamMembership]) -> (Vec<TeamEntry>, HashMap<i64, Vec<usize>>) {
+    let mut teams: Vec<TeamEntry> = Vec::new();
+    let mut team_index: HashMap<&str, usize> = HashMap::new();
+    let mut member_teams: HashMap<i64, Vec<usize>> = HashMap::new();
+    for membership in memberships {
+        let index = *team_index.entry(membership.team_slug.as_str()).or_insert_with(|| {
+            let index = teams.len();
+            teams.push(TeamEntry {
+                row: TeamScore {
+                    team_slug: membership.team_slug.clone(),
+                    team_name: membership.team_name.clone(),
+                    member_count: 0,
+                    totals: Totals::default(),
+                    rank: 0,
+                },
+                members: HashSet::new(),
+                repositories: HashSet::new(),
+            });
+            index
         });
+        let team = &mut teams[index];
+        if team.members.insert(membership.user_id) {
+            member_teams.entry(membership.user_id).or_default().push(index);
+        }
+        if let Some(names) = &membership.repository_names {
+            team.repositories.extend(names.iter().cloned());
+        }
     }
-    Ok(rank(rows, |r| r.totals.score, |r, n| r.rank = n))
+    for team in &mut teams {
+        team.row.member_count = u32::try_from(team.members.len()).unwrap_or(u32::MAX);
+    }
+    (teams, member_teams)
 }
 
-/// Team leaderboard: sum per-member scores, filtered to listed repositories when present.
+/// Score one snapshot in event time order. Every view receives the same points for each event.
 ///
 /// # Errors
-/// See [`ScoringError`]: an invalid timestamp, a non-finite ruleset number, or an overflowed total.
+/// Returns an error for invalid rules, timestamps, or overflowing totals.
+pub fn scoreboards(
+    signals: &[&Signal],
+    rules: &Ruleset,
+    memberships: &[TeamMembership],
+) -> Result<Scoreboards, ScoringError> {
+    let compiled = Compiled::new(rules)?;
+    let mut ordered = Vec::with_capacity(signals.len());
+    for (index, signal) in signals.iter().enumerate() {
+        let time = DateTime::parse_from_rfc3339(&signal.event_timestamp)
+            .ok()
+            .filter(|ts| ts.nanosecond() < 1_000_000_000)
+            .ok_or_else(|| ScoringError::InvalidTimestamp(signal.event_timestamp.clone()))?
+            .to_utc();
+        ordered.push((time, index));
+    }
+    ordered.sort_by_key(|(time, _)| *time);
+
+    let (mut teams, member_teams) = build_teams(memberships);
+
+    let mut contributors = Vec::<ContributorScore>::new();
+    let mut contributor_index = HashMap::<i64, usize>::new();
+    let mut states = HashMap::<i64, State>::new();
+    let mut repositories = Vec::<RepositoryScore>::new();
+    let mut repository_index = HashMap::<&str, usize>::new();
+    for (time, index) in ordered {
+        let s = signals[index];
+        let day = time.date_naive();
+        let week = day.iso_week();
+        let (points, penalty) =
+            compiled.points(s, states.entry(s.user_id).or_default(), day, (week.year(), week.week()));
+        let user = *contributor_index.entry(s.user_id).or_insert_with(|| {
+            let index = contributors.len();
+            contributors.push(ContributorScore {
+                user_id: s.user_id,
+                user_login: s.user_login.clone(),
+                totals: Totals::default(),
+                rank: 0,
+            });
+            index
+        });
+        if contributors[user].user_login != s.user_login {
+            contributors[user].user_login.clone_from(&s.user_login);
+        }
+        contributors[user].totals.record(s, points, penalty);
+        let repo = *repository_index.entry(s.repo.as_str()).or_insert_with(|| {
+            let index = repositories.len();
+            repositories.push(RepositoryScore {
+                repo_name: s.repo.clone(),
+                totals: Totals::default(),
+                rank: 0,
+            });
+            index
+        });
+        repositories[repo].totals.record(s, points, penalty);
+        if let Some(indices) = member_teams.get(&s.user_id) {
+            for &index in indices {
+                let team = &mut teams[index];
+                if team.repositories.is_empty() || team.repositories.contains(&s.repo) {
+                    team.row.totals.record(s, points, penalty);
+                }
+            }
+        }
+    }
+    for row in &mut contributors {
+        row.totals.finish()?;
+    }
+    for row in &mut repositories {
+        row.totals.finish()?;
+    }
+    let mut teams: Vec<TeamScore> = teams.into_iter().map(|team| team.row).collect();
+    for row in &mut teams {
+        row.totals.finish()?;
+    }
+    rank(&mut contributors, |row| row.totals.score, |row, rank| row.rank = rank);
+    rank(&mut repositories, |row| row.totals.score, |row, rank| row.rank = rank);
+    rank(&mut teams, |row| row.totals.score, |row, rank| row.rank = rank);
+    Ok(Scoreboards {
+        contributors,
+        repositories,
+        teams,
+    })
+}
+
+/// Contributor leaderboard for all supplied signals.
+///
+/// # Errors
+/// Returns an error for invalid rules, timestamps, or overflowing totals.
+pub fn contributor_leaderboard(signals: &[Signal], rules: &Ruleset) -> Result<Vec<ContributorScore>, ScoringError> {
+    Ok(scoreboards(&signals.iter().collect::<Vec<_>>(), rules, &[])?.contributors)
+}
+
+/// Repository leaderboard using the same scored events as contributors.
+///
+/// # Errors
+/// Returns an error for invalid rules, timestamps, or overflowing totals.
+pub fn repository_leaderboard(signals: &[Signal], rules: &Ruleset) -> Result<Vec<RepositoryScore>, ScoringError> {
+    Ok(scoreboards(&signals.iter().collect::<Vec<_>>(), rules, &[])?.repositories)
+}
+
+/// Team leaderboard; team repository restrictions apply after per-user scoring.
+///
+/// # Errors
+/// Returns an error for invalid rules, timestamps, or overflowing totals.
 pub fn team_leaderboard(
     signals: &[Signal],
     rules: &Ruleset,
     memberships: &[TeamMembership],
 ) -> Result<Vec<TeamScore>, ScoringError> {
-    let compiled = Compiled::new(rules, true)?;
-    let mut rows = Vec::new();
-    for team in group_by(memberships, |m| m.team_slug.as_str()) {
-        let members: HashSet<i64> = team.iter().map(|m| m.user_id).collect();
-        let repos: HashSet<&str> = team
-            .iter()
-            .flat_map(|m| m.repository_names.iter().flatten())
-            .map(String::as_str)
-            .collect();
-        let selected: Vec<&Signal> = signals
-            .iter()
-            .filter(|s| members.contains(&s.user_id) && (repos.is_empty() || repos.contains(s.repo.as_str())))
-            .collect();
-        let mut totals = Totals::default();
-        for (_, user) in user_totals(&selected, &compiled)? {
-            totals.absorb(&user);
-        }
-        totals.check_finite()?;
-        rows.push(TeamScore {
-            team_slug: team[0].team_slug.clone(),
-            team_name: team[0].team_name.clone(),
-            member_count: u32::try_from(members.len()).unwrap_or(u32::MAX),
-            totals,
-            rank: 0,
-        });
-    }
-    Ok(rank(rows, |r| r.totals.score, |r, n| r.rank = n))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::model::Metadata;
-
-    fn signal(kind: SignalType, ts: &str) -> Signal {
-        Signal {
-            user_id: 1,
-            user_login: "u".into(),
-            kind,
-            repo: "r".into(),
-            event_timestamp: ts.into(),
-            metadata: Metadata::default(),
-        }
-    }
-
-    #[test]
-    fn invalid_timestamp_is_an_error() {
-        let err = contributor_leaderboard(&[signal(SignalType::Commit, "yesterday")], &Ruleset::legacy_default());
-        assert_eq!(err, Err(ScoringError::InvalidTimestamp("yesterday".into())));
-    }
-
-    #[test]
-    fn eleventh_weekly_commit_is_diminished() {
-        let days = [
-            "2026-01-05",
-            "2026-01-05",
-            "2026-01-05",
-            "2026-01-06",
-            "2026-01-06",
-            "2026-01-06",
-            "2026-01-07",
-            "2026-01-07",
-            "2026-01-07",
-            "2026-01-08",
-            "2026-01-08",
-        ];
-        let signals: Vec<_> = days
-            .iter()
-            .enumerate()
-            .map(|(i, d)| signal(SignalType::Commit, &format!("{d}T{i:02}:00:00Z")))
-            .collect();
-        let rows = contributor_leaderboard(&signals, &Ruleset::legacy_default()).unwrap();
-        let expected = 4.0 * 15.0 + 6.0 * 10.0 + 10.0 * (1.0 - 0.11);
-        assert!(
-            (rows[0].totals.score - expected).abs() < 1e-9,
-            "{}",
-            rows[0].totals.score
-        );
-    }
+    Ok(scoreboards(&signals.iter().collect::<Vec<_>>(), rules, memberships)?.teams)
 }

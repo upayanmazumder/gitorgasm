@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"testing"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	"github.com/upayanmazumder/gitorgasm/core/internal/github"
 	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi"
 	"github.com/upayanmazumder/gitorgasm/core/internal/jobs"
+	"github.com/upayanmazumder/gitorgasm/core/internal/scorer"
 	"github.com/upayanmazumder/gitorgasm/core/internal/secure"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store"
 	"github.com/upayanmazumder/gitorgasm/core/internal/testdb"
@@ -58,7 +60,7 @@ func newHarness(t *testing.T) *harness {
 	cfg := &config.Config{AppOrigin: origin, CookieSecure: true, SessionTTL: time.Hour, GitHub: gh}
 	s := &httpapi.Server{
 		Pool: pool, Jobs: jobClient, Sealer: sealer, Cfg: cfg, GitHub: github.New(gh),
-		Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Now: time.Now,
+		Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Now: time.Now, Scorer: testScorer(),
 	}
 
 	doc, err := openapi3.NewLoader().LoadFromFile("../../../contracts/openapi/v1.yaml")
@@ -73,6 +75,11 @@ func newHarness(t *testing.T) *harness {
 		t.Fatal(err)
 	}
 	return &harness{t: t, pool: pool, srv: s.Handler(), router: router}
+}
+
+// testScorer runs the binary that `make test` builds and exports as SCORING_BIN.
+func testScorer() *scorer.Runner {
+	return scorer.New(os.Getenv("SCORING_BIN"), 2, 5*time.Second)
 }
 
 // do sends a request and validates the response against the OpenAPI contract.

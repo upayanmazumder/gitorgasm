@@ -202,7 +202,7 @@ After Gitorgasm: CPU requests 3080m (77%), free 920m. Memory requests 6750Mi (87
 
 Constraints that go with this budget:
 
-- Postgres: `shared_buffers=64MB`, `work_mem=4MB`, PVC 2Gi on `/srv/data`. Use a pool in the app. **Update**: the manifests set `max_connections=60`, `DB_MAX_CONNS=8` for the api, and `DB_MAX_CONNS=12` for the worker (`deploy/kustomize/base/postgres.yaml`, `base/config.env`, `base/worker.yaml`; budget in `deployment-topology.md` §3).
+- Postgres: `shared_buffers=64MB`, `work_mem=4MB`, PVC 2Gi on `/srv/data`. Use a pool in the app. **Update**: the manifests set `max_connections=60`, `DB_MAX_CONNS=8` for the api, and `DB_MAX_CONNS=13` for the worker (`deploy/kustomize/base/postgres.yaml`, `base/config.env`, `base/worker.yaml`; budget in `deployment-topology.md` §3).
 - No separate Redis or NATS in phase 1. Use Postgres for queues (`SELECT … FOR UPDATE SKIP LOCKED`) and for cache tables. Add Valkey (64Mi request) only if measurements show the need.
 - Expose `/metrics` with `prometheus.io/scrape: "true"` and port annotations. No ServiceMonitor.
 - If the worker is bursty, scale it with a KEDA `postgresql` trigger, min 1, max 2. Add `ignoreDifferences` for `/spec/replicas`.

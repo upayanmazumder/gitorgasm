@@ -3,7 +3,8 @@ name: gitorgasm
 
 x-core: &core
   build:
-    context: core
+    context: .
+    dockerfile: core/Dockerfile
   env_file:
     - path: .env.local
       required: true

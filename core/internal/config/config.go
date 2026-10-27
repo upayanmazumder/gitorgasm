@@ -47,6 +47,7 @@ type Config struct {
 	WorkerCount        int
 	ReconcileEvery     time.Duration
 	ShutdownTimeout    time.Duration
+	ScoringBin         string  // Rust score binary run by the api and worker
 	GitHub             *GitHub // nil when the integration is not configured
 }
 
@@ -115,8 +116,12 @@ func Load(mode Mode) (*Config, error) {
 		return c, errors.Join(errs...)
 	}
 	if mode == ModeWorker && workers > 0 && int(c.DBMaxConns) < minWorkerConns(workers) {
-		errs = append(errs, fmt.Errorf("DB_MAX_CONNS must be at least %d for WORKER_CONCURRENCY=%d (2 queues x workers + %d for River)",
+		errs = append(errs, fmt.Errorf("DB_MAX_CONNS must be at least %d for WORKER_CONCURRENCY=%d (2 queues x workers + 1 scoring job + %d for River)",
 			minWorkerConns(workers), workers, riverConns))
+	}
+	c.ScoringBin = get("SCORING_BIN", "/gitorgasm-score")
+	if info, err := os.Stat(c.ScoringBin); err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
+		errs = append(errs, fmt.Errorf("SCORING_BIN must name an executable file, got %q", c.ScoringBin))
 	}
 
 	if mode == ModeAPI {
@@ -141,8 +146,8 @@ func Load(mode Mode) (*Config, error) {
 // riverConns reserves connections for River's listener, fetching, completion, election, and maintenance.
 const riverConns = 4
 
-// minWorkerConns reserves one connection per job across both queues plus River headroom.
-func minWorkerConns(workers int) int { return 2*workers + riverConns }
+// minWorkerConns reserves one connection per job across both queues, one for scoring, and River headroom.
+func minWorkerConns(workers int) int { return 2*workers + 1 + riverConns }
 
 var githubKeys = []string{
 	"GITHUB_APP_ID", "GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "GITHUB_PRIVATE_KEY",

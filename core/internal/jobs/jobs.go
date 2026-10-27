@@ -15,11 +15,14 @@ import (
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 
 	"github.com/upayanmazumder/gitorgasm/core/internal/github"
+	"github.com/upayanmazumder/gitorgasm/core/internal/scorer"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store"
 )
 
 // QueueGitHub limits GitHub concurrency per worker replica.
 const QueueGitHub = "github"
+
+const QueueScoring = "scoring"
 
 // SyncInstallationArgs requests a full repository sync of one installation.
 type SyncInstallationArgs struct {
@@ -76,12 +79,15 @@ type WorkerOptions struct {
 	Concurrency    int
 	ReconcileEvery time.Duration
 	Logger         *slog.Logger
+	Scorer         *scorer.Runner
 }
 
 // NewWorkerClient returns a River client that executes jobs.
 func NewWorkerClient(pool *pgxpool.Pool, gh *github.Client, opts WorkerOptions) (*river.Client[pgx.Tx], error) {
 	workers := river.NewWorkers()
 	river.AddWorker(workers, &SyncWorker{Pool: pool, GitHub: gh, Now: time.Now})
+	river.AddWorker(workers, &IngestWorker{Pool: pool, GitHub: gh, Now: time.Now})
+	river.AddWorker(workers, &ScoreWorker{Pool: pool, Scorer: opts.Scorer})
 	river.AddWorker(workers, &WebhookWorker{Pool: pool, GitHub: gh})
 	river.AddWorker(workers, &ReconcileWorker{Pool: pool})
 	river.AddWorker(workers, &PurgeSessionsWorker{Pool: pool, Now: time.Now, Log: opts.Logger})
@@ -92,6 +98,7 @@ func NewWorkerClient(pool *pgxpool.Pool, gh *github.Client, opts WorkerOptions) 
 		Queues: map[string]river.QueueConfig{
 			river.QueueDefault: {MaxWorkers: opts.Concurrency},
 			QueueGitHub:        {MaxWorkers: opts.Concurrency},
+			QueueScoring:       {MaxWorkers: 1},
 		},
 		PeriodicJobs: []*river.PeriodicJob{
 			river.NewPeriodicJob(river.PeriodicInterval(opts.ReconcileEvery),
@@ -121,24 +128,13 @@ func (w *SyncWorker) Timeout(*river.Job[SyncInstallationArgs]) time.Duration { r
 const syncLockKey = `hashtextextended('gitorgasm:sync_installation:' || $1::bigint::text, 0)`
 
 func (w *SyncWorker) Work(ctx context.Context, job *river.Job[SyncInstallationArgs]) error {
-	id := job.Args.InstallationID
-	// Hold one connection and session lock for the full pass to prevent out-of-order tombstones.
-	conn, err := w.Pool.Acquire(ctx)
-	if err != nil {
-		return err
-	}
-	defer conn.Release()
-	var locked bool
-	if err := conn.QueryRow(ctx, `SELECT pg_try_advisory_lock(`+syncLockKey+`)`, id).Scan(&locked); err != nil {
-		return err
-	}
-	if !locked {
-		return river.JobSnooze(30 * time.Second)
-	}
-	defer func() {
-		_, _ = conn.Exec(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock(`+syncLockKey+`)`, id)
-	}()
+	// One connection holds the session lock for the full pass to prevent out-of-order tombstones.
+	return withSessionLock(ctx, w.Pool, syncLockKey, job.Args.InstallationID, func(conn *pgxpool.Conn) error {
+		return w.sync(ctx, conn, job.Args.InstallationID)
+	})
+}
 
+func (w *SyncWorker) sync(ctx context.Context, conn *pgxpool.Conn, id int64) error {
 	inst, err := w.GitHub.GetInstallation(ctx, id)
 	if github.IsKind(err, github.KindNotFound) {
 		w.GitHub.ForgetInstallation(id)
@@ -169,10 +165,54 @@ func (w *SyncWorker) Work(ctx context.Context, job *river.Job[SyncInstallationAr
 		}
 		return retryDecision(err)
 	}
-	if _, err := store.TombstoneUnseenRepositories(ctx, conn, id, started); err != nil {
+	client, err := insertClient(ctx, w.Pool)
+	if err != nil {
 		return err
 	}
-	return store.SyncFinished(ctx, conn, id, seen, "")
+	return pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+		if _, err := store.TombstoneUnseenRepositories(ctx, tx, id, started); err != nil {
+			return err
+		}
+		if err := store.SyncFinished(ctx, tx, id, seen, ""); err != nil {
+			return err
+		}
+		_, err := client.InsertTx(ctx, tx, IngestContributionsArgs{InstallationID: id}, nil)
+		return err
+	})
+}
+
+// withSessionLock runs fn on one pooled connection that holds a session advisory lock. A
+// connection whose unlock fails is closed, so a held lock never returns to the pool.
+func withSessionLock(ctx context.Context, pool *pgxpool.Pool, key string, id int64, fn func(*pgxpool.Conn) error) error {
+	conn, err := pool.Acquire(ctx)
+	if err != nil {
+		return err
+	}
+	var locked bool
+	if err := conn.QueryRow(ctx, `SELECT pg_try_advisory_lock(`+key+`)`, id).Scan(&locked); err != nil {
+		conn.Release()
+		return err
+	}
+	if !locked {
+		conn.Release()
+		return river.JobSnooze(30 * time.Second)
+	}
+	err = fn(conn)
+	cleanup := context.WithoutCancel(ctx)
+	if _, uerr := conn.Exec(cleanup, `SELECT pg_advisory_unlock(`+key+`)`, id); uerr != nil {
+		_ = conn.Hijack().Close(cleanup)
+		return errors.Join(err, uerr)
+	}
+	conn.Release()
+	return err
+}
+
+// insertClient reuses the worker's River client and builds an insert-only client outside River.
+func insertClient(ctx context.Context, pool *pgxpool.Pool) (*river.Client[pgx.Tx], error) {
+	if client, err := river.ClientFromContextSafely[pgx.Tx](ctx); err == nil {
+		return client, nil
+	}
+	return NewInsertClient(pool)
 }
 
 // retryDecision delays rate limits, stops on permission errors, and otherwise lets River back off.

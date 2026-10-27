@@ -9,7 +9,7 @@ Validate with `make manifests`. CI renders the production overlay and schema-val
 
 Non-secret settings are in `base/config.env` and `overlays/production/config.env`. The variable names are the names that `core/internal/config/config.go` reads. Kustomize adds a content hash to the ConfigMap name, so a changed value rolls the pods that use it.
 
-The worker overrides `DB_MAX_CONNS` in `base/worker.yaml`. The value must be at least 2 × `WORKER_CONCURRENCY` + 4, or the worker does not start.
+The worker overrides `DB_MAX_CONNS` in `base/worker.yaml`. The value must be at least 2 × `WORKER_CONCURRENCY` + 5, or the worker does not start.
 
 The API init container runs goose before River. Existing production databases already have goose version 1 (`core/internal/db/migrations/00001_core.sql`); new releases apply `00002_schema_hardening.sql` and `00003_concurrent_indexes.sql` forward, then later versions in order. Never replace or renumber version 1. If a migration fails, the new API pod does not start and the old replica continues serving; do not run a down migration in production.
 

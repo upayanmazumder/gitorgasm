@@ -54,13 +54,19 @@ down: ## Stop the local stack (keeps the database volume)
 db: .env.local ## Start only postgres (used by tests)
 	docker compose up -d --wait postgres
 
+SCORE_DEV_BIN := $(abspath $(SCORING))/target/debug/score
+
+.PHONY: score-bin
+score-bin: ## Build the Rust score binary used by host runs and Go tests
+	cd $(SCORING) && cargo build --locked --bin score
+
 .PHONY: run-api
-run-api: db ## Run migrations, then the API on the host (go run)
-	set -a && . ./.env.local && set +a && cd $(CORE) && go run ./cmd/gitorgasm migrate && go run ./cmd/gitorgasm api
+run-api: db score-bin ## Run migrations, then the API on the host (go run)
+	set -a && . ./.env.local && set +a && cd $(CORE) && go run ./cmd/gitorgasm migrate && SCORING_BIN=$(SCORE_DEV_BIN) go run ./cmd/gitorgasm api
 
 .PHONY: run-worker
-run-worker: db ## Run the worker on the host (go run; needs the GITHUB_* group)
-	set -a && . ./.env.local && set +a && cd $(CORE) && METRICS_ADDR=:9091 go run ./cmd/gitorgasm worker
+run-worker: db score-bin ## Run the worker on the host (go run; needs the GITHUB_* group)
+	set -a && . ./.env.local && set +a && cd $(CORE) && METRICS_ADDR=:9091 SCORING_BIN=$(SCORE_DEV_BIN) go run ./cmd/gitorgasm worker
 
 .PHONY: smoke
 smoke: up ## Start the stack and check health, readiness, and an authenticated route
@@ -87,8 +93,8 @@ lint: ## Lint and format-check all code
 	go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 
 .PHONY: test-go
-test-go: db ## Go tests against an isolated database per test
-	cd $(CORE) && go test -race -count=1 ./...
+test-go: db score-bin ## Go tests against an isolated database per test
+	cd $(CORE) && SCORING_BIN="$(SCORE_DEV_BIN)" go test -race -count=1 ./...
 
 .PHONY: test
 test: test-go ## Run all tests
@@ -103,7 +109,11 @@ build: ## Build binaries, the web app, and the container image
 	cd $(BENCH)/rust && cargo build --release --locked
 	cd $(SCORING) && cargo build --release --locked
 	cd $(WEB) && SKIP_ENV_VALIDATION=true pnpm build
-	docker build -t gitorgasm-core:dev $(CORE)
+	docker build -f $(CORE)/Dockerfile -t gitorgasm-core:dev .
+
+.PHONY: score-bench
+score-bench: ## Measure 100,000 scored contributions within 60 seconds
+	cd $(SCORING) && cargo run --release --locked --bin score-bench -- --limit-seconds 60
 
 .PHONY: manifests
 manifests: ## Render and schema-validate Kubernetes manifests
