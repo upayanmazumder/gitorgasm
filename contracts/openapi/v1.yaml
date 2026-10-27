@@ -158,9 +158,13 @@ paths:
   /v1/organizations/{login}/scores:
     get:
       summary: Get the latest daily organization scores and their freshness.
+      description: |
+        `fresh` is false when the last ingest failed, scoring has not caught up, or the data
+        is older than 24 hours. 503 `scores_pending` means no scores exist yet.
       parameters:
         - { name: login, in: path, required: true, schema: { type: string } }
       responses:
+        default: { $ref: '#/components/responses/Error' }
         '200':
           description: Stored scores
           content:
@@ -172,6 +176,10 @@ paths:
   /v1/organizations/{login}/scores/query:
     post:
       summary: Score an organization with a time period, filters, and rules.
+      description: |
+        A named period without `as_of` resolves against the latest ingest time. Results are
+        cached per data generation and query. 503 `scores_pending` means the current data is
+        not scored yet; 503 `scores_busy` means every scorer slot is in use.
       parameters:
         - { name: login, in: path, required: true, schema: { type: string } }
       requestBody:
@@ -180,6 +188,7 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/ScoreQuery' }
       responses:
+        default: { $ref: '#/components/responses/Error' }
         '200':
           description: Scores for the requested options
           content:
@@ -187,6 +196,7 @@ paths:
               schema: { $ref: '#/components/schemas/Scores' }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
   /v1/organizations/{login}/scores/presets:
@@ -195,13 +205,15 @@ paths:
       parameters:
         - { name: login, in: path, required: true, schema: { type: string } }
       responses:
+        default: { $ref: '#/components/responses/Error' }
         '200':
-          description: Saved scoring options
+          description: Saved scoring options, ordered by name
           content:
             application/json:
               schema:
                 type: object
                 required: [data]
+                additionalProperties: false
                 properties:
                   data:
                     type: array
@@ -210,16 +222,18 @@ paths:
         '404': { $ref: '#/components/responses/Error' }
   /v1/organizations/{login}/scores/presets/{name}:
     put:
-      summary: Save scoring options for an organization.
+      summary: Save scoring options for an organization (at most 50 presets).
+      description: The name is trimmed. A named period is stored without `as_of`.
       parameters:
         - { name: login, in: path, required: true, schema: { type: string } }
-        - { name: name, in: path, required: true, schema: { type: string, maxLength: 80 } }
+        - { name: name, in: path, required: true, schema: { type: string } }
       requestBody:
         required: true
         content:
           application/json:
             schema: { $ref: '#/components/schemas/ScoreQuery' }
       responses:
+        default: { $ref: '#/components/responses/Error' }
         '200':
           description: Saved options
           content:
@@ -227,16 +241,21 @@ paths:
               schema: { $ref: '#/components/schemas/ScorePreset' }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
     delete:
-      summary: Remove saved scoring options.
+      summary: Remove saved scoring options. The name is trimmed.
       parameters:
         - { name: login, in: path, required: true, schema: { type: string } }
         - { name: name, in: path, required: true, schema: { type: string } }
       responses:
+        default: { $ref: '#/components/responses/Error' }
         '204': { description: Removed }
+        '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
   /webhooks/github:
     post:
@@ -371,7 +390,11 @@ components:
       properties:
         period:
           type: object
-          description: All time, a custom RFC3339 range, or a named period with as_of.
+          description: |
+            All time, a custom range (start inclusive, end exclusive), or a named UTC period.
+            Named periods use as_of as the exclusive end; the server fills it in when absent.
+          additionalProperties: false
+          required: [kind]
           properties:
             kind: { type: string, enum: [all, custom, preset] }
             start: { type: string, format: date-time }
@@ -380,11 +403,14 @@ components:
             as_of: { type: string, format: date-time }
         filter:
           type: object
+          additionalProperties: false
           properties:
             preset: { type: string, enum: [all, code, reviews, issues] }
             users: { type: array, items: { type: integer, format: int64 } }
             repositories: { type: array, items: { type: string } }
-            kinds: { type: array, items: { type: string } }
+            kinds:
+              type: array
+              items: { type: string, enum: [commit, pr_open, pr_merge, review, issue_open, issue_close] }
             excludeBots: { type: boolean }
             search: { type: string, nullable: true }
         rules:
@@ -393,22 +419,36 @@ components:
     ScorePreset:
       type: object
       required: [name, query]
+      additionalProperties: false
       properties:
-        name: { type: string }
+        name: { type: string, minLength: 1, maxLength: 80 }
         query: { $ref: '#/components/schemas/ScoreQuery' }
+    ScoreRow:
+      type: object
+      required: [score, counts, breakdown, rank]
+      properties:
+        userId: { type: integer, format: int64 }
+        userLogin: { type: string }
+        repoName: { type: string }
+        score: { type: number }
+        rank: { type: integer }
+        breakdown: { type: object }
+        counts: { type: object }
     Scores:
       type: object
       required: [data, state, fresh]
+      additionalProperties: false
       properties:
         data:
           type: object
           required: [contributors, repositories, teams]
           properties:
-            contributors: { type: array, items: { type: object } }
-            repositories: { type: array, items: { type: object } }
-            teams: { type: array, items: { type: object } }
+            contributors: { type: array, items: { $ref: '#/components/schemas/ScoreRow' } }
+            repositories: { type: array, items: { $ref: '#/components/schemas/ScoreRow' } }
+            teams: { type: array, items: { $ref: '#/components/schemas/ScoreRow' } }
         state:
           type: object
+          additionalProperties: false
           required: [generation, scored_generation, last_ingested_at, last_scored_at, ingestion_failed]
           properties:
             generation: { type: integer, format: int64 }

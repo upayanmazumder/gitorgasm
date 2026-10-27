@@ -65,35 +65,35 @@ fn invalid_period_event_and_schema_fail_without_success_json() {
     let base = json!({"organization":"org", "signals":[], "memberships":[],
         "query":{"period":{"kind":"preset","preset":"today"}}});
     let output = invoke(&base);
-    assert!(!output.status.success());
-    assert!(output.stdout.is_empty());
-    assert!(!output.stderr.is_empty());
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "");
+    assert_ne!(String::from_utf8_lossy(&output.stderr), "");
 
     let output =
         invoke(&json!({"organization":"org", "signals":[event("commit", "invalid")], "memberships":[], "query":{}}));
-    assert!(!output.status.success());
-    assert!(output.stdout.is_empty());
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "");
 
     let output = invoke(&json!({"organization":"", "signals":[], "memberships":[], "query":{}}));
-    assert!(!output.status.success());
-    assert!(output.stdout.is_empty());
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "");
 }
 
 #[test]
 fn validates_bare_query_without_scoring() {
     let output = invoke_mode(&json!({}), Some("--validate-query"));
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-    assert!(output.stdout.is_empty());
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "");
 
     let output = invoke_mode(
         &json!({"period":{"kind":"custom",
         "start":"2026-01-05T00:00:00Z","end":"2026-01-05T00:00:00Z"}}),
         Some("--validate-query"),
     );
-    assert!(!output.status.success());
-    assert!(output.stdout.is_empty());
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "");
 
     let output = invoke_mode(&json!({"filter":{"preset":"not_a_filter"}}), Some("--validate-query"));
-    assert!(!output.status.success());
-    assert!(output.stdout.is_empty());
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "");
 }

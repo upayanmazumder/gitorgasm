@@ -43,49 +43,52 @@ type IngestWorker struct {
 	Now    func() time.Time
 }
 
+// River rescues jobs that run longer than one hour, so one attempt stops well before that and
+// snoozes. The next attempt resumes the same run from the stored cursors.
+const (
+	ingestTimeout = 50 * time.Minute
+	ingestBudget  = 40 * time.Minute
+)
+
 func (w *IngestWorker) Timeout(*river.Job[IngestContributionsArgs]) time.Duration {
-	return 3 * time.Hour
+	return ingestTimeout
 }
 
 const ingestLockKey = `hashtextextended('gitorgasm:ingest_contributions:' || $1::bigint::text, 0)`
 
 func (w *IngestWorker) Work(ctx context.Context, job *river.Job[IngestContributionsArgs]) error {
 	id := job.Args.InstallationID
-	conn, err := w.Pool.Acquire(ctx)
-	if err != nil {
+	return withSessionLock(ctx, w.Pool, ingestLockKey, id, func(conn *pgxpool.Conn) error {
+		err := w.ingest(ctx, conn, id)
+		var snooze *river.JobSnoozeError
+		if err == nil || errors.As(err, &snooze) || ctx.Err() != nil {
+			return err
+		}
+		if ferr := store.RecordIngestionFailure(context.WithoutCancel(ctx), conn, id, err.Error()); ferr != nil {
+			return errors.Join(err, ferr)
+		}
 		return err
-	}
-	defer conn.Release()
-	var locked bool
-	if err := conn.QueryRow(ctx, `SELECT pg_try_advisory_lock(`+ingestLockKey+`)`, id).Scan(&locked); err != nil {
-		return err
-	}
-	if !locked {
-		return river.JobSnooze(30 * time.Second)
-	}
-	defer func() {
-		_, _ = conn.Exec(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock(`+ingestLockKey+`)`, id)
-	}()
+	})
+}
 
-	last, err := store.LastIngestion(ctx, conn, id)
+func (w *IngestWorker) ingest(ctx context.Context, conn *pgxpool.Conn, id int64) error {
+	started := w.Now().UTC()
+	run, err := store.OpenContributionRun(ctx, conn, id, started)
 	if err != nil {
 		return err
 	}
-	until := w.Now().UTC()
-	dayStart := time.Date(until.Year(), until.Month(), until.Day(), 0, 0, 0, 0, time.UTC)
-	if last != nil && !last.Before(dayStart) {
-		return nil
-	}
-	from := time.Date(2008, 1, 1, 0, 0, 0, 0, time.UTC)
-	if last != nil {
-		from = last.Add(-30 * 24 * time.Hour)
-	}
-	if err := store.PruneContributionRuns(ctx, conn, id, until.Add(-30*24*time.Hour)); err != nil {
-		return err
-	}
-	runID, err := store.BeginContributionRun(ctx, conn, id, from, until)
-	if err != nil {
-		return err
+	if run == nil {
+		last, err := store.LastIngestion(ctx, conn, id)
+		if err != nil {
+			return err
+		}
+		dayStart := started.Truncate(24 * time.Hour)
+		if last != nil && !last.Before(dayStart) {
+			return nil
+		}
+		if run, err = store.BeginContributionRun(ctx, conn, id, started); err != nil {
+			return err
+		}
 	}
 
 	var cursor *store.RepoCursor
@@ -95,15 +98,11 @@ func (w *IngestWorker) Work(ctx context.Context, job *river.Job[IngestContributi
 			return err
 		}
 		for _, repo := range repos {
-			owner, name, ok := strings.Cut(repo.FullName, "/")
-			if !ok || owner == "" || name != repo.Name {
-				return fmt.Errorf("invalid repository name for %d", repo.GitHubID)
+			if w.Now().Sub(started) > ingestBudget {
+				return river.JobSnooze(time.Second)
 			}
-			err := w.GitHub.ListContributions(ctx, id, repo.GitHubID, owner, repo.Name, from, until, func(page []github.Contribution) error {
-				return store.StageContributions(ctx, conn, runID, page)
-			})
-			if err != nil {
-				return retryDecision(err)
+			if err := w.ingestRepository(ctx, conn, id, run, repo, started.Add(ingestBudget)); err != nil {
+				return err
 			}
 		}
 		if len(repos) < 100 {
@@ -112,12 +111,12 @@ func (w *IngestWorker) Work(ctx context.Context, job *river.Job[IngestContributi
 		end := repos[len(repos)-1]
 		cursor = &store.RepoCursor{Name: strings.ToLower(end.Name), ID: end.GitHubID}
 	}
-	client, err := NewInsertClient(w.Pool)
+	client, err := insertClient(ctx, w.Pool)
 	if err != nil {
 		return err
 	}
 	return pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
-		generation, err := store.PublishContributionRun(ctx, tx, runID, id)
+		generation, err := store.PublishContributionRun(ctx, tx, run.ID, id)
 		if err != nil {
 			return err
 		}
@@ -126,13 +125,49 @@ func (w *IngestWorker) Work(ctx context.Context, job *river.Job[IngestContributi
 	})
 }
 
-type ScoreWorker struct {
-	river.WorkerDefaults[ScoreOrganizationArgs]
-	Pool *pgxpool.Pool
+// ingestRepository stages one repository page by page. A repository GitHub no longer serves
+// is skipped and keeps its stored events; other failures stop the run so it can resume later.
+func (w *IngestWorker) ingestRepository(ctx context.Context, conn *pgxpool.Conn, id int64, run *store.ContributionRun, repo store.Repository, deadline time.Time) error {
+	progress, err := store.ClaimRunRepository(ctx, conn, run, repo.GitHubID)
+	if err != nil || progress.Finished() {
+		return err
+	}
+	owner, name, ok := strings.Cut(repo.FullName, "/")
+	if !ok || owner == "" || name != repo.Name {
+		return fmt.Errorf("invalid repository name for %d", repo.GitHubID)
+	}
+	fetchCtx, cancel := context.WithDeadline(ctx, deadline)
+	defer cancel()
+	err = w.GitHub.ListContributions(fetchCtx, id, repo.GitHubID, owner, name, progress.Window, progress.Cursor,
+		func(page []github.Contribution, next github.ContributionCursor) error {
+			return pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+				return store.StageContributionPage(ctx, tx, run.ID, repo.GitHubID, page, next)
+			})
+		})
+	switch {
+	case err == nil:
+		return nil
+	case fetchCtx.Err() != nil && ctx.Err() == nil:
+		return river.JobSnooze(time.Second) // Attempt budget spent; staged pages are kept.
+	case github.IsKind(err, github.KindNotFound):
+		return pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
+			return store.SkipRunRepository(ctx, tx, run.ID, repo.GitHubID)
+		})
+	default:
+		return retryDecision(err)
+	}
 }
 
+type ScoreWorker struct {
+	river.WorkerDefaults[ScoreOrganizationArgs]
+	Pool   *pgxpool.Pool
+	Scorer *scorer.Runner
+}
+
+const scoreJobStatementTimeout = 5 * time.Minute
+
 func (w *ScoreWorker) Timeout(*river.Job[ScoreOrganizationArgs]) time.Duration {
-	return 5 * time.Minute
+	return 10 * time.Minute
 }
 
 func (w *ScoreWorker) Work(ctx context.Context, job *river.Job[ScoreOrganizationArgs]) error {
@@ -145,10 +180,18 @@ func (w *ScoreWorker) Work(ctx context.Context, job *river.Job[ScoreOrganization
 		return nil
 	}
 	login, err := store.InstallationLogin(ctx, w.Pool, id, 0)
+	if errors.Is(err, store.ErrNotFound) {
+		return river.JobCancel(err) // Deleted or suspended installation.
+	}
 	if err != nil {
 		return err
 	}
-	result, err := scorer.Calculate(ctx, w.Pool, id, 0, login, json.RawMessage(`{}`))
+	var result json.RawMessage
+	err = scorer.ReadOnly(ctx, w.Pool, scoreJobStatementTimeout, func(tx pgx.Tx) error {
+		var err error
+		result, err = w.Scorer.Calculate(ctx, tx, id, 0, login, json.RawMessage(`{}`))
+		return err
+	})
 	if err != nil {
 		return err
 	}

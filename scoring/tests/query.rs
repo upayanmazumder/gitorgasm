@@ -4,8 +4,8 @@ use std::num::NonZeroUsize;
 
 use chrono::{DateTime, Utc};
 use gitorgasm_scoring::{
-    FilterPreset, Metadata, Period, PeriodPreset, ScoreQuery, ScoringCatalog, ScoringError, Signal, SignalFilter,
-    SignalType, TeamMembership,
+    ContributorScore, FilterPreset, Metadata, Period, PeriodPreset, ScoreQuery, ScoringCatalog, ScoringError, Signal,
+    SignalFilter, SignalType, TeamMembership,
 };
 
 fn instant(value: &str) -> DateTime<Utc> {
@@ -162,7 +162,10 @@ fn filters_search_and_rules_compose_before_scoring() {
         "Alice"
     );
     query.filter.preset = FilterPreset::Reviews;
-    assert!(catalog.query("org", &query).unwrap().contributors.is_empty());
+    assert_eq!(
+        catalog.query("org", &query).unwrap().contributors,
+        [] as [ContributorScore; 0]
+    );
 }
 
 #[test]
@@ -212,7 +215,10 @@ fn bounded_cache_reuses_exact_queries_and_evicts_old_entries() {
     assert_score(catalog.query("org", &all).unwrap().contributors[0].totals.score, 1.0);
     let mut filtered = all.clone();
     filtered.filter.repositories = vec!["other".into()];
-    assert!(catalog.query("org", &filtered).unwrap().contributors.is_empty());
+    assert_eq!(
+        catalog.query("org", &filtered).unwrap().contributors,
+        [] as [ContributorScore; 0]
+    );
     assert_score(catalog.query("org", &all).unwrap().contributors[0].totals.score, 1.0);
     let stats = catalog.cache_stats("org").unwrap();
     assert_eq!((stats.hits, stats.misses, stats.entries), (1, 3, 1));
@@ -286,11 +292,17 @@ fn invalid_input_cannot_poison_cache_and_manual_invalidation_recomputes() {
     );
     assert_eq!(catalog.cache_stats("org").unwrap().entries, 0);
     query.filter.repositories.push("other".into());
-    assert!(catalog.query("org", &query).unwrap().contributors.is_empty());
+    assert_eq!(
+        catalog.query("org", &query).unwrap().contributors,
+        [] as [ContributorScore; 0]
+    );
     assert_eq!(catalog.cache_stats("org").unwrap().misses, 1);
     catalog.clear_cache("org").unwrap();
     assert_eq!(catalog.cache_stats("org").unwrap().entries, 0);
-    assert!(catalog.query("org", &query).unwrap().contributors.is_empty());
+    assert_eq!(
+        catalog.query("org", &query).unwrap().contributors,
+        [] as [ContributorScore; 0]
+    );
     assert_eq!(catalog.cache_stats("org").unwrap().misses, 2);
     assert_eq!(
         catalog.replace_organization(" ", vec![], vec![]),

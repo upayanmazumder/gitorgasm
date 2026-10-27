@@ -18,11 +18,18 @@ import (
 	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi"
 	"github.com/upayanmazumder/gitorgasm/core/internal/jobs"
 	"github.com/upayanmazumder/gitorgasm/core/internal/obs"
+	"github.com/upayanmazumder/gitorgasm/core/internal/scorer"
 	"github.com/upayanmazumder/gitorgasm/core/internal/secure"
 )
 
 // version is set at build time with -ldflags "-X main.version=...".
 var version = "dev"
+
+// The API runs at most apiScorerSlots score processes and waits briefly for a free slot.
+const (
+	apiScorerSlots = 2
+	apiScorerWait  = 2 * time.Second
+)
 
 func main() {
 	if len(os.Args) < 2 {
@@ -87,7 +94,10 @@ func runAPI(ctx context.Context, log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	srv := &httpapi.Server{Pool: pool, Jobs: jobClient, Sealer: sealer, Cfg: cfg, Log: log, Now: time.Now}
+	srv := &httpapi.Server{
+		Pool: pool, Jobs: jobClient, Sealer: sealer, Cfg: cfg, Log: log, Now: time.Now,
+		Scorer: scorer.New(cfg.ScoringBin, apiScorerSlots, apiScorerWait),
+	}
 	if cfg.GitHub != nil {
 		srv.GitHub = github.New(cfg.GitHub)
 	} else {
@@ -128,6 +138,7 @@ func runWorker(ctx context.Context, log *slog.Logger) error {
 	defer pool.Close()
 	client, err := jobs.NewWorkerClient(pool, github.New(cfg.GitHub), jobs.WorkerOptions{
 		Concurrency: cfg.WorkerCount, ReconcileEvery: cfg.ReconcileEvery, Logger: log,
+		Scorer: scorer.New(cfg.ScoringBin, 1, time.Minute),
 	})
 	if err != nil {
 		return err

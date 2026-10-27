@@ -21,6 +21,7 @@ import (
 
 	"github.com/upayanmazumder/gitorgasm/core/internal/config"
 	"github.com/upayanmazumder/gitorgasm/core/internal/github"
+	"github.com/upayanmazumder/gitorgasm/core/internal/scorer"
 	"github.com/upayanmazumder/gitorgasm/core/internal/secure"
 )
 
@@ -44,6 +45,7 @@ type Server struct {
 	Sealer *secure.Sealer
 	Cfg    *config.Config
 	Log    *slog.Logger
+	Scorer *scorer.Runner
 	Now    func() time.Time
 }
 

@@ -1,65 +1,151 @@
+// Package scorer runs the Rust score binary as a local process.
 package scorer
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
+	"strings"
+	"syscall"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/upayanmazumder/gitorgasm/core/internal/store"
 )
 
-func Binary() string {
-	if path := os.Getenv("SCORING_BIN"); path != "" {
-		return path
-	}
-	return "/gitorgasm-score"
+var (
+	// ErrBusy means every scorer slot stayed taken for the whole wait.
+	ErrBusy = errors.New("scorer is busy")
+	// ErrInvalidQuery means the binary rejected the query or input (exit code 2).
+	ErrInvalidQuery = errors.New("score query is invalid")
+)
+
+const (
+	invalidInputExit = 2
+	maxOutputBytes   = 64 << 20
+	maxDetailBytes   = 300
+)
+
+// Runner bounds concurrent score processes so requests cannot exhaust CPU, memory, or connections.
+type Runner struct {
+	bin   string
+	slots chan struct{}
+	wait  time.Duration
 }
 
-func Validate(ctx context.Context, query json.RawMessage) error {
-	cmd := exec.CommandContext(ctx, Binary(), "--validate-query") //nolint:gosec // operator-configured binary path
-	cmd.Stdin = bytes.NewReader(query)
-	out, err := cmd.CombinedOutput()
+// New returns a runner for the binary at bin. Callers wait up to wait for a free slot.
+func New(bin string, concurrency int, wait time.Duration) *Runner {
+	return &Runner{bin: bin, slots: make(chan struct{}, max(concurrency, 1)), wait: wait}
+}
+
+func (r *Runner) acquire(ctx context.Context) (func(), error) {
+	timer := time.NewTimer(r.wait)
+	defer timer.Stop()
+	select {
+	case r.slots <- struct{}{}:
+		return func() { <-r.slots }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-timer.C:
+		return nil, ErrBusy
+	}
+}
+
+// Validate checks a query without reading events.
+func (r *Runner) Validate(ctx context.Context, query json.RawMessage) error {
+	release, err := r.acquire(ctx)
 	if err != nil {
-		return fmt.Errorf("score query validation: %w: %s", err, out)
+		return err
 	}
-	return nil
+	defer release()
+	cmd := exec.CommandContext(ctx, r.bin, "--validate-query") //nolint:gosec // binary path comes from validated config
+	cmd.Stdin = bytes.NewReader(query)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	return exitError("score query validation", cmd.Run(), &stderr)
 }
 
-// Calculate streams the stored events to the Rust scorer without retaining all events in Go.
-func Calculate(ctx context.Context, q store.DBTX, installationID, userID int64, organization string, query json.RawMessage) (json.RawMessage, error) {
-	cmd := exec.CommandContext(ctx, Binary()) //nolint:gosec // operator-configured binary path
+// Calculate streams stored events to the binary inside a read-only transaction whose
+// statement timeout covers the whole stream.
+func (r *Runner) Calculate(ctx context.Context, db pgx.Tx, installationID, userID int64, organization string, query json.RawMessage) (json.RawMessage, error) {
+	release, err := r.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	cmd := exec.CommandContext(ctx, r.bin) //nolint:gosec // binary path comes from validated config
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
 	}
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	stdout := &limitedBuffer{limit: maxOutputBytes}
+	var stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = stdout, &stderr
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
-	writeErr := writeInput(ctx, stdin, q, installationID, userID, organization, query)
+	buffered := bufio.NewWriterSize(stdin, 64<<10)
+	writeErr := writeInput(ctx, buffered, db, installationID, userID, organization, query)
+	if writeErr == nil {
+		writeErr = buffered.Flush()
+	}
 	if err := stdin.Close(); writeErr == nil {
 		writeErr = err
 	}
-	if writeErr != nil {
-		_ = cmd.Process.Kill()
-	}
 	waitErr := cmd.Wait()
+	// A process that exits early breaks the pipe; then its own error explains why.
+	if writeErr != nil && !errors.Is(writeErr, syscall.EPIPE) {
+		return nil, writeErr
+	}
+	if err := exitError("score calculation", waitErr, &stderr); err != nil {
+		return nil, err
+	}
 	if writeErr != nil {
 		return nil, writeErr
 	}
-	if waitErr != nil {
-		return nil, fmt.Errorf("score calculation: %w: %s", waitErr, stderr.String())
+	if stdout.exceeded {
+		return nil, fmt.Errorf("score calculation: output exceeds %d bytes", maxOutputBytes)
 	}
 	if !json.Valid(stdout.Bytes()) {
-		return nil, fmt.Errorf("scorer returned invalid JSON")
+		return nil, errors.New("score calculation: invalid JSON output")
 	}
 	return json.RawMessage(stdout.Bytes()), nil
+}
+
+// exitError keeps only the first line of stderr, bounded, so logs never carry input payloads.
+func exitError(op string, err error, stderr *bytes.Buffer) error {
+	if err == nil {
+		return nil
+	}
+	detail, _, _ := strings.Cut(stderr.String(), "\n")
+	if len(detail) > maxDetailBytes {
+		detail = detail[:maxDetailBytes]
+	}
+	var exit *exec.ExitError
+	if errors.As(err, &exit) && exit.ExitCode() == invalidInputExit {
+		return fmt.Errorf("%s: %w: %s", op, ErrInvalidQuery, detail)
+	}
+	return fmt.Errorf("%s: %w: %s", op, err, detail)
+}
+
+type limitedBuffer struct {
+	bytes.Buffer
+	limit    int
+	exceeded bool
+}
+
+func (b *limitedBuffer) Write(p []byte) (int, error) {
+	if b.Len()+len(p) > b.limit {
+		b.exceeded = true
+		return 0, errors.New("output limit exceeded")
+	}
+	return b.Buffer.Write(p)
 }
 
 func writeInput(ctx context.Context, w io.Writer, q store.DBTX, installationID, userID int64, organization string, query json.RawMessage) error {
@@ -111,4 +197,16 @@ func writeInput(ctx context.Context, w io.Writer, q store.DBTX, installationID, 
 	}
 	_, err = io.WriteString(w, `]}`)
 	return err
+}
+
+// ReadOnly runs fn in a read-only transaction with its own statement timeout.
+func ReadOnly(ctx context.Context, db interface {
+	BeginTx(context.Context, pgx.TxOptions) (pgx.Tx, error)
+}, statementTimeout time.Duration, fn func(pgx.Tx) error) error {
+	return pgx.BeginTxFunc(ctx, db, pgx.TxOptions{AccessMode: pgx.ReadOnly}, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, fmt.Sprintf("SET LOCAL statement_timeout = %d", statementTimeout.Milliseconds())); err != nil {
+			return err
+		}
+		return fn(tx)
+	})
 }
