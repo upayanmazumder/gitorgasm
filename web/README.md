@@ -46,6 +46,16 @@ Configure the GitHub App's **Setup URL** as `/api/v1/auth/login` on the frontend
 
 Session and organization data use TanStack Query, with no automatic error retries. Returning to the browser tab rechecks both, and organization caches are keyed by signed-in user. Organization access is always enforced by the API, not the presence of a navigation link.
 
+## Component structure
+
+Keep route files in `src/app/` thin. They import and compose components rather than implement full screens.
+Place UI in feature folders under `src/components/`, with subfolders for each part of the screen.
+Pass data and actions through typed props. Export public components through `index.ts` barrels for page imports.
+
+Keep components small and focused. About 80 lines is a target, not a minimum.
+Usually keep implementation files below 100 lines after formatting. Smaller files are welcome.
+Do not compress code or add unnecessary abstractions to meet a line count.
+
 ## Deployment (Vercel)
 
 1. Import the Gitorgasm repository in Vercel.

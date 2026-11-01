@@ -1,4 +1,4 @@
-import type { ScoreResult, ScoreRow } from './score-query';
+import type { ScoreResult, ScoreRow } from './types';
 
 interface Props {
   result: ScoreResult;

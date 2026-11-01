@@ -1,4 +1,4 @@
-import { ScoresView } from './scores-view';
+import { ScoresView } from '@/components/organizations/scores';
 
 export default async function OrganizationPage({ params }: { params: Promise<{ login: string }> }) {
   const { login } = await params;

@@ -45,11 +45,18 @@ src/
     page.tsx            # Home page
     motion/             # /motion demo route
   components/
+    home/               # Home screen components and barrel
+    organizations/      # Organization screen components and barrel
+      account/          # Identity, installation, and access actions
+      authorization/    # Session state and authorization views
+      directory/        # Organization list and empty states
+      scores/           # Score forms, results, presets, and state
     providers/          # Client-side React context providers
       query-provider.tsx
       theme-provider.tsx
       index.ts          # Barrel export
     motion/             # Framer Motion wrapper components
+      demo/             # Motion demo components and barrel
       index.ts
     ui/                 # shadcn-style primitive components
       button.tsx
@@ -112,14 +119,17 @@ Feature-specific hooks, types, and helpers should be colocated with their featur
 
 ### Modular Code
 
-The single most important structural rule: **one concern per file**.
+Keep `src/app/` for route entry points, layouts, metadata, and route-specific framework files.
 
-- A component renders. A hook manages state or side effects. A lib function transforms data. Never mix.
-- If a component file exceeds ~150 lines, it is doing too much — extract.
-- Logic that isn't directly tied to rendering belongs in a `use*` hook next to the component, or in `src/hooks/` if reused across three or more places.
-- Shared pure functions go in `src/lib/`. Do not colocate data-transform logic inside components.
-- New UI variants → add to the existing `cva()` call, not a new component.
-- Prefer composing small components over branching inside a large one.
+- Route pages import feature components from `src/components/` and compose them. Do not implement full screens inside `app/`.
+- Organize components into feature folders and subfolders that reflect the UI hierarchy.
+- Export public components through `index.ts` barrels. Pages import those barrels. Internal files use direct imports to avoid cycles.
+- Split screens into small components with explicit, typed props. Pass data and actions to presentation components.
+- Target about 80 lines per implementation file. Usually keep files below 100 lines after formatting.
+- Smaller components are welcome. Do not add code to reach 80 lines, or compress formatting to meet the limit.
+- Keep one concern per file. Extract a cohesive component or helper when a file grows.
+- Keep route-specific state near its feature. Put shared hooks in `src/hooks/` and shared pure functions in `src/lib/`.
+- Reuse existing components and variants instead of creating duplicates.
 
 ### Comments
 

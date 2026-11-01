@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/api';
 
-import type { Preset, ScoreQuery, ScoreResult } from './score-query';
+import type { Preset, ScoreQuery, ScoreResult } from './types';
 
 // The API stops a custom calculation after 25 seconds; leave room for the response.
 const CALCULATE_TIMEOUT_MS = 30_000;

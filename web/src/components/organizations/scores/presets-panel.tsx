@@ -1,6 +1,6 @@
 'use client';
 
-import type { Preset } from './score-query';
+import type { Preset } from './types';
 
 interface Props {
   presets: Preset[];
