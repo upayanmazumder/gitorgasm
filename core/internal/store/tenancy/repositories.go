@@ -34,20 +34,22 @@ type RepoCursor struct {
 	ID   int64  `json:"i"`
 }
 
-// ListRepositories returns up to limit repositories after the cursor, ordered by name.
-func ListRepositories(ctx context.Context, q store.DBTX, installationID int64, after *RepoCursor, limit int) ([]Repository, error) {
-	afterName, afterID := "", int64(0)
-	if after != nil {
-		afterName, afterID = after.Name, after.ID
-	}
-	rows, err := q.Query(ctx, `
-		SELECT github_id, name, full_name, description, private, fork, archived, visibility,
+const repositoryColumns = `SELECT github_id, name, full_name, description, private, fork, archived, visibility,
 		       default_branch, language, stargazers, pushed_at, synced_at
 		  FROM repositories
-		 WHERE installation_id = $1 AND deleted_at IS NULL
-		   AND ($2 = '' AND $3 = 0 OR (lower(name), github_id) > ($2, $3))
-		 ORDER BY lower(name), github_id
-		 LIMIT $4`, installationID, afterName, afterID, limit)
+		 WHERE installation_id = $1 AND deleted_at IS NULL`
+
+// ListRepositories returns up to limit repositories after the cursor, ordered by name.
+// A row-value seek keeps the partial listing index usable for every page.
+func ListRepositories(ctx context.Context, q store.DBTX, installationID int64, after *RepoCursor, limit int) ([]Repository, error) {
+	var rows pgx.Rows
+	var err error
+	if after == nil {
+		rows, err = q.Query(ctx, repositoryColumns+` ORDER BY lower(name), github_id LIMIT $2`, installationID, limit)
+	} else {
+		rows, err = q.Query(ctx, repositoryColumns+` AND (lower(name), github_id) > ($2, $3)
+		 ORDER BY lower(name), github_id LIMIT $4`, installationID, after.Name, after.ID, limit)
+	}
 	if err != nil {
 		return nil, err
 	}
