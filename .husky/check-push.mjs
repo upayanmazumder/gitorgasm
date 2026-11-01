@@ -13,7 +13,9 @@ for (const update of updates ? updates.split('\n') : []) {
   if (zero.test(local)) continue;
   const base = zero.test(remote) ? git('merge-base', local, 'refs/remotes/origin/main') : remote;
   const changed = execFileSync('git', ['diff', '--name-only', '-z', base, local], { encoding: 'utf8' });
-  for (const file of changed.split('\0').filter(Boolean)) files.add(file);
+  for (const file of changed.split('\0').filter(Boolean)) {
+    if (!/\.mdx?$/i.test(file)) files.add(file);
+  }
 }
 const changed = (...prefixes) => [...files].some(file => prefixes.some(prefix => file.startsWith(prefix)));
 const run = (cwd, command, args, env = {}) => {
@@ -22,8 +24,7 @@ const run = (cwd, command, args, env = {}) => {
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status ?? 1);
 };
-const web = [...files].some(file => file.startsWith('web/') && !file.endsWith('.md'));
-if (web) {
+if (changed('web/')) {
   run('web', 'pnpm', ['lint']);
   run('web', 'pnpm', ['typecheck']);
   run('web', 'pnpm', ['format:check']);
