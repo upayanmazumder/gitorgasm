@@ -68,12 +68,13 @@ func TestReusedLoginResolvesToNewestAccount(t *testing.T) {
 
 func TestRepositoryPagination(t *testing.T) {
 	h := newHarness(t)
-	s := h.seedTenant(1, "acme", 100, 10, "Charlie", "alpha", "bravo", "delta", "echo")
+	// "API" and "api" sort equal under lower(name), so only github_id orders them across the page boundary.
+	s := h.seedTenant(1, "acme", 100, 10, "Charlie", "alpha", "bravo", "delta", "echo", "API", "api")
 	h.exec(`UPDATE repositories SET deleted_at = now() WHERE name = 'delta'`)
 
 	var names []string
 	cursor := ""
-	for range 5 {
+	for range 6 {
 		path := "/v1/organizations/ACME/repositories?limit=2"
 		if cursor != "" {
 			path += "&cursor=" + cursor
@@ -91,7 +92,7 @@ func TestRepositoryPagination(t *testing.T) {
 		}
 		cursor = *p.NextCursor
 	}
-	want := []string{"alpha", "bravo", "Charlie", "echo"}
+	want := []string{"alpha", "API", "api", "bravo", "Charlie", "echo"}
 	if len(names) != len(want) {
 		t.Fatalf("names = %v, want %v", names, want)
 	}
