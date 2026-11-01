@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isApiError, request } from '@/api';
 import { createQueryKeys } from '@/lib/query';
 
-import { organizationsSchema, userSchema } from './schemas';
+import { organizationsSchema, userSchema } from '../model';
 
 const sessionKeys = createQueryKeys('session');
 const organizationKeys = createQueryKeys('organizations');

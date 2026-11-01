@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import type { Organization } from '../authorization/schemas';
+import type { Organization } from '../model';
 
 interface OrganizationListProps {
   organizations: readonly Organization[] | undefined;

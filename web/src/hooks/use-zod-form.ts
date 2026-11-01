@@ -8,7 +8,6 @@ import {
 } from 'react-hook-form';
 import type * as z from 'zod';
 
-// Preserve the schema's input and parsed output types.
 export function useZodForm<TSchema extends z.ZodType<FieldValues, FieldValues>>(
   schema: TSchema,
   options?: Omit<UseFormProps<z.input<TSchema>, unknown, z.output<TSchema>>, 'resolver'>

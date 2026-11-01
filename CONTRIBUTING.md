@@ -41,6 +41,19 @@ See the quick start in [README.md](README.md). Tests need Docker: `make test` st
 
 ## Standards
 
+### Module structure
+
+- Group code by domain, then by responsibility within each domain.
+- Keep implementation files small. Split cohesive behavior instead of compressing code.
+- Reuse existing helpers and primitives before adding abstractions.
+- Prefer established, maintained packages and standard libraries over custom infrastructure.
+- Check behavior, maintenance, security, and dependency cost before adding a package.
+- Keep comments to one line when a reason is not clear from the code.
+- Use domain package imports in Go. Shared SQL contracts remain in `internal/store`.
+- Use explicit `mod.rs` exports in Rust and `index.ts` barrels in frontend feature folders.
+- Import public entries across folders. Use direct sibling imports within a folder to avoid cycles.
+- Let the configured formatters group imports. Use type-only imports for TypeScript types.
+
 ### Go (`core`)
 
 - All SQL lives in `internal/store`. Handlers and workers never build SQL.

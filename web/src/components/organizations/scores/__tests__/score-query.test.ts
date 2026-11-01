@@ -2,10 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { ApiError } from '@/api';
 
-import { defaultForm } from '../default-form';
-import { errorMessage } from '../error-message';
-import { fromQuery } from '../from-query';
-import { toQuery } from '../to-query';
+import { defaultForm, fromQuery, toQuery } from '../form';
+import { errorMessage } from '../state';
 
 describe('toQuery', () => {
   it('leaves named periods unanchored so the server uses the latest ingest', () => {

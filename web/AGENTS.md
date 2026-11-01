@@ -47,10 +47,17 @@ src/
   components/
     home/               # Home screen components and barrel
     organizations/      # Organization screen components and barrel
+      model/            # Shared identity and organization schemas
       account/          # Identity, installation, and access actions
       authorization/    # Session state and authorization views
       directory/        # Organization list and empty states
-      scores/           # Score forms, results, presets, and state
+      scores/
+        data/           # API types and query state
+        form/
+          fields/       # Date and filter controls
+        presets/        # Saved queries
+        results/        # Score tables
+        state/          # Form controller and error messages
     providers/          # Client-side React context providers
       query-provider.tsx
       theme-provider.tsx

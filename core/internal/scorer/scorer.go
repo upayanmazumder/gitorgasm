@@ -8,15 +8,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os/exec"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v5"
-
-	"github.com/upayanmazumder/gitorgasm/core/internal/store"
 )
 
 var (
@@ -71,8 +68,7 @@ func (r *Runner) Validate(ctx context.Context, query json.RawMessage) error {
 	return exitError("score query validation", cmd.Run(), &stderr)
 }
 
-// Calculate streams stored events to the binary inside a read-only transaction whose
-// statement timeout covers the whole stream.
+// Calculate streams events within a read-only transaction whose timeout covers the whole stream.
 func (r *Runner) Calculate(ctx context.Context, db pgx.Tx, installationID, userID int64, organization string, query json.RawMessage) (json.RawMessage, error) {
 	release, err := r.acquire(ctx)
 	if err != nil {
@@ -146,67 +142,4 @@ func (b *limitedBuffer) Write(p []byte) (int, error) {
 		return 0, errors.New("output limit exceeded")
 	}
 	return b.Buffer.Write(p)
-}
-
-func writeInput(ctx context.Context, w io.Writer, q store.DBTX, installationID, userID int64, organization string, query json.RawMessage) error {
-	rows, err := store.ContributionRows(ctx, q, installationID, userID)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-	name, err := json.Marshal(organization)
-	if err != nil {
-		return err
-	}
-	if _, err := fmt.Fprintf(w, `{"organization":%s,"memberships":[],"query":%s,"signals":[`, name, query); err != nil {
-		return err
-	}
-	enc := json.NewEncoder(w)
-	first := true
-	for rows.Next() {
-		var id int64
-		var login, kind, repo string
-		var at time.Time
-		var bot bool
-		if err := rows.Scan(&id, &login, &kind, &repo, &at, &bot); err != nil {
-			return err
-		}
-		if !first {
-			if _, err := io.WriteString(w, ","); err != nil {
-				return err
-			}
-		}
-		first = false
-		signal := struct {
-			UserID         int64     `json:"userId"`
-			UserLogin      string    `json:"userLogin"`
-			Kind           string    `json:"type"`
-			Repo           string    `json:"repo"`
-			EventTimestamp time.Time `json:"eventTimestamp"`
-			Metadata       struct {
-				IsBot bool `json:"isBot"`
-			} `json:"metadata"`
-		}{UserID: id, UserLogin: login, Kind: kind, Repo: repo, EventTimestamp: at}
-		signal.Metadata.IsBot = bot
-		if err := enc.Encode(signal); err != nil {
-			return err
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return err
-	}
-	_, err = io.WriteString(w, `]}`)
-	return err
-}
-
-// ReadOnly runs fn in a read-only transaction with its own statement timeout.
-func ReadOnly(ctx context.Context, db interface {
-	BeginTx(context.Context, pgx.TxOptions) (pgx.Tx, error)
-}, statementTimeout time.Duration, fn func(pgx.Tx) error) error {
-	return pgx.BeginTxFunc(ctx, db, pgx.TxOptions{AccessMode: pgx.ReadOnly}, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, fmt.Sprintf("SET LOCAL statement_timeout = %d", statementTimeout.Milliseconds())); err != nil {
-			return err
-		}
-		return fn(tx)
-	})
 }

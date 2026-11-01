@@ -14,7 +14,7 @@ import (
 
 	"github.com/upayanmazumder/gitorgasm/core/internal/jobs"
 	"github.com/upayanmazumder/gitorgasm/core/internal/scorer"
-	"github.com/upayanmazumder/gitorgasm/core/internal/store"
+	"github.com/upayanmazumder/gitorgasm/core/internal/store/scores"
 )
 
 func eventCount(t *testing.T, pool *pgxpool.Pool) int {
@@ -26,9 +26,9 @@ func eventCount(t *testing.T, pool *pgxpool.Pool) int {
 	return n
 }
 
-func scoringState(t *testing.T, pool *pgxpool.Pool) store.ScoringState {
+func scoringState(t *testing.T, pool *pgxpool.Pool) scores.ScoringState {
 	t.Helper()
-	state, err := store.GetScoringState(context.Background(), pool, instID, 0)
+	state, err := scores.GetScoringState(context.Background(), pool, instID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestIngestionSkipsGoneRepositoriesResumesAndPublishesOnlyCompleteRuns(t *te
 	if err := score.Work(ctx, &river.Job[jobs.ScoreOrganizationArgs]{Args: jobs.ScoreOrganizationArgs{InstallationID: instID, Generation: 1}}); err != nil {
 		t.Fatalf("score: %v", err)
 	}
-	original, err := store.LoadSnapshot(ctx, pool, instID, 1, 0, "default")
+	original, err := scores.LoadSnapshot(ctx, pool, instID, 1, 0, "default")
 	if err != nil || original == nil {
 		t.Fatalf("stored scores = %s, %v", original, err)
 	}
@@ -98,7 +98,7 @@ func TestIngestionSkipsGoneRepositoriesResumesAndPublishesOnlyCompleteRuns(t *te
 	if state := scoringState(t, pool); state.Generation != 1 || !state.IngestionFailed {
 		t.Fatalf("after failure: %+v", state)
 	}
-	if unchanged, _ := store.LoadSnapshot(ctx, pool, instID, 1, 0, "default"); string(unchanged) != string(original) {
+	if unchanged, _ := scores.LoadSnapshot(ctx, pool, instID, 1, 0, "default"); string(unchanged) != string(original) {
 		t.Fatal("failed ingestion changed scores")
 	}
 

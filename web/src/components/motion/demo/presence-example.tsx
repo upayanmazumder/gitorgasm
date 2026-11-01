@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { AnimatePresence, m } from 'framer-motion';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui';
 import { spring } from '@/lib/motion';
 
 import { Card } from './card';

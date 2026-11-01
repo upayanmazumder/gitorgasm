@@ -6,7 +6,7 @@ import './globals.css';
 
 import { MotionProvider } from '@/components/motion';
 import { QueryProvider, ThemeProvider } from '@/components/providers';
-import { Toaster } from '@/components/ui/sonner';
+import { Toaster } from '@/components/ui';
 import { cn } from '@/lib/utils';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
