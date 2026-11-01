@@ -55,13 +55,31 @@ func Open(ctx context.Context, url string, limits Limits) (*pgxpool.Pool, error)
 	if err != nil {
 		return nil, fmt.Errorf("create pool: %w", err)
 	}
-	pingCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	pingCtx, cancel := context.WithTimeout(ctx, startupWait)
 	defer cancel()
-	if err := pool.Ping(pingCtx); err != nil {
+	if err := retryUntilReady(pingCtx, pool.Ping, time.Second); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("ping database: %w", err)
 	}
 	return pool, nil
+}
+
+// startupWait bounds how long a starting process waits for PostgreSQL to accept connections.
+const startupWait = 30 * time.Second
+
+// retryUntilReady calls ping until it succeeds or ctx ends, and returns the last ping error.
+func retryUntilReady(ctx context.Context, ping func(context.Context) error, every time.Duration) error {
+	for {
+		err := ping(ctx)
+		if err == nil {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return err
+		case <-time.After(every):
+		}
+	}
 }
 
 func setTimeout(params map[string]string, name string, d time.Duration) {
