@@ -1,0 +1,4 @@
+set -eu
+
+make lint
+make test

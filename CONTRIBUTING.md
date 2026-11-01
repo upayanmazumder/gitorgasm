@@ -25,6 +25,7 @@ Run `pnpm install` at the repository root once. It installs husky hooks. The roo
 
 - `pre-commit` runs lint-staged on staged files only, with the formatters above. It needs `go`, `rustfmt`, and `pnpm` on `PATH`. golangci-lint runs through `go run` at the pinned version.
 - `commit-msg` runs commitlint (Conventional Commits).
+- `pre-push` runs `make lint` and `make test`. A failed check stops the push. Docker must be running, and the pinned tools must be installed with `make tools`.
 
 `make fmt` formats everything. `make lint` and each CI language job check the same rules.
 
