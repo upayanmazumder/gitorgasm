@@ -4,7 +4,8 @@
   "description": "Repository tooling: git hooks and commit linting. Formatters live with each language.",
   "packageManager": "pnpm@11.28.6",
   "scripts": {
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:hooks": "node --test .husky/*.test.mjs"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",

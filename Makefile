@@ -101,6 +101,7 @@ test: test-go ## Run all tests
 	cd $(BENCH)/rust && cargo test --locked
 	cd $(SCORING) && cargo test --locked
 	cd $(WEB) && SKIP_ENV_VALIDATION=true pnpm test
+	node --test .husky/*.test.mjs
 
 .PHONY: build
 build: ## Build binaries, the web app, and the container image

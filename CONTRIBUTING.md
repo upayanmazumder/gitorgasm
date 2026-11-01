@@ -25,12 +25,13 @@ Run `pnpm install` at the repository root once. It installs husky hooks. The roo
 
 - `pre-commit` runs lint-staged on staged files only, with the formatters above. It needs `go`, `rustfmt`, and `pnpm` on `PATH`. golangci-lint runs through `go run` at the pinned version.
 - `commit-msg` runs commitlint (Conventional Commits).
-- `pre-push` checks the committed paths being pushed. New branches compare with their merge base on `origin/main`. Deleted branches need no checks.
-- Web changes run lint, type checks, formatting checks, and frontend tests. Markdown-only web changes skip these checks.
-- Core and contract changes run `go vet`. Rust changes run formatting checks, clippy, and tests for the affected crate.
-- Go benchmark changes run `go vet`. Deployment changes run `make manifests`. Workflow changes run actionlint.
-- Hook changes run JavaScript syntax checks. Documentation-only pushes do not start code tests or Docker.
-- Full integration tests, including PostgreSQL and Go race tests, remain in CI. Run `make verify` before opening a PR.
+- `pre-push` reads every ref update from Git, checks committed paths across all updated refs, and ignores deleted refs. New branches compare their local commit with its merge base on `origin/main`; a missing remote commit object uses the same comparison. No network fetch is needed.
+- Web code changes run lint, type checks, formatting checks, and frontend tests. Markdown-only web changes still run `pnpm format:check`; other markdown-only pushes skip code checks.
+- Core and contract changes run `make lint test-go`, including the database-backed tenant-isolation and API-contract tests. These checks need Docker and the tools used by `make lint`; `make test-go` starts PostgreSQL and builds the scoring binary.
+- Rust changes run formatting checks, clippy, and tests for the affected crate. Go benchmark changes run `go vet`. Deployment changes run `make manifests`.
+- Shared tooling changes (`Makefile`, package manifests, dependency lockfiles, `.husky/`, or `.github/`) and unknown non-documentation paths run full `make lint test`. Shared tooling rules also apply to markdown inside `.husky/` and `.github/`.
+- Malformed or missing ref input, unresolved comparisons, and an empty diff for any non-deletion update also run full `make lint test`. A failed check blocks the push; the hook never substitutes a successful fallback for a failed command.
+- Hook behavior tests use Node's built-in runner: `pnpm run test:hooks`. They also run in `make test` and in the CI tooling job. Ref tests create disposable local Git repositories; they do not push or contact GitHub. Run `make verify` before opening a PR.
 
 `make fmt` formats everything. `make lint` and each CI language job check the same rules.
 

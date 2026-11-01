@@ -1,26 +1,27 @@
-import Link from 'next/link';
+import { HomeFeatures } from './home-features';
+import { HomeHero } from './home-hero';
+import { HomeNavigation } from './home-navigation';
 
-export default function Home() {
+export function HomeView() {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex w-full max-w-3xl flex-1 flex-col items-center justify-between bg-white px-16 py-32 sm:items-start dark:bg-black">
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl leading-10 font-semibold tracking-tight text-black dark:text-zinc-50">
-            Gitorgasm
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            View activity scores for the organizations you can access.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <Link
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] md:w-[158px] dark:border-white/[.145] dark:hover:bg-[#1a1a1a]"
-            href="/organizations"
-          >
-            View organizations
-          </Link>
-        </div>
+    <div className="flex flex-1 flex-col bg-background text-foreground">
+      <a
+        href="#home-content"
+        className="sr-only rounded-md bg-foreground p-3 text-background focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50"
+      >
+        Skip to content
+      </a>
+      <HomeNavigation />
+      <main id="home-content" tabIndex={-1} className="mx-auto w-full max-w-6xl px-6 sm:px-10">
+        <HomeHero />
+        <HomeFeatures />
       </main>
+      <footer className="mt-auto border-t">
+        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-6 py-6 text-xs text-muted-foreground sm:flex-row sm:justify-between sm:px-10">
+          <p>Gitorgasm</p>
+          <p>Organization activity. A little easier to read.</p>
+        </div>
+      </footer>
     </div>
   );
 }
