@@ -33,6 +33,19 @@ Create `web/.env.local` with `API_ORIGIN=http://localhost:8080` for local develo
 
 Only `/api/v1/*` is proxied. The browser calls this app's origin, so session cookies remain first-party and CORS is unnecessary. GitHub's OAuth callback must also target `/api/v1/auth/callback` on the frontend origin. The schema is in `src/env.ts`, the proxy and security headers are in `next.config.ts`, and formatter configuration is in `web/.prettierrc`.
 
+## Sign-in and organization access
+
+Open `/organizations` to sign in with GitHub. The page checks `/api/v1/me` before loading accessible organizations, shows the signed-in identity, and links each organization to its activity scores. A failed session check is distinct from being signed out and can be retried.
+
+- **Install GitHub App** opens `/api/v1/auth/install`. Choose an organization on GitHub; an organization owner may need to approve the installation.
+- **Refresh GitHub access** opens `/api/v1/auth/login` to refresh installation grants through OAuth. Use it after an installation is approved or your GitHub access changes.
+- **Check organizations** reloads the accessible organization list without starting OAuth. A new installation may still be waiting for its first sync.
+- **Sign out** posts to `/api/v1/auth/logout`. On success, the website cancels in-flight queries and removes cached organization, score, and mutation data. A failed sign-out keeps the current screen available and shows an error.
+
+Configure the GitHub App's **Setup URL** as `/api/v1/auth/login` on the frontend origin and its OAuth callback as `/api/v1/auth/callback`. Disable **Request user authorization (OAuth) during installation**: the setup return must begin the server's state- and PKCE-protected OAuth flow. OAuth returns to `/organizations`; installation query parameters are never treated as proof of access by the UI.
+
+Session and organization data use TanStack Query, with no automatic error retries. Returning to the browser tab rechecks both, and organization caches are keyed by signed-in user. Organization access is always enforced by the API, not the presence of a navigation link.
+
 ## Deployment (Vercel)
 
 1. Import the Gitorgasm repository in Vercel.

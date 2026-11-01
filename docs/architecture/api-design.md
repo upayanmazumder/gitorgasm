@@ -26,10 +26,10 @@ Labels: **Verified** (file path or command), **Assumption**, **Decision**, **Alt
 | -------------------------------------------- | ----------------- | --------- | ---------------------------------- |
 | `GET /healthz`                               | none              | 200       | liveness, no dependencies          |
 | `GET /readyz`                                | none              | 200 / 503 | ready only when PostgreSQL answers |
-| `GET /v1/auth/login`                         | none              | 302       | start GitHub web flow              |
-| `GET /v1/auth/callback`                      | none              | 302       | finish flow, create session        |
+| `GET /v1/auth/login`                         | none              | 302       | sign in / refresh grants / GitHub Setup URL |
+| `GET /v1/auth/callback`                      | none              | 302       | refresh grants, create session, redirect to `/organizations` |
 | `GET /v1/auth/install`                       | none              | 302       | redirect to App install page       |
-| `POST /v1/auth/logout`                       | cookie (optional) | 204       | delete session                     |
+| `POST /v1/auth/logout`                       | cookie (optional) | 204       | delete session and clear pending OAuth |
 | `GET /v1/me`                                 | session           | 200       | current user                       |
 | `GET /v1/organizations`                      | session           | 200       | accessible organizations           |
 | `GET /v1/organizations/{login}/repositories` | session           | 200       | repositories, keyset paginated     |
