@@ -14,6 +14,8 @@ import (
 
 	"github.com/upayanmazumder/gitorgasm/core/internal/config"
 	"github.com/upayanmazumder/gitorgasm/core/internal/github"
+	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/middleware"
+	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/response"
 	"github.com/upayanmazumder/gitorgasm/core/internal/scorer"
 	"github.com/upayanmazumder/gitorgasm/core/internal/secure"
 )
@@ -50,14 +52,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /v1/organizations/{login}/scores/presets/{name}", s.authed(s.saveScorePreset))
 	mux.HandleFunc("DELETE /v1/organizations/{login}/scores/presets/{name}", s.authed(s.deleteScorePreset))
 
-	mux.HandleFunc("POST /webhooks/github", s.requireGitHub(limitConcurrent(maxWebhookReads, s.webhook)))
+	mux.HandleFunc("POST /webhooks/github", s.requireGitHub(middleware.LimitConcurrent(maxWebhookReads, s.webhook)))
 
 	var h http.Handler = mux
-	h = s.checkOrigin(h)
-	h = s.accessLog(h)
-	h = securityHeaders(h)
-	h = s.recoverer(h)
-	h = requestID(h)
+	h = middleware.CheckOrigin(s.Cfg.AppOrigin.Scheme+"://"+s.Cfg.AppOrigin.Host, h)
+	h = middleware.AccessLog(s.Log, h)
+	h = middleware.SecurityHeaders(h)
+	h = middleware.Recoverer(s.Log, h)
+	h = middleware.RequestID(h)
 	return otelhttp.NewHandler(h, "http", otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {
 		if r.Pattern != "" {
 			return r.Pattern
@@ -67,7 +69,7 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) healthz(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	response.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // readyz requires PostgreSQL before Kubernetes routes traffic to the pod.
@@ -75,8 +77,8 @@ func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 	if err := s.Pool.Ping(ctx); err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unavailable", "database": "unreachable"})
+		response.JSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unavailable", "database": "unreachable"})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ready", "database": "ok"})
+	response.JSON(w, http.StatusOK, map[string]string{"status": "ready", "database": "ok"})
 }

@@ -30,26 +30,17 @@ func (c *Client) GetInstallation(ctx context.Context, id int64) (*models.Install
 func (c *Client) ListInstallationRepositories(ctx context.Context, id int64, fn func([]models.Repository) error) error {
 	next := "/installation/repositories?per_page=100"
 	for next != "" {
-		token, err := c.installationToken(ctx, id)
-		if err != nil {
-			return err
-		}
-		req, err := c.newRequest(ctx, http.MethodGet, next, nil)
-		if err != nil {
-			return err
-		}
-		req.Header.Set("Authorization", "Bearer "+token)
 		var page struct {
 			Repositories []models.Repository `json:"repositories"`
 		}
-		hdr, err := c.do(ctx, "apps/list-repos-accessible-to-installation", "installation", req, &page)
+		following, err := c.GetInstallationPage(ctx, id, next, "apps/list-repos-accessible-to-installation", &page)
 		if err != nil {
 			return err
 		}
 		if err := fn(page.Repositories); err != nil {
 			return err
 		}
-		next = nextLink(hdr.Get("Link"))
+		next = following
 	}
 	return nil
 }

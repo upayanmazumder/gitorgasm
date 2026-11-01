@@ -60,7 +60,7 @@ See the quick start in [README.md](README.md). Tests need Docker: `make test` st
 - Every org-scoped query joins `user_installations`. Inaccessible organizations return 404.
 - A job that follows a data change is inserted with `InsertTx` in the same transaction.
 - GitHub calls go through `internal/github`. Verify each new endpoint against the pinned REST description (`github/rest-api-description` v2.1.0) or docs.github.com before you use it. Record the operationId in the doc comment.
-- Return classified errors. Workers map them with `retryDecision`.
+- Return classified errors. Workers map them through `internal/jobs/internal/execution`.
 - Never log tokens, cookies, webhook payloads, or private repository content.
 - Lint: `golangci-lint` with `core/.golangci.yml`.
 

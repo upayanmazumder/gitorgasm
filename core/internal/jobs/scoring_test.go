@@ -12,7 +12,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 
-	"github.com/upayanmazumder/gitorgasm/core/internal/jobs"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/ingest"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/queue"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/scoring"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/sync"
 	"github.com/upayanmazumder/gitorgasm/core/internal/scorer"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store/scores"
 )
@@ -40,23 +43,23 @@ func TestIngestionSkipsGoneRepositoriesResumesAndPublishesOnlyCompleteRuns(t *te
 	pool, gh := setup(t, f)
 	ctx := context.Background()
 	seedStale(t, pool)
-	if err := work(t, &jobs.SyncWorker{Pool: pool, GitHub: gh, Now: time.Now}); err != nil {
+	if err := work(t, &sync.Worker{Pool: pool, GitHub: gh, Now: time.Now}); err != nil {
 		t.Fatal(err)
 	}
 	at := time.Now().UTC()
-	ingest := &jobs.IngestWorker{Pool: pool, GitHub: gh, Now: func() time.Time { return at }}
-	job := &river.Job[jobs.IngestContributionsArgs]{Args: jobs.IngestContributionsArgs{InstallationID: instID}}
-	score := &jobs.ScoreWorker{Pool: pool, Scorer: scorer.New(os.Getenv("SCORING_BIN"), 1, time.Minute)}
+	ingester := &ingest.Worker{Pool: pool, GitHub: gh, Now: func() time.Time { return at }}
+	job := &river.Job[queue.IngestContributions]{Args: queue.IngestContributions{InstallationID: instID}}
+	score := &scoring.Worker{Pool: pool, Scorer: scorer.New(os.Getenv("SCORING_BIN"), 1, time.Minute)}
 
 	// A repository GitHub no longer serves is skipped instead of blocking the organization.
 	f.setRepoStatus("web", http.StatusNotFound)
-	if err := ingest.Work(ctx, job); err != nil {
+	if err := ingester.Work(ctx, job); err != nil {
 		t.Fatalf("initial ingestion: %v", err)
 	}
 	if state := scoringState(t, pool); state.Generation != 1 || state.IngestionFailed || eventCount(t, pool) != 2 {
 		t.Fatalf("after skip: state=%+v events=%d", state, eventCount(t, pool))
 	}
-	if err := score.Work(ctx, &river.Job[jobs.ScoreOrganizationArgs]{Args: jobs.ScoreOrganizationArgs{InstallationID: instID, Generation: 1}}); err != nil {
+	if err := score.Work(ctx, &river.Job[queue.ScoreOrganization]{Args: queue.ScoreOrganization{InstallationID: instID, Generation: 1}}); err != nil {
 		t.Fatalf("score: %v", err)
 	}
 	original, err := scores.LoadSnapshot(ctx, pool, instID, 1, 0, "default")
@@ -71,17 +74,17 @@ func TestIngestionSkipsGoneRepositoriesResumesAndPublishesOnlyCompleteRuns(t *te
 	}
 
 	// The same day does not ingest again.
-	if err := ingest.Work(ctx, job); err != nil || scoringState(t, pool).Generation != 1 {
+	if err := ingester.Work(ctx, job); err != nil || scoringState(t, pool).Generation != 1 {
 		t.Fatalf("same-day rerun: %v", err)
 	}
 
 	// Next day: "web" is back, "infra" hits a rate limit. The run snoozes, keeps finished
 	// repositories, and does not mark the scores as failed.
-	ingest.Now = func() time.Time { return at.Add(25 * time.Hour) }
+	ingester.Now = func() time.Time { return at.Add(25 * time.Hour) }
 	f.setRepoStatus("web", 0)
 	f.setRepoStatus("infra", http.StatusForbidden)
 	apiCalls := f.calls("api")
-	err = ingest.Work(ctx, job)
+	err = ingester.Work(ctx, job)
 	var snooze *river.JobSnoozeError
 	if !errors.As(err, &snooze) {
 		t.Fatalf("rate limit: err = %v, want snooze", err)
@@ -92,7 +95,7 @@ func TestIngestionSkipsGoneRepositoriesResumesAndPublishesOnlyCompleteRuns(t *te
 
 	// A server error is recorded; published scores stay unchanged.
 	f.setRepoStatus("infra", http.StatusBadGateway)
-	if err := ingest.Work(ctx, job); err == nil {
+	if err := ingester.Work(ctx, job); err == nil {
 		t.Fatal("server error did not stop ingestion")
 	}
 	if state := scoringState(t, pool); state.Generation != 1 || !state.IngestionFailed {
@@ -104,7 +107,7 @@ func TestIngestionSkipsGoneRepositoriesResumesAndPublishesOnlyCompleteRuns(t *te
 
 	// The retry resumes: "api" finished in the first attempt and is not fetched again.
 	f.setRepoStatus("infra", 0)
-	if err := ingest.Work(ctx, job); err != nil {
+	if err := ingester.Work(ctx, job); err != nil {
 		t.Fatalf("resumed ingestion: %v", err)
 	}
 	if got := f.calls("api") - apiCalls; got != 1 {
@@ -118,7 +121,7 @@ func TestIngestionSkipsGoneRepositoriesResumesAndPublishesOnlyCompleteRuns(t *te
 	if n := eventCount(t, pool); n != 3 {
 		t.Fatalf("events = %d, want 3 (idempotent per repository)", n)
 	}
-	if err := score.Work(ctx, &river.Job[jobs.ScoreOrganizationArgs]{Args: jobs.ScoreOrganizationArgs{InstallationID: instID, Generation: 2}}); err != nil {
+	if err := score.Work(ctx, &river.Job[queue.ScoreOrganization]{Args: queue.ScoreOrganization{InstallationID: instID, Generation: 2}}); err != nil {
 		t.Fatalf("second score: %v", err)
 	}
 	if state := scoringState(t, pool); state.ScoredGeneration != 2 {

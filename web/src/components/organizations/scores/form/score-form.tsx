@@ -2,8 +2,8 @@
 
 import type { FormEvent } from 'react';
 
-import type { ScoreForm as Form } from '../data';
 import { FilterFields, PeriodFields } from './fields';
+import type { ScoreFormValues as Form } from './types';
 
 interface Props {
   form: Form;

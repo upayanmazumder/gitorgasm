@@ -10,7 +10,7 @@ import (
 	"github.com/upayanmazumder/gitorgasm/core/internal/db"
 	"github.com/upayanmazumder/gitorgasm/core/internal/github"
 	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi"
-	"github.com/upayanmazumder/gitorgasm/core/internal/jobs"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/queue"
 	"github.com/upayanmazumder/gitorgasm/core/internal/obs"
 	"github.com/upayanmazumder/gitorgasm/core/internal/scorer"
 	"github.com/upayanmazumder/gitorgasm/core/internal/secure"
@@ -35,7 +35,7 @@ func runAPI(ctx context.Context, log *slog.Logger) error {
 		return err
 	}
 	defer pool.Close()
-	jobClient, err := jobs.NewInsertClient(pool)
+	jobClient, err := queue.NewInsertClient(pool)
 	if err != nil {
 		return err
 	}

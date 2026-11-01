@@ -9,7 +9,7 @@ import (
 
 	"github.com/riverqueue/river"
 
-	"github.com/upayanmazumder/gitorgasm/core/internal/jobs"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/sync"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store/tenancy"
 )
 
@@ -17,7 +17,7 @@ func TestSyncMirrorsRepositoriesAndTombstonesRemoved(t *testing.T) {
 	f := &fakeGitHub{}
 	pool, gh := setup(t, f)
 	seedStale(t, pool)
-	w := &jobs.SyncWorker{Pool: pool, GitHub: gh, Now: time.Now}
+	w := &sync.Worker{Pool: pool, GitHub: gh, Now: time.Now}
 
 	if err := work(t, w); err != nil {
 		t.Fatalf("sync: %v", err)
@@ -50,7 +50,7 @@ func TestSyncSnoozesOnRateLimitWithoutTombstoning(t *testing.T) {
 	f := &fakeGitHub{rateLimitPage: 2}
 	pool, gh := setup(t, f)
 	seedStale(t, pool)
-	err := work(t, &jobs.SyncWorker{Pool: pool, GitHub: gh, Now: time.Now})
+	err := work(t, &sync.Worker{Pool: pool, GitHub: gh, Now: time.Now})
 
 	var snooze *river.JobSnoozeError
 	if !errors.As(err, &snooze) || snooze.Duration < time.Minute || snooze.Duration > 3*time.Minute {
@@ -79,7 +79,7 @@ func TestConcurrentSyncOfSameInstallationIsDeferred(t *testing.T) {
 	if _, err := holder.Exec(ctx, `SELECT pg_advisory_lock(hashtextextended('gitorgasm:sync_installation:' || $1::bigint::text, 0))`, instID); err != nil {
 		t.Fatal(err)
 	}
-	err = work(t, &jobs.SyncWorker{Pool: pool, GitHub: gh, Now: time.Now})
+	err = work(t, &sync.Worker{Pool: pool, GitHub: gh, Now: time.Now})
 	var snooze *river.JobSnoozeError
 	if !errors.As(err, &snooze) {
 		t.Fatalf("err = %v, want snooze while another pass holds the lock", err)
@@ -93,7 +93,7 @@ func TestSyncMarksUninstalledInstallationDeleted(t *testing.T) {
 	f := &fakeGitHub{gone: true}
 	pool, gh := setup(t, f)
 	seedStale(t, pool)
-	if err := work(t, &jobs.SyncWorker{Pool: pool, GitHub: gh, Now: time.Now}); err != nil {
+	if err := work(t, &sync.Worker{Pool: pool, GitHub: gh, Now: time.Now}); err != nil {
 		t.Fatalf("sync: %v", err)
 	}
 	ids, err := tenancy.ActiveInstallationIDs(context.Background(), pool)

@@ -2,7 +2,6 @@
 package jobs
 
 import (
-	"context"
 	"log/slog"
 	"time"
 
@@ -12,13 +11,14 @@ import (
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 
 	"github.com/upayanmazumder/gitorgasm/core/internal/github"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/ingest"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/maintenance"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/queue"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/scoring"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/sync"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/webhook"
 	"github.com/upayanmazumder/gitorgasm/core/internal/scorer"
 )
-
-// NewInsertClient returns a River client that only inserts jobs (used by the API process).
-func NewInsertClient(pool *pgxpool.Pool) (*river.Client[pgx.Tx], error) {
-	return river.NewClient(riverpgxv5.New(pool), &river.Config{})
-}
 
 // WorkerOptions configures the worker process.
 type WorkerOptions struct {
@@ -31,39 +31,31 @@ type WorkerOptions struct {
 // NewWorkerClient returns a River client that executes jobs.
 func NewWorkerClient(pool *pgxpool.Pool, gh *github.Client, opts WorkerOptions) (*river.Client[pgx.Tx], error) {
 	workers := river.NewWorkers()
-	river.AddWorker(workers, &SyncWorker{Pool: pool, GitHub: gh, Now: time.Now})
-	river.AddWorker(workers, &IngestWorker{Pool: pool, GitHub: gh, Now: time.Now})
-	river.AddWorker(workers, &ScoreWorker{Pool: pool, Scorer: opts.Scorer})
-	river.AddWorker(workers, &WebhookWorker{Pool: pool, GitHub: gh})
-	river.AddWorker(workers, &ReconcileWorker{Pool: pool})
-	river.AddWorker(workers, &PurgeSessionsWorker{Pool: pool, Now: time.Now, Log: opts.Logger})
-	river.AddWorker(workers, &PurgeWebhookDeliveriesWorker{Pool: pool, Now: time.Now, Log: opts.Logger})
+	river.AddWorker(workers, &sync.Worker{Pool: pool, GitHub: gh, Now: time.Now})
+	river.AddWorker(workers, &ingest.Worker{Pool: pool, GitHub: gh, Now: time.Now})
+	river.AddWorker(workers, &scoring.Worker{Pool: pool, Scorer: opts.Scorer})
+	river.AddWorker(workers, &webhook.Worker{Pool: pool, GitHub: gh})
+	river.AddWorker(workers, &maintenance.ReconcileWorker{Pool: pool})
+	river.AddWorker(workers, &maintenance.PurgeSessionsWorker{Pool: pool, Now: time.Now, Log: opts.Logger})
+	river.AddWorker(workers, &maintenance.PurgeWebhookDeliveriesWorker{Pool: pool, Now: time.Now, Log: opts.Logger})
 	return river.NewClient(riverpgxv5.New(pool), &river.Config{
 		Logger:  opts.Logger,
 		Workers: workers,
 		Queues: map[string]river.QueueConfig{
 			river.QueueDefault: {MaxWorkers: opts.Concurrency},
-			QueueGitHub:        {MaxWorkers: opts.Concurrency},
-			QueueScoring:       {MaxWorkers: 1},
+			queue.GitHub:       {MaxWorkers: opts.Concurrency},
+			queue.Scoring:      {MaxWorkers: 1},
 		},
 		PeriodicJobs: []*river.PeriodicJob{
 			river.NewPeriodicJob(river.PeriodicInterval(opts.ReconcileEvery),
-				func() (river.JobArgs, *river.InsertOpts) { return ReconcileArgs{}, nil },
+				func() (river.JobArgs, *river.InsertOpts) { return queue.Reconcile{}, nil },
 				&river.PeriodicJobOpts{RunOnStart: true}),
-			river.NewPeriodicJob(river.PeriodicInterval(purgeInterval),
-				func() (river.JobArgs, *river.InsertOpts) { return PurgeSessionsArgs{}, nil },
+			river.NewPeriodicJob(river.PeriodicInterval(24*time.Hour),
+				func() (river.JobArgs, *river.InsertOpts) { return queue.PurgeSessions{}, nil },
 				&river.PeriodicJobOpts{RunOnStart: true}),
-			river.NewPeriodicJob(river.PeriodicInterval(purgeInterval),
-				func() (river.JobArgs, *river.InsertOpts) { return PurgeWebhookDeliveriesArgs{}, nil },
+			river.NewPeriodicJob(river.PeriodicInterval(24*time.Hour),
+				func() (river.JobArgs, *river.InsertOpts) { return queue.PurgeWebhookDeliveries{}, nil },
 				&river.PeriodicJobOpts{RunOnStart: true}),
 		},
 	})
-}
-
-// insertClient reuses the worker's River client and builds an insert-only client outside River.
-func insertClient(ctx context.Context, pool *pgxpool.Pool) (*river.Client[pgx.Tx], error) {
-	if client, err := river.ClientFromContextSafely[pgx.Tx](ctx); err == nil {
-		return client, nil
-	}
-	return NewInsertClient(pool)
 }

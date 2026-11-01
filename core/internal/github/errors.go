@@ -90,8 +90,3 @@ func summarize(body []byte) string {
 	}
 	return string(body)
 }
-
-func hasStatus(err error, status int) bool {
-	var apiErr *APIError
-	return errors.As(err, &apiErr) && apiErr.Status == status
-}

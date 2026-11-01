@@ -10,7 +10,8 @@ import (
 	"github.com/riverqueue/river/rivertest"
 
 	"github.com/upayanmazumder/gitorgasm/core/internal/github/models"
-	"github.com/upayanmazumder/gitorgasm/core/internal/jobs"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/queue"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/webhook"
 	"github.com/upayanmazumder/gitorgasm/core/internal/secure"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store/identity"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store/tenancy"
@@ -33,7 +34,7 @@ func TestWebhookWorkerAppliesEvents(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tw := rivertest.NewWorker(t, riverpgxv5.New(pool), &river.Config{}, &jobs.WebhookWorker{Pool: pool, GitHub: gh})
+	tw := rivertest.NewWorker(t, riverpgxv5.New(pool), &river.Config{}, &webhook.Worker{Pool: pool, GitHub: gh})
 	deliver := func(id, event, payload string) {
 		t.Helper()
 		if _, err := webhooks.InsertWebhookDelivery(ctx, pool, webhooks.WebhookDelivery{DeliveryID: id, Event: event, Payload: []byte(payload)}); err != nil {
@@ -44,7 +45,7 @@ func TestWebhookWorkerAppliesEvents(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer func() { _ = tx.Rollback(ctx) }()
-		res, err := tw.Work(ctx, t, tx, jobs.ProcessWebhookArgs{DeliveryID: id}, nil)
+		res, err := tw.Work(ctx, t, tx, queue.ProcessWebhook{DeliveryID: id}, nil)
 		if err != nil || res.EventKind != river.EventKindJobCompleted {
 			t.Fatalf("work %s: %v %+v", id, err, res)
 		}

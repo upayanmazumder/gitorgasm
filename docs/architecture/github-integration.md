@@ -68,7 +68,7 @@ The install entry `/api/v1/auth/install` redirects to GitHub. Its return starts 
 
 **Verified** against <https://docs.github.com/en/webhooks/webhook-events-and-payloads>.
 
-| Event                                                   | Subscription                                                                                                                                                                     | Handling now (`jobs.WebhookWorker.apply`)                                                                                                                    |
+| Event                                                   | Subscription                                                                                                                                                                     | Handling now (`internal/jobs/webhook`)                                                                                                                    |
 | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `installation`                                          | "All GitHub Apps receive this event by default. You cannot manually subscribe to this event." Actions: `created`, `deleted`, `new_permissions_accepted`, `suspend`, `unsuspend`. | `deleted`: forget token, mark deleted, revoke grants. Other actions: upsert installation, enqueue sync.                                                      |
 | `installation_repositories`                             | Received by default.                                                                                                                                                             | Enqueue sync.                                                                                                                                                |
@@ -139,10 +139,10 @@ flowchart TD
   UP -- "Link rel=next" --> P
   UP -- "last page" --> TB["tombstone synced_at < start"]
   TB --> F["sync_state success, repositories_seen"]
-  P -- error --> FE["sync_state.last_error; no tombstone; retryDecision"]
+  P -- error --> FE["sync_state.last_error; no tombstone; worker retry policy"]
 ```
 
-**Verified**: `jobs/jobs.go` `SyncWorker.Work`, `retryDecision`; `store.TombstoneUnseenRepositories`.
+**Verified**: `internal/jobs/sync`, `internal/jobs/internal/execution`, and `store/tenancy.TombstoneUnseenRepositories`.
 
 Cost estimate (**Assumption**, from decisions workload numbers): one full sync = `ceil(repos / 100)` + 2 requests. 1,000 repos ≈ 12 requests. 10,000 repos ≈ 102 requests. Legacy dev data (372 repos over 10 orgs) needs about 25 requests per full reconcile.
 
@@ -160,9 +160,9 @@ Secondary limits (**Verified**, same REST page): at most 100 concurrent requests
 
 Documented retry rule (**Verified**, same page): honor `retry-after`. Else if `x-ratelimit-remaining` is `0`, wait until `x-ratelimit-reset`. Else wait at least one minute. On repeated secondary limits, back off exponentially.
 
-Classification (**Verified**, `client.go` `classify`):
+Classification (**Verified**, `github/errors.go`):
 
-| Response                                                                               | Kind                                                                 | Job outcome (`retryDecision`)                          | API outcome (`githubError`)               |
+| Response                                                                               | Kind                                                                 | Job outcome (worker retry policy)                          | API outcome (`githubError`)               |
 | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------ | ----------------------------------------- |
 | 429, or 403 with `x-ratelimit-remaining: 0`, `retry-after`, or "rate limit" in message | `KindRateLimited`, `RetryAfter` = `retry-after` → reset + 1 s → 60 s | `JobSnooze(RetryAfter)`                                | 503 `github_rate_limited` + `Retry-After` |
 | 401                                                                                    | `KindUnauthorized`                                                   | `JobCancel`                                            | 400 `github_auth_failed`                  |

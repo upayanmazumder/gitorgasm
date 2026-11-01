@@ -6,6 +6,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/response"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store/identity"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store/scores"
 )
@@ -19,7 +20,7 @@ func presetName(w http.ResponseWriter, r *http.Request) (string, bool) {
 	valid := utf8.ValidString(name) && n >= 1 && n <= maxPresetNameRunes &&
 		strings.IndexFunc(name, func(c rune) bool { return !unicode.IsPrint(c) }) < 0
 	if !valid {
-		writeError(w, r, http.StatusBadRequest, "invalid_name", "preset name must contain 1 to 80 printable characters")
+		response.Error(w, r, http.StatusBadRequest, "invalid_name", "preset name must contain 1 to 80 printable characters")
 	}
 	return name, valid
 }
@@ -31,10 +32,10 @@ func (s *Server) listScorePresets(w http.ResponseWriter, r *http.Request, u *ide
 	}
 	presets, err := scores.ListScoringPresets(r.Context(), s.Pool, id, u.UserID)
 	if err != nil {
-		s.internalError(w, r, err)
+		response.InternalError(s.Log, w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"data": presets})
+	response.JSON(w, http.StatusOK, map[string]any{"data": presets})
 }
 
 func (s *Server) saveScorePreset(w http.ResponseWriter, r *http.Request, u *identity.SessionUser) {
@@ -60,7 +61,7 @@ func (s *Server) saveScorePreset(w http.ResponseWriter, r *http.Request, u *iden
 		s.scoreError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, scores.ScoringPreset{Name: name, Query: query})
+	response.JSON(w, http.StatusOK, scores.ScoringPreset{Name: name, Query: query})
 }
 
 func (s *Server) deleteScorePreset(w http.ResponseWriter, r *http.Request, u *identity.SessionUser) {
@@ -74,11 +75,11 @@ func (s *Server) deleteScorePreset(w http.ResponseWriter, r *http.Request, u *id
 	}
 	deleted, err := scores.DeleteScoringPreset(r.Context(), s.Pool, id, u.UserID, name)
 	if err != nil {
-		s.internalError(w, r, err)
+		response.InternalError(s.Log, w, r, err)
 		return
 	}
 	if !deleted {
-		writeError(w, r, http.StatusNotFound, "preset_not_found", "preset not found")
+		response.Error(w, r, http.StatusNotFound, "preset_not_found", "preset not found")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

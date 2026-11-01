@@ -12,7 +12,8 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/upayanmazumder/gitorgasm/core/internal/github/models"
-	"github.com/upayanmazumder/gitorgasm/core/internal/jobs"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/maintenance"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/queue"
 	"github.com/upayanmazumder/gitorgasm/core/internal/secure"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store/identity"
 	"github.com/upayanmazumder/gitorgasm/core/internal/testdb"
@@ -52,10 +53,10 @@ func TestPurgeKeepsRowsInsideRetention(t *testing.T) {
 
 	log := slog.New(slog.DiscardHandler)
 	clock := func() time.Time { return now }
-	if err := (&jobs.PurgeSessionsWorker{Pool: pool, Now: clock, Log: log}).Work(ctx, &river.Job[jobs.PurgeSessionsArgs]{}); err != nil {
+	if err := (&maintenance.PurgeSessionsWorker{Pool: pool, Now: clock, Log: log}).Work(ctx, &river.Job[queue.PurgeSessions]{}); err != nil {
 		t.Fatal(err)
 	}
-	if err := (&jobs.PurgeWebhookDeliveriesWorker{Pool: pool, Now: clock, Log: log}).Work(ctx, &river.Job[jobs.PurgeWebhookDeliveriesArgs]{}); err != nil {
+	if err := (&maintenance.PurgeWebhookDeliveriesWorker{Pool: pool, Now: clock, Log: log}).Work(ctx, &river.Job[queue.PurgeWebhookDeliveries]{}); err != nil {
 		t.Fatal(err)
 	}
 

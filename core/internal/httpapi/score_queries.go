@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/response"
 )
 
 const maxScoreQueryBytes = 16 << 10
@@ -17,19 +19,19 @@ type scoreQuery map[string]any
 func readScoreQuery(w http.ResponseWriter, r *http.Request) (scoreQuery, bool) {
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxScoreQueryBytes))
 	if err != nil {
-		writeError(w, r, http.StatusBadRequest, "invalid_query", "query exceeds the size limit or cannot be read")
+		response.Error(w, r, http.StatusBadRequest, "invalid_query", "query exceeds the size limit or cannot be read")
 		return nil, false
 	}
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.UseNumber()
 	var query scoreQuery
 	if err := dec.Decode(&query); err != nil || query == nil || dec.More() {
-		writeError(w, r, http.StatusBadRequest, "invalid_query", "query must be one JSON object")
+		response.Error(w, r, http.StatusBadRequest, "invalid_query", "query must be one JSON object")
 		return nil, false
 	}
 	for key := range query {
 		if key != "period" && key != "filter" && key != "rules" {
-			writeError(w, r, http.StatusBadRequest, "invalid_query", "query contains an unknown field")
+			response.Error(w, r, http.StatusBadRequest, "invalid_query", "query contains an unknown field")
 			return nil, false
 		}
 	}

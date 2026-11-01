@@ -15,7 +15,8 @@ import (
 	"github.com/upayanmazumder/gitorgasm/core/internal/config"
 	"github.com/upayanmazumder/gitorgasm/core/internal/github"
 	"github.com/upayanmazumder/gitorgasm/core/internal/github/models"
-	"github.com/upayanmazumder/gitorgasm/core/internal/jobs"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/queue"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/sync"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store/tenancy"
 	"github.com/upayanmazumder/gitorgasm/core/internal/testdb"
 )
@@ -59,7 +60,7 @@ func seedStale(t *testing.T, pool *pgxpool.Pool) {
 	}
 }
 
-func work(t *testing.T, w *jobs.SyncWorker) error {
+func work(t *testing.T, w *sync.Worker) error {
 	t.Helper()
-	return w.Work(context.Background(), &river.Job[jobs.SyncInstallationArgs]{Args: jobs.SyncInstallationArgs{InstallationID: instID}})
+	return w.Work(context.Background(), &river.Job[queue.SyncInstallation]{Args: queue.SyncInstallation{InstallationID: instID}})
 }

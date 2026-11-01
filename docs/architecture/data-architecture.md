@@ -94,8 +94,8 @@ Not in one transaction (**Verified**, `jobs/jobs.go` `SyncWorker.Work`):
 **Verified** (`jobs/jobs.go` package comment): "River stores jobs in PostgreSQL, so a job is committed atomically with the data change that caused it (transactional outbox)."
 
 - A job row exists if and only if its cause committed. No separate outbox table and no relay process exist.
-- Dedupe: `SyncInstallationArgs` and `ProcessWebhookArgs` use `UniqueOpts{ByArgs: true}`. A second insert while a matching job is pending returns `UniqueSkippedAsDuplicate`. `requestSync` returns this as `duplicate: true`.
-- Retry policy: `sync_installation` has `MaxAttempts: 8` and a 15-minute timeout. `process_webhook` has `MaxAttempts: 10`. Rate limits snooze the job. 401, 403, and other 4xx cancel it (`retryDecision`).
+- Dedupe: sync and webhook argument types in `internal/jobs/queue` use `UniqueOpts{ByArgs: true}`. A second insert while a matching job is pending returns `UniqueSkippedAsDuplicate`. `requestSync` returns this as `duplicate: true`.
+- Retry policy: `sync_installation` has `MaxAttempts: 8` and a 15-minute timeout. `process_webhook` has `MaxAttempts: 10`. Rate limits snooze the job. 401, 403, and other 4xx cancel it (`internal/jobs/internal/execution`).
 - **Alternative considered**: NATS JetStream as an event bus. Rejected: a second stateful system for no current consumer (decisions item 4).
 
 ## 5. Retention

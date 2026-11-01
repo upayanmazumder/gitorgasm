@@ -1,8 +1,8 @@
-import type { ScoreForm } from '../../data';
+import type { ScoreFormValues } from '..';
 
 export interface FormFieldsProps {
-  form: ScoreForm;
-  set: <K extends keyof ScoreForm>(key: K, value: ScoreForm[K]) => void;
+  form: ScoreFormValues;
+  set: <K extends keyof ScoreFormValues>(key: K, value: ScoreFormValues[K]) => void;
 }
 
 export const inputClassName = 'rounded border p-2';

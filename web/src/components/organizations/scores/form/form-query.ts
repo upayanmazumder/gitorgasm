@@ -1,6 +1,7 @@
-import type { ScoreForm, ScoreQuery } from '../data';
+import type { ScoreQuery } from '../data';
+import type { ScoreFormValues } from './types';
 
-export const defaultForm: ScoreForm = {
+export const defaultForm: ScoreFormValues = {
   period: 'last30_days',
   start: '',
   end: '',
@@ -18,7 +19,7 @@ function toLocalInput(iso: string): string {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 }
 
-export function fromQuery(query: ScoreQuery): ScoreForm {
+export function fromQuery(query: ScoreQuery): ScoreFormValues {
   const { period, filter } = query;
   return {
     period:
@@ -40,7 +41,7 @@ export function fromQuery(query: ScoreQuery): ScoreForm {
 }
 
 // Named periods carry no anchor; the server uses the latest ingest.
-export function toQuery(form: ScoreForm): ScoreQuery {
+export function toQuery(form: ScoreFormValues): ScoreQuery {
   const userId = form.userId.trim();
   if (userId && !(Number.isSafeInteger(Number(userId)) && Number(userId) > 0)) {
     throw new Error('Enter a valid GitHub user ID.');

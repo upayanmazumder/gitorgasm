@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/upayanmazumder/gitorgasm/core/internal/github"
+	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/response"
 )
 
 // githubError maps upstream failures to stable API errors without leaking upstream bodies.
@@ -16,13 +17,23 @@ func (s *Server) githubError(w http.ResponseWriter, r *http.Request, err error) 
 		switch apiErr.Kind {
 		case github.KindRateLimited:
 			w.Header().Set("Retry-After", strconv.Itoa(int(apiErr.RetryAfter.Seconds())))
-			writeError(w, r, http.StatusServiceUnavailable, "github_rate_limited", "GitHub rate limit reached; retry later")
+			response.Error(w, r, http.StatusServiceUnavailable, "github_rate_limited", "GitHub rate limit reached; retry later")
 			return
 		case github.KindInvalid, github.KindUnauthorized:
-			writeError(w, r, http.StatusBadRequest, "github_auth_failed", "GitHub rejected the authorization; start again")
+			response.Error(w, r, http.StatusBadRequest, "github_auth_failed", "GitHub rejected the authorization; start again")
 			return
 		}
 	}
 	s.Log.ErrorContext(r.Context(), "github call failed", "error", err)
-	writeError(w, r, http.StatusBadGateway, "github_unavailable", "GitHub request failed")
+	response.Error(w, r, http.StatusBadGateway, "github_unavailable", "GitHub request failed")
+}
+
+func (s *Server) requireGitHub(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if s.GitHub == nil {
+			response.Error(w, r, http.StatusServiceUnavailable, "github_not_configured", "the GitHub App is not configured on this deployment")
+			return
+		}
+		next(w, r)
+	}
 }

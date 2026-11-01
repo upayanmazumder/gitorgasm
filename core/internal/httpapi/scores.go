@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/response"
 	"github.com/upayanmazumder/gitorgasm/core/internal/scorer"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store/identity"
@@ -33,17 +34,17 @@ type scoreResponse struct {
 func (s *Server) scoreError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		writeError(w, r, http.StatusNotFound, "organization_not_found", "organization not found")
+		response.Error(w, r, http.StatusNotFound, "organization_not_found", "organization not found")
 	case errors.Is(err, scorer.ErrInvalidQuery):
-		writeError(w, r, http.StatusBadRequest, "invalid_query", "score query is invalid")
+		response.Error(w, r, http.StatusBadRequest, "invalid_query", "score query is invalid")
 	case errors.Is(err, scorer.ErrBusy), errors.Is(err, context.DeadlineExceeded):
-		writeError(w, r, http.StatusServiceUnavailable, "scores_busy", "score calculation is busy; try again")
+		response.Error(w, r, http.StatusServiceUnavailable, "scores_busy", "score calculation is busy; try again")
 	case errors.Is(err, scores.ErrStaleGeneration):
-		writeError(w, r, http.StatusServiceUnavailable, "scores_pending", "the scores changed during this request")
+		response.Error(w, r, http.StatusServiceUnavailable, "scores_pending", "the scores changed during this request")
 	case errors.Is(err, scores.ErrPresetLimit):
-		writeError(w, r, http.StatusConflict, "preset_limit", "this organization has too many presets")
+		response.Error(w, r, http.StatusConflict, "preset_limit", "this organization has too many presets")
 	default:
-		s.internalError(w, r, err)
+		response.InternalError(s.Log, w, r, err)
 	}
 }
 
@@ -58,7 +59,7 @@ func (s *Server) getScores(w http.ResponseWriter, r *http.Request, u *identity.S
 		return
 	}
 	if state.ScoredGeneration == 0 {
-		writeError(w, r, http.StatusServiceUnavailable, "scores_pending", "scores are not ready")
+		response.Error(w, r, http.StatusServiceUnavailable, "scores_pending", "scores are not ready")
 		return
 	}
 	result, err := scores.LoadSnapshot(r.Context(), s.Pool, id, state.ScoredGeneration, u.UserID, "default")
@@ -67,10 +68,10 @@ func (s *Server) getScores(w http.ResponseWriter, r *http.Request, u *identity.S
 		return
 	}
 	if result == nil {
-		s.internalError(w, r, errors.New("default score snapshot missing"))
+		response.InternalError(s.Log, w, r, errors.New("default score snapshot missing"))
 		return
 	}
-	writeJSON(w, http.StatusOK, scoreResponse{Data: result, State: state, Fresh: scoreFresh(state, s.Now())})
+	response.JSON(w, http.StatusOK, scoreResponse{Data: result, State: state, Fresh: scoreFresh(state, s.Now())})
 }
 
 func scoreFresh(state scores.ScoringState, now time.Time) bool {
@@ -95,7 +96,7 @@ func (s *Server) queryScores(w http.ResponseWriter, r *http.Request, u *identity
 		return
 	}
 	if state.Generation == 0 || state.ScoredGeneration != state.Generation || state.LastIngestedAt == nil {
-		writeError(w, r, http.StatusServiceUnavailable, "scores_pending", "the current scores are not ready")
+		response.Error(w, r, http.StatusServiceUnavailable, "scores_pending", "the current scores are not ready")
 		return
 	}
 	query := decoded.withAsOf(*state.LastIngestedAt).encode()
@@ -112,7 +113,7 @@ func (s *Server) queryScores(w http.ResponseWriter, r *http.Request, u *identity
 			return
 		}
 	}
-	writeJSON(w, http.StatusOK, scoreResponse{Data: result, State: state, Fresh: scoreFresh(state, s.Now())})
+	response.JSON(w, http.StatusOK, scoreResponse{Data: result, State: state, Fresh: scoreFresh(state, s.Now())})
 }
 
 func (s *Server) calculate(ctx context.Context, id, userID, generation int64, key string, query json.RawMessage) (json.RawMessage, error) {

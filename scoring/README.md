@@ -9,6 +9,7 @@ This Rust crate scores a complete snapshot of one organization's GitHub contribu
 - `query/` owns filters, periods, and the nested catalog with its result cache.
 - Each domain uses `mod.rs` for public exports. `lib.rs` exposes the crate API.
 - Tests group query behavior by catalog, filter, and period.
+- Public leaderboard functions pass borrowed signal iterators to the engine without temporary reference lists.
 
 ## Default scoring
 

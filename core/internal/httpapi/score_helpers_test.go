@@ -10,7 +10,8 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/upayanmazumder/gitorgasm/core/internal/github/models"
-	"github.com/upayanmazumder/gitorgasm/core/internal/jobs"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/queue"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/scoring"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store/contributions"
 )
 
@@ -46,8 +47,8 @@ func newScoreFixture(t *testing.T) (*harness, string, string, time.Time, func(in
 		if err != nil {
 			t.Fatal(err)
 		}
-		job := &river.Job[jobs.ScoreOrganizationArgs]{Args: jobs.ScoreOrganizationArgs{InstallationID: instID, Generation: generation}}
-		if err := (&jobs.ScoreWorker{Pool: h.pool, Scorer: testScorer()}).Work(ctx, job); err != nil {
+		job := &river.Job[queue.ScoreOrganization]{Args: queue.ScoreOrganization{InstallationID: instID, Generation: generation}}
+		if err := (&scoring.Worker{Pool: h.pool, Scorer: testScorer()}).Work(ctx, job); err != nil {
 			t.Fatal(err)
 		}
 		return generation

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 
-import { useScores } from '../data';
-import type { Preset } from '../data';
+import { useScores, type Preset } from '../data';
 import { defaultForm, fromQuery, toQuery } from '../form';
 import { errorMessage } from './error-message';
 

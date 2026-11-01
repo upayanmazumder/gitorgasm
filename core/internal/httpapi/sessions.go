@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/upayanmazumder/gitorgasm/core/internal/github/models"
+	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/response"
 	"github.com/upayanmazumder/gitorgasm/core/internal/secure"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store/identity"
@@ -36,7 +37,7 @@ func (s *Server) createSession(ctx context.Context, tx pgx.Tx, sessionID string,
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(s.cookieName(sessionCookie)); err == nil {
 		if err := identity.DeleteSession(r.Context(), s.Pool, secure.Hash(c.Value)); err != nil {
-			s.internalError(w, r, err)
+			response.InternalError(s.Log, w, r, err)
 			return
 		}
 	}
@@ -49,17 +50,17 @@ func (s *Server) authed(next func(http.ResponseWriter, *http.Request, *identity.
 	return func(w http.ResponseWriter, r *http.Request) {
 		c, err := r.Cookie(s.cookieName(sessionCookie))
 		if err != nil || c.Value == "" {
-			writeError(w, r, http.StatusUnauthorized, "unauthenticated", "sign in required")
+			response.Error(w, r, http.StatusUnauthorized, "unauthenticated", "sign in required")
 			return
 		}
 		u, err := identity.LookupSession(r.Context(), s.Pool, secure.Hash(c.Value))
 		if errors.Is(err, store.ErrNotFound) {
 			s.clearCookie(w, sessionCookie)
-			writeError(w, r, http.StatusUnauthorized, "unauthenticated", "session expired")
+			response.Error(w, r, http.StatusUnauthorized, "unauthenticated", "session expired")
 			return
 		}
 		if err != nil {
-			s.internalError(w, r, err)
+			response.InternalError(s.Log, w, r, err)
 			return
 		}
 		next(w, r, u)
@@ -67,5 +68,5 @@ func (s *Server) authed(next func(http.ResponseWriter, *http.Request, *identity.
 }
 
 func (s *Server) me(w http.ResponseWriter, _ *http.Request, u *identity.SessionUser) {
-	writeJSON(w, http.StatusOK, u)
+	response.JSON(w, http.StatusOK, u)
 }

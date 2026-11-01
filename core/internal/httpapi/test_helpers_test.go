@@ -23,7 +23,7 @@ import (
 	"github.com/upayanmazumder/gitorgasm/core/internal/github"
 	"github.com/upayanmazumder/gitorgasm/core/internal/github/models"
 	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi"
-	"github.com/upayanmazumder/gitorgasm/core/internal/jobs"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/queue"
 	"github.com/upayanmazumder/gitorgasm/core/internal/scorer"
 	"github.com/upayanmazumder/gitorgasm/core/internal/secure"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store/identity"
@@ -53,7 +53,7 @@ func newHarness(t *testing.T) *harness {
 func newHarnessWithGitHub(t *testing.T, gh *config.GitHub) *harness {
 	t.Helper()
 	pool := testdb.New(t)
-	jobClient, err := jobs.NewInsertClient(pool)
+	jobClient, err := queue.NewInsertClient(pool)
 	if err != nil {
 		t.Fatal(err)
 	}

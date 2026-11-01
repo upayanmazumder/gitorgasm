@@ -62,7 +62,7 @@ pub(super) fn score<'a>(
         }
         selected.push(signal);
     }
-    let result = scoreboards(&selected, &query.rules, &snapshot.memberships)?;
+    let result = scoreboards(selected.into_iter(), &query.rules, &snapshot.memberships)?;
     if cache.entries.len() == capacity {
         cache.entries.pop_front();
     }

@@ -10,7 +10,9 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/upayanmazumder/gitorgasm/core/internal/jobs"
+	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/requestid"
+	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/response"
+	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/queue"
 	"github.com/upayanmazumder/gitorgasm/core/internal/secure"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store/audit"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store/identity"
@@ -38,18 +40,18 @@ func (s *Server) callback(w http.ResponseWriter, r *http.Request) {
 	c, err := r.Cookie(s.cookieName(oauthCookie))
 	s.clearCookie(w, oauthCookie)
 	if err != nil {
-		writeError(w, r, http.StatusBadRequest, "oauth_state_missing", "login session expired; start again")
+		response.Error(w, r, http.StatusBadRequest, "oauth_state_missing", "login session expired; start again")
 		return
 	}
 	state, verifier, ok := strings.Cut(c.Value, ".")
 	got := r.URL.Query().Get("state")
 	if !ok || state == "" || verifier == "" || got == "" || subtle.ConstantTimeCompare([]byte(state), []byte(got)) != 1 {
-		writeError(w, r, http.StatusBadRequest, "oauth_state_mismatch", "login state mismatch")
+		response.Error(w, r, http.StatusBadRequest, "oauth_state_mismatch", "login state mismatch")
 		return
 	}
 	code := r.URL.Query().Get("code")
 	if r.URL.Query().Get("error") != "" || code == "" {
-		writeError(w, r, http.StatusBadRequest, "oauth_denied", "GitHub did not return an authorization code")
+		response.Error(w, r, http.StatusBadRequest, "oauth_denied", "GitHub did not return an authorization code")
 		return
 	}
 
@@ -89,17 +91,17 @@ func (s *Server) callback(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		for _, id := range ids {
-			if _, err := s.Jobs.InsertTx(ctx, tx, jobs.SyncInstallationArgs{InstallationID: id}, nil); err != nil {
+			if _, err := s.Jobs.InsertTx(ctx, tx, queue.SyncInstallation{InstallationID: id}, nil); err != nil {
 				return err
 			}
 		}
 		return audit.Audit(ctx, tx, audit.AuditEvent{
-			ActorUserID: &userID, Action: "session.created", RequestID: RequestIDFrom(ctx),
+			ActorUserID: &userID, Action: "session.created", RequestID: requestid.From(ctx),
 			Metadata: map[string]any{"installations": len(ids)},
 		})
 	})
 	if err != nil {
-		s.internalError(w, r, err)
+		response.InternalError(s.Log, w, r, err)
 		return
 	}
 	s.setCookie(w, sessionCookie, sessionID, s.Cfg.SessionTTL)

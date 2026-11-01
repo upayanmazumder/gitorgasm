@@ -31,13 +31,13 @@ This document estimates GitHub request counts, rate-budget use, database size, a
 | Fact                                                                                                                                                                                                                                          | Source                                                                          |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | Repository sync lists `GET /installation/repositories?per_page=100` and follows `Link` pages.                                                                                                                                                 | **Verified**: `core/internal/github/client.go` (`ListInstallationRepositories`) |
-| One full sync = 1 `GET /app/installations/{id}` (JWT) + 0 or 1 token mint (JWT) + `ceil(repos/100)` pages (installation token).                                                                                                               | **Verified**: `core/internal/jobs/jobs.go` (`SyncWorker.Work`)                  |
+| One full sync = 1 `GET /app/installations/{id}` (JWT), up to one token mint (JWT), and `ceil(repos/100)` pages (installation token). | **Verified**: `core/internal/jobs/sync` |
 | Login = token exchange on `github.com` + `GET /user` + `ceil(installations/100)` pages of `GET /user/installations` (user token). It enqueues one sync per installation.                                                                      | **Verified**: `core/internal/httpapi/auth.go` (`callback`)                      |
-| Reconcile enqueues one sync per active installation every `RECONCILE_INTERVAL` (default `6h`), also on worker start.                                                                                                                          | **Verified**: `jobs.ReconcileWorker`, `core/internal/config/config.go`          |
+| Reconcile enqueues one sync per active installation every `RECONCILE_INTERVAL` (default `6h`), also on worker start. | **Verified**: `internal/jobs/maintenance`, `core/internal/config/config.go` |
 | Worker concurrency: `WORKER_CONCURRENCY` default 4, applied to both the `default` and `github` queues per replica.                                                                                                                            | **Verified**: `config.go`, `jobs.NewWorkerClient`                               |
 | Database pool: `DB_MAX_CONNS` default 10 per process in code, 8 in the production ConfigMap.                                                                                                                                                  | **Verified**: `config.go`, `deploy/kustomize/base/config.env`                  |
-| Webhook events that cause work: `installation`, `installation_repositories`, `repository` (each enqueues a full installation sync), `github_app_authorization` revoked (deletes the user's sessions and grants via `store.RevokeGitHubUser`). | **Verified**: `jobs.WebhookWorker.apply`                                        |
-| Rate-limited sync snoozes until the retry time. Permission errors cancel.                                                                                                                                                                     | **Verified**: `jobs.retryDecision`                                              |
+| Webhook events that cause work: `installation`, `installation_repositories`, and `repository` enqueue a full installation sync. Revoked `github_app_authorization` removes sessions and grants. | **Verified**: `internal/jobs/webhook`, `store/identity.RevokeGitHubUser` |
+| Rate-limited sync snoozes until the retry time. Permission errors cancel. | **Verified**: `internal/jobs/internal/execution` |
 
 ### 1.3 Sync deduplication and serialization
 
@@ -86,7 +86,8 @@ Logins cost the **user** budget (5,000 req/h per user, shared with other apps th
 
 ### 2.3 Webhook bursts
 
-Each delivery = 1 `webhook_deliveries` row (raw body) + 1 River job row, written in one transaction. Then one `process_webhook` job runs. **Verified**: `httpapi/orgs.go` (`webhook`), `jobs.WebhookWorker`.
+Each delivery creates one `webhook_deliveries` row and one River job row in one transaction.
+One `process_webhook` job then runs. **Verified**: `httpapi/webhooks.go` and `internal/jobs/webhook`.
 
 | Burst                                            | GitHub cost (1-minute dedupe) | DB writes                                | Bottleneck                                                                                                          |
 | ------------------------------------------------ | ----------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |

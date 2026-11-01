@@ -22,16 +22,16 @@ fn rank<T>(rows: &mut [T], score: impl Fn(&T) -> f64, set_rank: impl Fn(&mut T, 
 }
 
 /// Score one snapshot in event time order. Every view receives the same points for each event.
-pub(crate) fn scoreboards(
-    signals: &[&Signal],
+pub(crate) fn scoreboards<'a>(
+    signals: impl ExactSizeIterator<Item = &'a Signal>,
     rules: &Ruleset,
     memberships: &[TeamMembership],
 ) -> Result<Scoreboards, ScoringError> {
     let compiled = Compiled::new(rules)?;
     let mut ordered = Vec::with_capacity(signals.len());
-    for (index, signal) in signals.iter().enumerate() {
+    for signal in signals {
         let time = signal.timestamp()?;
-        ordered.push((time, index));
+        ordered.push((time, signal));
     }
     ordered.sort_by_key(|(time, _)| *time);
 
@@ -42,8 +42,7 @@ pub(crate) fn scoreboards(
     let mut states = HashMap::<i64, State>::new();
     let mut repositories = Vec::<RepositoryScore>::new();
     let mut repository_index = HashMap::<&str, usize>::new();
-    for (time, index) in ordered {
-        let s = signals[index];
+    for (time, s) in ordered {
         let day = time.date_naive();
         let week = day.iso_week();
         let (points, penalty) =
@@ -106,7 +105,7 @@ pub(crate) fn scoreboards(
 /// # Errors
 /// Returns an error for invalid rules, timestamps, or overflowing totals.
 pub fn contributor_leaderboard(signals: &[Signal], rules: &Ruleset) -> Result<Vec<ContributorScore>, ScoringError> {
-    Ok(scoreboards(&signals.iter().collect::<Vec<_>>(), rules, &[])?.contributors)
+    Ok(scoreboards(signals.iter(), rules, &[])?.contributors)
 }
 
 /// Repository leaderboard using the same scored events as contributors.
@@ -114,7 +113,7 @@ pub fn contributor_leaderboard(signals: &[Signal], rules: &Ruleset) -> Result<Ve
 /// # Errors
 /// Returns an error for invalid rules, timestamps, or overflowing totals.
 pub fn repository_leaderboard(signals: &[Signal], rules: &Ruleset) -> Result<Vec<RepositoryScore>, ScoringError> {
-    Ok(scoreboards(&signals.iter().collect::<Vec<_>>(), rules, &[])?.repositories)
+    Ok(scoreboards(signals.iter(), rules, &[])?.repositories)
 }
 
 /// Team leaderboard; team repository restrictions apply after per-user scoring.
@@ -126,5 +125,5 @@ pub fn team_leaderboard(
     rules: &Ruleset,
     memberships: &[TeamMembership],
 ) -> Result<Vec<TeamScore>, ScoringError> {
-    Ok(scoreboards(&signals.iter().collect::<Vec<_>>(), rules, memberships)?.teams)
+    Ok(scoreboards(signals.iter(), rules, memberships)?.teams)
 }

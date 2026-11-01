@@ -65,6 +65,7 @@ Do not compress code or add unnecessary abstractions to meet a line count.
 The organization feature separates account actions, authorization, directory views, and shared models.
 Scores use nested `data`, `form/fields`, `presets`, `results`, and `state` folders.
 Each folder exports its public API through `index.ts`. Internal siblings use direct imports to avoid cycles.
+Form values stay in `form/types.ts`. The `data` folder contains API models and query hooks.
 
 ## Deployment (Vercel)
 

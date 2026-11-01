@@ -42,7 +42,7 @@ impl ScoreQuery {
     /// Returns an error for an invalid period or ruleset.
     pub fn validate(&self) -> Result<(), ScoringError> {
         self.period.bounds()?;
-        scoreboards(&[], &self.rules, &[])?;
+        scoreboards(std::iter::empty(), &self.rules, &[])?;
         Ok(())
     }
 }
