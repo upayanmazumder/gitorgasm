@@ -1,4 +1,3 @@
 set -eu
 
-make lint
-make test
+node .husky/check-push.mjs

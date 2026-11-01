@@ -25,7 +25,12 @@ Run `pnpm install` at the repository root once. It installs husky hooks. The roo
 
 - `pre-commit` runs lint-staged on staged files only, with the formatters above. It needs `go`, `rustfmt`, and `pnpm` on `PATH`. golangci-lint runs through `go run` at the pinned version.
 - `commit-msg` runs commitlint (Conventional Commits).
-- `pre-push` runs `make lint` and `make test`. A failed check stops the push. Docker must be running, and the pinned tools must be installed with `make tools`.
+- `pre-push` checks the committed paths being pushed. New branches compare with their merge base on `origin/main`. Deleted branches need no checks.
+- Web changes run lint, type checks, formatting checks, and frontend tests. Markdown-only web changes skip these checks.
+- Core and contract changes run `go vet`. Rust changes run formatting checks, clippy, and tests for the affected crate.
+- Go benchmark changes run `go vet`. Deployment changes run `make manifests`. Workflow changes run actionlint.
+- Hook changes run JavaScript syntax checks. Documentation-only pushes do not start code tests or Docker.
+- Full integration tests, including PostgreSQL and Go race tests, remain in CI. Run `make verify` before opening a PR.
 
 `make fmt` formats everything. `make lint` and each CI language job check the same rules.
 
