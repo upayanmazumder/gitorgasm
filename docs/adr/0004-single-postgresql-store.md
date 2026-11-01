@@ -31,3 +31,16 @@ The legacy app used Supabase Postgres and Upstash Redis. Only the dev Supabase p
 - Temporal for workflows: rejected. Server cost. River jobs with checkpoints suffice for Stage 4 bulk operations.
 - ClickHouse for analytics: rejected. Legacy data is tiny (949 rows in the dev project). Use Postgres aggregates first.
 - Reuse the legacy Supabase project: rejected. Only the dev project exists, and the budget forbids paid plans.
+
+## Re-evaluation: Redis for caching (2026-11-02)
+
+Decision: keep PostgreSQL as the only store. Add Redis only when a measurement shows a need.
+
+Measurements on PostgreSQL 18 with 100,000 repositories in one installation:
+
+- A cached score snapshot is 3.6 KB. A read by primary key takes 0.25 ms. All 200 snapshots of one installation use 928 kB.
+- The repository list was the slow path. The cursor condition used an `OR`, so the planner read the whole installation and the filter removed 99,000 rows. One page took 26.6 ms and 2,015 buffer reads. Reading all pages took 15.06 s.
+- The fix splits the first page and the seek query. The seek uses the existing `repositories_listing_idx` to its full key. One page now takes 0.21 ms and 5 buffer reads. Reading all pages takes 0.30 s. No index was added.
+- The only foreign key without a leading index is `repositories.installation_id`. The application soft-deletes installations, so no cascade runs.
+
+A cache in front of a 0.25 ms read gives no latency gain. A Redis pod would use memory on a node where memory is the binding constraint. The session and lock designs in this ADR stay in PostgreSQL.
