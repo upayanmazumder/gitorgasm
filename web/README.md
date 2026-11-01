@@ -2,6 +2,12 @@
 
 Gitorgasm shows organization activity and scores. The website connects to the app server.
 
+## Home page
+
+The home page at `/` introduces GitHub organization connection, contributor and repository activity scores, date/time filters and search, saved query presets, and daily score refreshes. Its navigation and primary action lead to `/organizations`. It does not present team membership as a supported feature.
+
+The server-rendered components live in `src/components/home`, exported through a named barrel. Local, static SVG contribution-calendar and Git-branch illustrations use ordered Bayer dots, inherit the existing light/dark theme tokens, and are hidden from assistive technology. They are illustrations, not sample metrics. No animation, browser canvas, external assets, or additional dependencies are required.
+
 ## Requirements
 
 - Node.js 20 or later
