@@ -38,6 +38,13 @@ func TestRecoverer(t *testing.T) {
 		body.Error.RequestID != "request-123" || strings.Contains(rec.Body.String(), "private panic") {
 		t.Fatalf("response = %d %s", rec.Code, rec.Body)
 	}
+	var entry map[string]any
+	if err := json.Unmarshal(logs.Bytes(), &entry); err != nil {
+		t.Fatal(err)
+	}
+	if entry["level"] != "ERROR" || entry["value"] != "private panic" || entry["stack"] == "" {
+		t.Fatalf("panic was not logged with its value and stack: %v", entry)
+	}
 }
 
 func TestRecovererPreservesAbort(t *testing.T) {

@@ -11,7 +11,7 @@ Labels: **Verified** (file path or command), **Assumption**, **Decision**, **Alt
 1. Public API = REST + JSON over HTTPS. No public GraphQL API.
 2. The OpenAPI file is the contract. Code follows the contract. A contract change and a code change ship in the same pull request.
 3. Tests validate real responses against the contract. **Verified**: `core/internal/httpapi/api_test.go` imports `kin-openapi/openapi3filter`.
-4. Resources are nouns under `/v1`. Organizations are addressed by GitHub login (`/v1/organizations/{login}`). Login match is case-insensitive (`lower(a.login) = lower($2)` in `store.AccessibleInstallation`).
+4. Resources are nouns under `/v1`. Organizations are addressed by GitHub login (`/v1/organizations/{login}`). Login match is case-insensitive (`lower(a.login) = lower($2)` in `tenancy.AccessibleInstallation`).
 5. Inaccessible and unknown organizations both return 404 `organization_not_found`. This prevents tenant enumeration. **Verified**: `httpapi/orgs.go` `resolveOrg`.
 6. Long work is asynchronous. The API enqueues a job and returns `202`. **Verified**: `POST /v1/organizations/{login}/sync`.
 7. Field names are `snake_case`. Timestamps are RFC 3339 UTC strings. GitHub ids are `int64` and named `github_id`. Internal ids are not exposed (`SessionUser.UserID` has `json:"-"`).
@@ -85,7 +85,7 @@ Known contract gaps (**Verified** by comparing the contract with code):
 
 ## 4. Pagination
 
-**Verified** (`httpapi/orgs.go`, `store.ListRepositories`):
+**Verified** (`httpapi/orgs.go`, `tenancy.ListRepositories`):
 
 - Keyset pagination. Response shape: `{"data": [...], "next_cursor": "<opaque>" | null}`.
 - `limit` default 50, range 1 to 100. Out of range returns 400 `invalid_limit`.

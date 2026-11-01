@@ -171,7 +171,7 @@ Never put secret values in this repository. Compose uses local development value
 ## 9. Rollout and rollback
 
 - `api` (**Verified**): `RollingUpdate`, `maxSurge: 1`, `maxUnavailable: 0`, `revisionHistoryLimit: 5`. The startup and readiness probes gate traffic. `terminationGracePeriodSeconds: 35`, including a 5 s `preStop` drain.
-- `worker` (**Verified**): no explicit strategy, so the Kubernetes default `RollingUpdate` (25% / 25%) applies. With one replica, the new pod starts before the old pod stops. For a short time two workers run. River claims each job once, and the per-installation advisory lock in `SyncWorker` prevents two passes on one installation. `terminationGracePeriodSeconds: 40`.
+- `worker` (**Verified**): no explicit strategy, so the Kubernetes default `RollingUpdate` (25% / 25%) applies. With one replica, the new pod starts before the old pod stops. For a short time two workers run. River claims each job once, and the per-installation advisory lock in `jobs/sync` prevents two passes on one installation. `terminationGracePeriodSeconds: 40`.
 - `postgres` (**Verified**): `terminationGracePeriodSeconds: 60` for a clean shutdown.
 - Graceful shutdown (**Verified** `main.go` `serve`): on SIGTERM the process stops HTTP servers, then stops River (`client.Stop`) and flushes traces within `SHUTDOWN_TIMEOUT` (`25s` in the ConfigMap). Both grace periods are longer than 25 s.
 - Rollback: revert the commit on `main`. For an image, revert the code commit so that CI pushes a new `latest`. Because of expand/contract, the previous binary must work on the new schema. Never roll back with a down migration in production.

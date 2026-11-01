@@ -1,4 +1,4 @@
-import type { ScoreFormValues } from '..';
+import type { ScoreFormValues } from '../types';
 
 export interface FormFieldsProps {
   form: ScoreFormValues;

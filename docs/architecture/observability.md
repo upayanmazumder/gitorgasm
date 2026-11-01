@@ -16,11 +16,11 @@ Scope: the Go core in `core`. The cluster stack is plain Prometheus with pod-ann
 | `app_version`          | build flag `-X main.version`, attached by `obs.NewLogger(role).With("app_version", version)` (`cmd/gitorgasm/main.go`) | commit SHA, `dev` locally  |
 | `trace_id`, `span_id`  | added by `traceHandler` when the context has a valid span                                                              | 32 / 16 hex chars          |
 
-Access log (**Verified** `internal/httpapi/server.go` `accessLog`): one `info` record `request` per request with `method`, `route` (the `net/http` pattern, for example `GET /v1/organizations/{login}/repositories`, or `unmatched`), `status`, `duration_ms`, `request_id`. `/healthz` and `/readyz` are not logged. Errors: `request failed` with `error`, `route`, `request_id` (`internalError`). Panics: `panic` with `value` and `stack` (`recoverer`).
+Access log (**Verified** `internal/httpapi/middleware` `AccessLog`): one `info` record `request` per request with `method`, `route` (the `net/http` pattern, for example `GET /v1/organizations/{login}/repositories`, or `unmatched`), `status`, `duration_ms`, `request_id`. `/healthz` and `/readyz` are not logged. Errors: `request failed` with `error`, `route`, `request_id` (`response.InternalError`). Panics: `panic` with `value` and `stack` (`middleware.Recoverer`).
 
 ### Request ids
 
-**Verified** (`server.go` `requestID`): the API accepts an inbound `X-Request-Id` only if it matches `^[A-Za-z0-9._-]{8,64}$`. Otherwise it generates a 22-character random id. It echoes the id in the `X-Request-Id` response header. The error body carries it as `error.request_id`. A user can quote this id. An operator then finds the log line in Loki.
+**Verified** (`httpapi/middleware` `RequestID`): the API accepts an inbound `X-Request-Id` only if it matches `^[A-Za-z0-9._-]{8,64}$`. Otherwise it generates a 22-character random id. It echoes the id in the `X-Request-Id` response header. The error body carries it as `error.request_id`. A user can quote this id. An operator then finds the log line in Loki.
 
 ### Tenant-safe diagnostics
 
@@ -31,7 +31,7 @@ Access log (**Verified** `internal/httpapi/server.go` `accessLog`): one `info` r
 3. Log ids, not names: installation id, internal user id, GitHub delivery id, River job id. **Verified**: the access log uses the route pattern, not the raw path, so organization logins in the URL path do not reach the `route` field. Current code does not log repository names.
 4. Log the error kind and HTTP status of GitHub failures, not the GitHub message body.
 
-**Assumption**: `store.SyncFinished` stores `err.Error()` in `sync_state` (`internal/jobs/jobs.go`). River also stores job errors in `river_job.errors`. Review the `github.APIError` string format in Stage 2 so it carries no token or private repository name.
+**Assumption**: `tenancy.SyncFinished` stores `err.Error()` in `sync_state` (`internal/jobs/sync`). River also stores job errors in `river_job.errors`. Review the `github.APIError` string format in Stage 2 so it carries no token or private repository name.
 
 ## 2. Metrics
 
@@ -39,10 +39,10 @@ Access log (**Verified** `internal/httpapi/server.go` `accessLog`): one `info` r
 
 | Metric                                    | Type                           | Labels                                               | Source              |
 | ----------------------------------------- | ------------------------------ | ---------------------------------------------------- | ------------------- |
-| `gitorgasm_http_requests_total`           | counter                        | `route`, `method`, `status`                          | `httpapi/server.go` |
-| `gitorgasm_http_request_duration_seconds` | histogram, buckets 5 ms to 5 s | `route`                                              | `httpapi/server.go` |
-| `gitorgasm_github_requests_total`         | counter                        | `operation`, `status` (`2xx`, `4xx`, `5xx`, `error`) | `github/client.go`  |
-| `gitorgasm_github_rate_limit_remaining`   | gauge                          | `credential` (credential kind, not per installation) | `github/client.go`  |
+| `gitorgasm_http_requests_total`           | counter                        | `route`, `method`, `status`                          | `httpapi/middleware` |
+| `gitorgasm_http_request_duration_seconds` | histogram, buckets 5 ms to 5 s | `route`                                              | `httpapi/middleware` |
+| `gitorgasm_github_requests_total`         | counter                        | `operation`, `status` (`2xx`, `4xx`, `5xx`, `error`) | `github/transport.go` |
+| `gitorgasm_github_rate_limit_remaining`   | gauge                          | `credential` (credential kind, not per installation) | `github/transport.go` |
 | `go_*`, `process_*`                       | default collectors             | none                                                 | `client_golang`     |
 
 **Decision**: label values stay bounded. Use the route pattern, never the raw path. Never use installation ids, user ids, or logins as labels. Per-tenant detail goes to logs and to the `sync_state` table.

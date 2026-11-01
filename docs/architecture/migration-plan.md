@@ -45,7 +45,7 @@ Source: `database-audit.md` §6. **Verified**.
 | `scoring_preset_daily_quotas`                                                     | same                                                                                                                    | `(preset_id, signal_type)`     | –                                                                                              |
 | `scoring_preset_zero_point_conditions`                                            | same                                                                                                                    | `(preset_id, kind)`            | –                                                                                              |
 
-Rules (**Decision**): no `updated_at` triggers. The store sets `updated_at = now()` in each `UPDATE`, as in `store.UpsertInstallation`. Drop single-column indexes that duplicate a PK prefix (`database-audit.md` §2.5 item 4).
+Rules (**Decision**): no `updated_at` triggers. The store sets `updated_at = now()` in each `UPDATE`, as in `tenancy.UpsertInstallation`. Drop single-column indexes that duplicate a PK prefix (`database-audit.md` §2.5 item 4).
 
 ## 4. Seed or import
 

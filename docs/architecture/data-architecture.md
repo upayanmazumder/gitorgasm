@@ -55,16 +55,16 @@ Source: `core/internal/db/migrations/`. `00001_core.sql` is the immutable baseli
 
 | Table                | Class                                    | Writer (code)                                                                     | Reader (code)                                               | Notes                                                                                                   |
 | -------------------- | ---------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `users`              | Mirror (GitHub identity) + internal id   | `store.UpsertUser` at login (`httpapi/auth.go` `callback`)                        | `store.LookupSession`                                       | `id` is internal. `github_id` is unique.                                                                |
-| `sessions`           | Authoritative, ephemeral                 | `store.CreateSession`, `store.DeleteSession`, `store.DeleteSessionsForGitHubUser` | `store.LookupSession`                                       | Stores `SHA-256(session id)` and sealed GitHub tokens. Loss = users log in again.                       |
-| `accounts`           | Mirror                                   | `store.UpsertInstallation`                                                        | `store.ListOrganizations`, `store.AccessibleInstallation`   | Non-unique index `accounts_login_recent_idx` on `(lower(login), updated_at DESC)` (migration 3). GitHub frees a login on rename; another account can take it before the mirror resyncs. `store.AccessibleInstallation` picks the most recently updated account (test `TestReusedLoginResolvesToNewestAccount`). |
-| `installations`      | Mirror                                   | `store.UpsertInstallation`, `store.MarkInstallationDeleted`                       | list and access queries                                     | Soft delete with `deleted_at`.                                                                          |
-| `user_installations` | Authoritative grant, sourced from GitHub | `store.ReplaceUserInstallations` (login), `store.MarkInstallationDeleted`         | every org-scoped query                                      | The tenant boundary. See section 6.                                                                     |
-| `repositories`       | Mirror                                   | `store.UpsertRepositories`, `store.TombstoneUnseenRepositories`                   | `store.ListRepositories`, repo count in `ListOrganizations` | Tombstoned with `deleted_at`.                                                                           |
-| `sync_state`         | Derived (sync metadata)                  | `store.SyncStarted`, `store.SyncFinished`                                         | `ListOrganizations` (`last_succeeded_at`)                   | Safe to drop. Next sync recreates it.                                                                   |
-| `webhook_deliveries` | Authoritative inbox (short-lived)        | `store.InsertWebhookDelivery`, `store.FinishWebhookDelivery`                      | `store.GetWebhookDelivery`                                  | Raw signed body as `BYTEA`. Dedupe key = `X-GitHub-Delivery`.                                           |
-| `audit_events`       | Authoritative, append-only               | `store.Audit`                                                                     | none yet                                                    | Actions in use: `session.created`, `installation.sync_requested`, `session.revoked_by_github`.          |
-| `river_*`            | Authoritative work state                 | River client (`jobs` package, `httpapi`)                                          | River worker                                                | Job kinds: `sync_installation`, `process_webhook`, `reconcile_installations`, `purge_sessions`, `purge_webhook_deliveries` (`internal/jobs/jobs.go`). |
+| `users`              | Mirror (GitHub identity) + internal id   | `identity.UpsertUser` at login (`httpapi/auth.go` `callback`)                     | `identity.LookupSession`                                    | `id` is internal. `github_id` is unique.                                                                |
+| `sessions`           | Authoritative, ephemeral                 | `identity.CreateSession`, `identity.DeleteSession`, `identity.RevokeGitHubUser`   | `identity.LookupSession`                                    | Stores `SHA-256(session id)` and sealed GitHub tokens. Loss = users log in again.                       |
+| `accounts`           | Mirror                                   | `tenancy.UpsertInstallation`                                                      | `tenancy.ListOrganizations`, `tenancy.AccessibleInstallation` | Non-unique index `accounts_login_recent_idx` on `(lower(login), updated_at DESC)` (migration 3). GitHub frees a login on rename; another account can take it before the mirror resyncs. `tenancy.AccessibleInstallation` picks the most recently updated account (test `TestReusedLoginResolvesToNewestAccount`). |
+| `installations`      | Mirror                                   | `tenancy.UpsertInstallation`, `tenancy.MarkInstallationDeleted`                   | list and access queries                                     | Soft delete with `deleted_at`.                                                                          |
+| `user_installations` | Authoritative grant, sourced from GitHub | `tenancy.ReplaceUserInstallations` (login), `tenancy.MarkInstallationDeleted`     | every org-scoped query                                      | The tenant boundary. See section 6.                                                                     |
+| `repositories`       | Mirror                                   | `tenancy.UpsertRepositories`, `tenancy.TombstoneUnseenRepositories`               | `tenancy.ListRepositories`, repo count in `tenancy.ListOrganizations` | Tombstoned with `deleted_at`.                                                                           |
+| `sync_state`         | Derived (sync metadata)                  | `tenancy.SyncStarted`, `tenancy.SyncFinished`                                     | `tenancy.ListOrganizations` (`last_succeeded_at`)           | Safe to drop. Next sync recreates it.                                                                   |
+| `webhook_deliveries` | Authoritative inbox (short-lived)        | `webhooks.InsertWebhookDelivery`, `webhooks.FinishWebhookDelivery`                | `webhooks.GetWebhookDelivery`                               | Raw signed body as `BYTEA`. Dedupe key = `X-GitHub-Delivery`.                                           |
+| `audit_events`       | Authoritative, append-only               | `audit.Audit`                                                                     | none yet                                                    | Actions in use: `session.created`, `installation.sync_requested`, `session.revoked_by_github`.          |
+| `river_*`            | Authoritative work state                 | River client (`jobs` package, `httpapi`)                                          | River worker                                                | Job kinds: `sync_installation`, `process_webhook`, `reconcile_installations`, `purge_sessions`, `purge_webhook_deliveries` (`internal/jobs/queue`). |
 
 The baseline `00001_core.sql` defines the GitHub mirror tables. GitHub stays the source of truth; the later schema-hardening migration does not change that ownership.
 
@@ -76,22 +76,22 @@ Every boundary below is in code. **Verified** by the cited function.
 
 | Use case            | One transaction contains                                                                                                                               | Code                                           |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
-| Login callback      | upsert user, upsert each installation and account, replace grants, create session, `InsertManyTx` of `sync_installation` jobs, audit `session.created` | `httpapi/auth.go` `callback` (`pgx.BeginFunc`) |
+| Login callback      | upsert user, upsert each installation and account, replace grants, create session, `InsertTx` of one `sync_installation` job per installation, audit `session.created` | `httpapi/auth.go` `callback` (`pgx.BeginFunc`) |
 | Manual sync request | `InsertTx` of `sync_installation`, audit `installation.sync_requested`                                                                                 | `httpapi/orgs.go` `requestSync`                |
-| Webhook receive     | insert `webhook_deliveries` row, `InsertTx` of `process_webhook`                                                                                       | `httpapi/orgs.go` `webhook`                    |
-| Webhook apply       | event-specific writes, `InsertTx` of follow-up `sync_installation`                                                                                     | `jobs/jobs.go` `WebhookWorker.apply`           |
-| Repository page     | one multi-row `INSERT … ON CONFLICT` per page of 100                                                                                                   | `store.UpsertRepositories`                     |
+| Webhook receive     | insert `webhook_deliveries` row, `InsertTx` of `process_webhook`                                                                                       | `httpapi/webhooks.go` `webhook`                |
+| Webhook apply       | event-specific writes, `InsertTx` of follow-up `sync_installation`                                                                                     | `jobs/webhook` `Worker.apply`                  |
+| Repository page     | one multi-row `INSERT … ON CONFLICT` per page of 100                                                                                                   | `tenancy.UpsertRepositories`                   |
 
-Not in one transaction (**Verified**, `jobs/jobs.go` `SyncWorker.Work`):
+Not in one transaction (**Verified**, `jobs/sync` `Worker.Work`):
 
 - A full sync is many short statements, one per page. A crash between pages leaves some rows with the new `synced_at`. This is safe: tombstoning runs only after every page succeeded (section 7).
-- `ReconcileWorker` calls `client.InsertMany` outside a transaction. This is safe: it only reads `installations` and inserts unique jobs.
+- `ReconcileWorker` (`jobs/maintenance`) calls `client.InsertMany` outside a transaction. This is safe: it only reads `installations` and inserts unique jobs.
 
 **Decision**: no GitHub call runs inside an open database transaction. The login callback calls GitHub first and opens the transaction after. This keeps transactions short and avoids holding locks during network I/O.
 
 ## 4. Transactional outbox with River
 
-**Verified** (`jobs/jobs.go` package comment): "River stores jobs in PostgreSQL, so a job is committed atomically with the data change that caused it (transactional outbox)."
+**Verified** (`jobs/jobs.go` package comment): "Package jobs uses River's transactional outbox for durable PostgreSQL-backed work." A job is committed atomically with the data change that caused it.
 
 - A job row exists if and only if its cause committed. No separate outbox table and no relay process exist.
 - Dedupe: sync and webhook argument types in `internal/jobs/queue` use `UniqueOpts{ByArgs: true}`. A second insert while a matching job is pending returns `UniqueSkippedAsDuplicate`. `requestSync` returns this as `duplicate: true`.
@@ -100,7 +100,7 @@ Not in one transaction (**Verified**, `jobs/jobs.go` `SyncWorker.Work`):
 
 ## 5. Retention
 
-`jobs.NewWorkerClient` registers the daily purge jobs `purge_sessions` and `purge_webhook_deliveries` (`core/internal/jobs/jobs.go`). Each statement deletes at most 10,000 rows (`store.purgeBatch`).
+`jobs.NewWorkerClient` registers the daily purge jobs `purge_sessions` and `purge_webhook_deliveries` (`core/internal/jobs/jobs.go`, workers in `core/internal/jobs/maintenance`). Each statement deletes at most 10,000 rows (`purgeBatch` in `core/internal/store/maintenance`).
 
 | Data                                          | Growth driver               | Retention                                                                         | Mechanism                                                                                                                                                                                                                              |
 | --------------------------------------------- | --------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -116,12 +116,12 @@ Not in one transaction (**Verified**, `jobs/jobs.go` `SyncWorker.Work`):
 
 **Decision**: tenant = GitHub installation. The grant edge is `user_installations` (decisions item 9).
 
-**Verified** (`core/internal/store/store.go`):
+**Verified** (`core/internal/store/tenancy`):
 
 - `ListOrganizations` starts `FROM user_installations ui … WHERE ui.user_id = $1`. It also requires `i.deleted_at IS NULL`.
 - `AccessibleInstallation` joins `user_installations ui ON … AND ui.user_id = $1`. A missing grant returns `ErrNotFound`. The handler maps it to HTTP 404 `organization_not_found` (`httpapi/orgs.go` `resolveOrg`).
 - `ListRepositories` filters by `installation_id = $1`. The handler passes only an id that `AccessibleInstallation` returned.
-- Every statement uses bind parameters (`$1`, `$2`, …). No handler builds SQL (package comment of `store`).
+- Every statement uses bind parameters (`$1`, `$2`, …). No handler builds SQL. All SQL lives in the domain packages under `core/internal/store`.
 - `ReplaceUserInstallations` deletes grants that GitHub no longer reports, in the login transaction.
 - `MarkInstallationDeleted` deletes all grants for a removed installation.
 
@@ -135,13 +135,13 @@ Rules for new code (**Decision**):
 
 ## 7. Reconciliation
 
-GitHub is the source for mirror tables. Gitorgasm converges on GitHub state through three paths. **Verified** (`jobs/jobs.go`):
+GitHub is the source for mirror tables. Gitorgasm converges on GitHub state through three paths. **Verified** (`jobs/jobs.go` for the periodic schedule, `jobs/webhook`, `jobs/maintenance`):
 
 1. Login: the callback enqueues `sync_installation` for every installation that GitHub lists for the user.
 2. Webhooks: `installation`, `installation_repositories`, and `repository` events enqueue `sync_installation`. The handler does not trust payload contents for repository data. It re-reads GitHub.
 3. Periodic: `reconcile_installations` runs every `RECONCILE_INTERVAL` (default `6h`, `config.go`) and at worker start (`RunOnStart: true`). It enqueues a sync for every installation that is not deleted and not suspended.
 
-Sync algorithm (`SyncWorker.Work`):
+Sync algorithm (`jobs/sync` `Worker.Work`):
 
 - `GET /app/installations/{id}`. A 404 marks the installation deleted and revokes grants.
 - Suspended installation: update the row, skip repositories.
