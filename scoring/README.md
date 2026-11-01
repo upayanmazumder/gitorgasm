@@ -2,6 +2,15 @@
 
 This Rust crate scores a complete snapshot of one organization's GitHub contributions. It does not fetch contributions or persist them. The caller must provide the organization's complete, fresh signal snapshot and memberships; it must not mix organizations. Re-run the scorer on each refreshed snapshot rather than adding scores from earlier runs. Results are deterministic for the same signals, memberships, and query; no implicit current time is used.
 
+## Module structure
+
+- `model/` defines signals, totals, leaderboard rows, and nested scoring rules.
+- `engine/` separates point calculation, team membership, and leaderboard assembly.
+- `query/` owns filters, periods, and the nested catalog with its result cache.
+- Each domain uses `mod.rs` for public exports. `lib.rs` exposes the crate API.
+- Tests group query behavior by catalog, filter, and period.
+- Public leaderboard functions pass borrowed signal iterators to the engine without temporary reference lists.
+
 ## Default scoring
 
 | Event type | Points | Daily per-user limit |

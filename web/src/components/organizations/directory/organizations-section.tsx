@@ -1,6 +1,6 @@
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui';
 
-import type { Organization } from '../authorization/schemas';
+import type { Organization } from '../model';
 import { EmptyOrganizations } from './empty-organizations';
 import { OrganizationList } from './organization-list';
 

@@ -41,13 +41,26 @@ See the quick start in [README.md](README.md). Tests need Docker: `make test` st
 
 ## Standards
 
+### Module structure
+
+- Group code by domain, then by responsibility within each domain.
+- Keep implementation files small. Split cohesive behavior instead of compressing code.
+- Reuse existing helpers and primitives before adding abstractions.
+- Prefer established, maintained packages and standard libraries over custom infrastructure.
+- Check behavior, maintenance, security, and dependency cost before adding a package.
+- Keep comments to one line when a reason is not clear from the code.
+- Use domain package imports in Go. Shared SQL contracts remain in `internal/store`.
+- Use explicit `mod.rs` exports in Rust and `index.ts` barrels in frontend feature folders.
+- Import public entries across folders. Use direct sibling imports within a folder to avoid cycles.
+- Let the configured formatters group imports. Use type-only imports for TypeScript types.
+
 ### Go (`core`)
 
 - All SQL lives in `internal/store`. Handlers and workers never build SQL.
 - Every org-scoped query joins `user_installations`. Inaccessible organizations return 404.
 - A job that follows a data change is inserted with `InsertTx` in the same transaction.
 - GitHub calls go through `internal/github`. Verify each new endpoint against the pinned REST description (`github/rest-api-description` v2.1.0) or docs.github.com before you use it. Record the operationId in the doc comment.
-- Return classified errors. Workers map them with `retryDecision`.
+- Return classified errors. Workers map them through `internal/jobs/internal/execution`.
 - Never log tokens, cookies, webhook payloads, or private repository content.
 - Lint: `golangci-lint` with `core/.golangci.yml`.
 

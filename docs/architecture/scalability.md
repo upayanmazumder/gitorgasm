@@ -18,10 +18,10 @@ This document states how each part of Gitorgasm scales, what limits it, and the 
 
 **Verified** stateless properties:
 
-- Sessions are rows in Postgres (`sessions`), not process memory (`core/internal/httpapi/auth.go`).
+- Sessions are rows in Postgres (`sessions`), not process memory (`core/internal/store/identity`).
 - PKCE verifier and OAuth state are in short-lived cookies, not memory (D8).
 - Jobs are enqueued in Postgres (`InsertTx`), not in process queues.
-- The only process cache is the installation token cache in `internal/github/client.go`. A cache miss costs one App JWT request. Each replica has its own cache.
+- The only process cache is the installation token cache in `internal/github/tokens.go`. A cache miss costs one App JWT request. Each replica has its own cache.
 
 Consequences:
 
@@ -32,7 +32,7 @@ Consequences:
 
 ## 3. Worker replicas and River
 
-**Verified** (`core/internal/jobs/jobs.go`):
+**Verified** (`core/internal/jobs/jobs.go` for queues and periodic jobs, `core/internal/jobs/sync` for the lock, `core/internal/jobs/queue` for unique options):
 
 - River clients in several replicas coordinate through Postgres. Each job is claimed by one worker.
 - Per replica, the `default` and `github` queues each run up to `WORKER_CONCURRENCY` jobs (default 4).
@@ -70,7 +70,7 @@ Scaling rules:
 **Gaps**:
 
 - A large bulk operation or ingest for one installation could fill all `github` slots (Stage 4–5 risk).
-- `gitorgasm_github_rate_limit_remaining{credential}` is a gauge per credential label, not a budget controller (**Verified**: `core/internal/github/client.go`).
+- `gitorgasm_github_rate_limit_remaining{credential}` is a gauge per credential label, not a budget controller (**Verified**: `core/internal/github/transport.go`).
 
 **Planned** per-installation budget (Stage 4, before bulk operations):
 

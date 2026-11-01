@@ -1,6 +1,6 @@
 # Authentication and authorization
 
-Status: Stage 1 (Foundation). Code: `core/internal/httpapi/auth.go`, `internal/secure/secure.go`, `internal/store/store.go`.
+Status: Stage 1 (Foundation). Code: `core/internal/httpapi/auth.go`, `internal/secure/secure.go`, `internal/store/identity`, `internal/store/tenancy`.
 
 Labels: **Verified** (file path, command, or official URL), **Assumption**, **Decision**, **Alternative considered**, **Planned**.
 
@@ -38,7 +38,7 @@ sequenceDiagram
   API-->>B: 302 to APP_ORIGIN/organizations<br/>Set-Cookie __Host-gitorgasm_session=id (168h, HttpOnly, Secure, Lax, Path=/)
 ```
 
-**Verified** step by step in `auth.go`: `login`, `callback`, `createSession`. Notes:
+**Verified** step by step in `auth.go` (`login`, `callback`) and `sessions.go` (`createSession`). Notes:
 
 - All GitHub calls finish before the transaction opens. A GitHub failure creates no rows.
 - The redirect target is the fixed `APP_ORIGIN/organizations`. Incoming `returnTo`, `redirect_uri`, and installation ids never select the destination or grant access. This removes the legacy open redirect (SEC-5).
@@ -86,7 +86,7 @@ Regression coverage: `core/internal/httpapi/auth_test.go` covers the PKCE redire
 | Stored form | `SHA-256(id)` as `sessions.id_hash`                                | `secure.Hash`, `00001_core.sql` |
 | Cookie      | `__Host-gitorgasm_session`, HttpOnly, Secure, SameSite=Lax, Path=/ | `setCookie`                     |
 | TTL         | `SESSION_TTL`, default 168 h, absolute                             | `config.go`, `createSession`    |
-| Activity    | `last_seen_at` updated at most once per minute                     | `store.LookupSession`           |
+| Activity    | `last_seen_at` updated at most once per minute                     | `identity.LookupSession`        |
 | Transport   | cookie only. No bearer header. Never returned in a body.           | `authed`                        |
 
 - A database leak does not reveal usable session ids. Only hashes are stored.
@@ -115,10 +115,10 @@ Emergency rotation: delete all sessions (`DELETE FROM sessions`). Users log in a
 
 **Decision** (decisions item 9): tenant = GitHub installation. A user may access an installation only if GitHub said so.
 
-- `user_installations` is written only by `store.ReplaceUserInstallations` with the list from `GET /user/installations` (user token), at login and explicit/post-install OAuth refresh. The call replaces the full set. Grants that GitHub no longer reports are deleted, including when the new set is empty. **Verified**.
+- `user_installations` is written only by `tenancy.ReplaceUserInstallations` with the list from `GET /user/installations` (user token), at login and explicit/post-install OAuth refresh. The call replaces the full set. Grants that GitHub no longer reports are deleted, including when the new set is empty. **Verified**.
 - GitHub lists only installations of this App that the user can access. **Verified**: comment on `client.ListUserInstallations`, operation `apps/list-installations-for-authenticated-user`.
-- Installation deletion (webhook or 404 in sync) deletes all grants (`store.MarkInstallationDeleted`). **Verified**.
-- Every org-scoped handler calls `resolveOrg` → `store.AccessibleInstallation`, which joins `user_installations` for the session user. Missing grant → 404. **Verified**.
+- Installation deletion (webhook or 404 in sync) deletes all grants (`tenancy.MarkInstallationDeleted`). **Verified**.
+- Every org-scoped handler calls `resolveOrg` → `tenancy.AccessibleInstallation`, which joins `user_installations` for the session user. Missing grant → 404. **Verified**.
 - `GET /v1/auth/install` only redirects to GitHub. The Setup URL is `/api/v1/auth/login`, not the OAuth callback; any `installation_id` query value is ignored. No endpoint accepts an installation id as authorization. This removes the legacy installation-linking IDOR (SEC-2). **Verified**: `auth.go`, `server.go`.
 
 ```mermaid
@@ -151,7 +151,7 @@ flowchart LR
 
 ## 6. CSRF
 
-**Verified** (`checkOrigin`, decisions item 10):
+**Verified** (`middleware.CheckOrigin`, decisions item 10):
 
 - Session cookie `SameSite=Lax`. Browsers do not send it on cross-site `POST` subrequests.
 - Every unsafe method (not GET, HEAD, OPTIONS) must send `Origin` equal to `APP_ORIGIN` scheme + host. Else 403 `origin_rejected`.
@@ -165,8 +165,8 @@ flowchart LR
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
 | `POST /v1/auth/logout`         | delete the current session row, clear the session and pending OAuth cookies, 204; idempotent and guarded by the frontend Origin | `auth.go` `logout` |
 | Session expiry                 | `LookupSession` ignores rows with `expires_at <= now()`. The handler clears the cookie.                                                                                                                              | `authed`                                             |
-| User revokes the App on GitHub | `github_app_authorization` `revoked` webhook calls `store.RevokeGitHubUser`: deletes all sessions and all `user_installations` grants of that GitHub user in one transaction, and audits `session.revoked_by_github` | `jobs.WebhookWorker.apply`, `store.RevokeGitHubUser` |
-| Installation deleted           | grants deleted, so org routes return 404                                                                                                                                                                             | `store.MarkInstallationDeleted`                      |
+| User revokes the App on GitHub | The `github_app_authorization` `revoked` webhook deletes the user's sessions and installation grants in one transaction. It audits `session.revoked_by_github`. | `internal/jobs/webhook`, `store/identity.RevokeGitHubUser` |
+| Installation deleted           | Grants are deleted, so organization routes return 404. | `store/tenancy.MarkInstallationDeleted` |
 
 - **Verified**: GitHub delivers `github_app_authorization` to every App and the App cannot unsubscribe. <https://docs.github.com/en/webhooks/webhook-events-and-payloads#github_app_authorization>
 - **Planned**: logout does not revoke the GitHub user token. Add `DELETE /applications/{client_id}/token` (`apps/delete-token`, verified in the pinned description) at logout, so a stolen sealed token is useless after logout.

@@ -1,6 +1,6 @@
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui';
 
-import type { OrganizationUser } from '../authorization/schemas';
+import type { OrganizationUser } from '../model';
 import { AccessActions } from './access-actions';
 
 interface AccountSectionProps {

@@ -2,12 +2,10 @@
 
 import Link from 'next/link';
 
-import { errorMessage } from './error-message';
-import { PresetsPanel } from './presets-panel';
-import { ScoreForm } from './score-form';
-import { ScoreResults } from './score-results';
-import { toQuery } from './to-query';
-import { useScoreControls } from './use-score-controls';
+import { ScoreForm } from './form';
+import { PresetsPanel } from './presets';
+import { ScoreResults } from './results';
+import { errorMessage, useScoreControls } from './state';
 
 interface Props {
   login: string;
@@ -25,7 +23,7 @@ export function ScoresView({ login }: Props) {
     presetName,
     setPresetName,
     message,
-    run,
+    submit,
     load,
     save,
     remove,
@@ -45,7 +43,7 @@ export function ScoresView({ login }: Props) {
       <ScoreForm
         form={form}
         onChange={setForm}
-        onSubmit={() => run(() => calculate.mutate(toQuery(form)))}
+        onSubmit={submit}
         disabled={!daily.data}
         pending={calculate.isPending}
       />

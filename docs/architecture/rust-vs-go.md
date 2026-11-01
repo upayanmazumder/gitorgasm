@@ -8,7 +8,7 @@ This document selects a language per logical service. It uses measured benchmark
 | --------------------------- | ----------------------- | ------------------------------------------------------------------------------------ |
 | core api                    | Go                      | **Verified** implemented: `core` (`api` role)                                        |
 | worker / sync               | Go                      | **Verified** implemented: `core` (`worker` role)                                     |
-| webhook ingest              | Go (inside core api)    | **Verified** implemented: `POST /webhooks/github` in `core/internal/httpapi/orgs.go` |
+| webhook ingest              | Go (inside core api)    | **Verified** implemented: `POST /webhooks/github` in `core/internal/httpapi/webhooks.go` |
 | operations (bulk mutations) | Go (inside core worker) | Planned, Stage 4                                                                     |
 | scoring engine              | Rust                    | **Hypothesis**. Planned, Stage 5. Re-verify before building (section 5).             |
 | analytics                   | Go + SQL rollups        | Planned, Stage 5+                                                                    |
@@ -91,8 +91,8 @@ Scale: ++ strong advantage, + advantage, 0 neutral, − disadvantage. Each cell 
 Library facts:
 
 - River: Go only. **Verified**: `github.com/riverqueue/river` in `core/go.mod`. No Rust client exists in that project (**Assumption** from the repository contents).
-- GitHub clients: `go-github` (Go) and `octocrab` (Rust) both exist. **Decision**: Gitorgasm uses a narrow hand-written client for the endpoints it needs (D12, `core/internal/github/client.go`), so library maturity matters less.
-- Database: Gitorgasm uses `pgx/v5` with hand-written SQL in one package (`core/internal/store/store.go`). `sqlc` is an option, not used. Rust would use SQLx.
+- GitHub clients: `go-github` (Go) and `octocrab` (Rust) both exist. **Decision**: Gitorgasm uses a narrow hand-written client for the endpoints it needs (D12, `core/internal/github`), so library maturity matters less.
+- Database: Gitorgasm uses `pgx/v5` with hand-written SQL in the domain packages under `core/internal/store`. `sqlc` is an option, not used. Rust would use SQLx.
 
 ## 4. Polyglot rules
 

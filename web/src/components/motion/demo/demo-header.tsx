@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { Fade } from '../fade';
+import { Fade } from '..';
 
 export function DemoHeader() {
   return (

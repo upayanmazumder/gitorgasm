@@ -19,8 +19,8 @@ Pinned API description: `github/rest-api-description` release v2.1.0, file `desc
 - **Verified** (JWT): "set this 60 seconds in the past" and "no more than 10 minutes into the future". <https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-json-web-token-jwt-for-a-github-app>
 - **Verified** (installation token): "The installation access token will expire after 1 hour." <https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app>
 - **Verified** (user token): "By default, the user access token expires after 8 hours." `refresh_token_expires_in` is "always `15897600` (6 months)". Expiring tokens are an optional App feature. <https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app>
-- **Verified**: the installation token cache is in process memory (`map[int64]installationToken` in `client.go`). It is not shared between worker replicas. Each replica mints its own tokens. This is acceptable at one worker replica.
-- **Verified**: the slice does not use the user token after login. The sealed token and refresh token are stored in `sessions` for Stage 2 (`httpapi/auth.go` `createSession`). Refresh is **Planned** (Stage 2).
+- **Verified**: the installation token cache is in process memory (`map[int64]installationToken`, field `tokens` in `github/client.go`, logic in `github/tokens.go`). It is not shared between worker replicas. Each replica mints its own tokens. This is acceptable at one worker replica.
+- **Verified**: the slice does not use the user token after login. The sealed token and refresh token are stored in `sessions` for Stage 2 (`httpapi/sessions.go` `createSession`). Refresh is **Planned** (Stage 2).
 
 ### Installation and grant-refresh browser entry points
 
@@ -33,13 +33,13 @@ The install entry `/api/v1/auth/install` redirects to GitHub. Its return starts 
 
 ## 2. Endpoints in use
 
-**Verified**: all requests send `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`, and `User-Agent: gitorgasm` (`client.go` `do`).
+**Verified**: all requests send `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`, and `User-Agent: gitorgasm` (`github/transport.go` `do`).
 
 | Method and path                                           | operationId                                      | Credential                           | Pagination             | Caller              |
 | --------------------------------------------------------- | ------------------------------------------------ | ------------------------------------ | ---------------------- | ------------------- |
-| `GET /app/installations/{installation_id}`                | `apps/get-installation`                          | App JWT                              | none                   | `SyncWorker.Work`   |
+| `GET /app/installations/{installation_id}`                | `apps/get-installation`                          | App JWT                              | none                   | `jobs/sync` `Worker.Work` |
 | `POST /app/installations/{installation_id}/access_tokens` | `apps/create-installation-access-token`          | App JWT                              | none                   | `installationToken` |
-| `GET /installation/repositories`                          | `apps/list-repos-accessible-to-installation`     | installation                         | `Link`, `per_page=100` | `SyncWorker.Work`   |
+| `GET /installation/repositories`                          | `apps/list-repos-accessible-to-installation`     | installation                         | `Link`, `per_page=100` | `jobs/sync` `Worker.Work` |
 | `GET /user`                                               | `users/get-authenticated`                        | user                                 | none                   | login `callback`    |
 | `GET /user/installations`                                 | `apps/list-installations-for-authenticated-user` | user                                 | `Link`, `per_page=100` | login `callback`    |
 | `POST https://github.com/login/oauth/access_token`        | not in REST description (OAuth endpoint)         | client id + secret + `code_verifier` | none                   | login `callback`    |
@@ -68,19 +68,19 @@ The install entry `/api/v1/auth/install` redirects to GitHub. Its return starts 
 
 **Verified** against <https://docs.github.com/en/webhooks/webhook-events-and-payloads>.
 
-| Event                                                   | Subscription                                                                                                                                                                     | Handling now (`jobs.WebhookWorker.apply`)                                                                                                                    |
+| Event                                                   | Subscription                                                                                                                                                                     | Handling now (`internal/jobs/webhook`)                                                                                                                    |
 | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `installation`                                          | "All GitHub Apps receive this event by default. You cannot manually subscribe to this event." Actions: `created`, `deleted`, `new_permissions_accepted`, `suspend`, `unsuspend`. | `deleted`: forget token, mark deleted, revoke grants. Other actions: upsert installation, enqueue sync.                                                      |
 | `installation_repositories`                             | Received by default.                                                                                                                                                             | Enqueue sync.                                                                                                                                                |
 | `repository`                                            | Subscribe. Needs "Metadata" read.                                                                                                                                                | Enqueue sync.                                                                                                                                                |
-| `github_app_authorization`                              | "A GitHub App receives this webhook by default and cannot unsubscribe from this event."                                                                                          | `revoked`: `store.RevokeGitHubUser` deletes all sessions and installation grants of `sender.id` in one transaction, then audits `session.revoked_by_github`. |
+| `github_app_authorization`                              | "A GitHub App receives this webhook by default and cannot unsubscribe from this event."                                                                                          | `revoked`: `identity.RevokeGitHubUser` deletes all sessions and installation grants of `sender.id` in one transaction, then audits `session.revoked_by_github`. |
 | `ping` and others                                       | n/a                                                                                                                                                                              | Acknowledge, no action.                                                                                                                                      |
 | `organization`, `member`, `membership`, `team`          | Subscribe. Needs "Members" read.                                                                                                                                                 | **Planned** (Stage 3).                                                                                                                                       |
 | `push`, `pull_request`, `pull_request_review`, `issues` | Subscribe.                                                                                                                                                                       | **Planned** (Stage 5), as ingest hints.                                                                                                                      |
 
 ## 5. Webhook ingestion
 
-**Verified** (`httpapi/orgs.go` `webhook`):
+**Verified** (`httpapi/webhooks.go` `webhook`):
 
 1. Read at most 25 MB (`maxWebhookBytes`). GitHub caps payloads at 25 MB and does not deliver larger ones. **Verified**: "Payloads are capped at 25 MB." (events page).
 2. Verify `X-Hub-Signature-256` with HMAC-SHA256 in constant time (`github.VerifySignature`, `hmac.Equal`). **Verified**: the header "always starts with `sha256=`" and docs require a constant-time compare. <https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries>
@@ -139,10 +139,10 @@ flowchart TD
   UP -- "Link rel=next" --> P
   UP -- "last page" --> TB["tombstone synced_at < start"]
   TB --> F["sync_state success, repositories_seen"]
-  P -- error --> FE["sync_state.last_error; no tombstone; retryDecision"]
+  P -- error --> FE["sync_state.last_error; no tombstone; worker retry policy"]
 ```
 
-**Verified**: `jobs/jobs.go` `SyncWorker.Work`, `retryDecision`; `store.TombstoneUnseenRepositories`.
+**Verified**: `internal/jobs/sync`, `internal/jobs/internal/execution`, and `store/tenancy.TombstoneUnseenRepositories`.
 
 Cost estimate (**Assumption**, from decisions workload numbers): one full sync = `ceil(repos / 100)` + 2 requests. 1,000 repos ≈ 12 requests. 10,000 repos ≈ 102 requests. Legacy dev data (372 repos over 10 orgs) needs about 25 requests per full reconcile.
 
@@ -160,9 +160,9 @@ Secondary limits (**Verified**, same REST page): at most 100 concurrent requests
 
 Documented retry rule (**Verified**, same page): honor `retry-after`. Else if `x-ratelimit-remaining` is `0`, wait until `x-ratelimit-reset`. Else wait at least one minute. On repeated secondary limits, back off exponentially.
 
-Classification (**Verified**, `client.go` `classify`):
+Classification (**Verified**, `github/errors.go`):
 
-| Response                                                                               | Kind                                                                 | Job outcome (`retryDecision`)                          | API outcome (`githubError`)               |
+| Response                                                                               | Kind                                                                 | Job outcome (worker retry policy)                          | API outcome (`githubError`)               |
 | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------ | ----------------------------------------- |
 | 429, or 403 with `x-ratelimit-remaining: 0`, `retry-after`, or "rate limit" in message | `KindRateLimited`, `RetryAfter` = `retry-after` → reset + 1 s → 60 s | `JobSnooze(RetryAfter)`                                | 503 `github_rate_limited` + `Retry-After` |
 | 401                                                                                    | `KindUnauthorized`                                                   | `JobCancel`                                            | 400 `github_auth_failed`                  |
@@ -179,7 +179,7 @@ Gaps (**Planned**):
 - No proactive throttle on `x-ratelimit-remaining`. Metric `gitorgasm_github_rate_limit_remaining{credential}` exists. Add a pre-check that snoozes when remaining is below a floor.
 - A 404 from a page call (not the installation call) retries with backoff. It cannot tombstone. This is safe.
 
-Security guard (**Verified**, `client.go` `newRequest`): `Link` URLs must start with `APIBaseURL + "/"`. Else the client refuses. This prevents a token leak to another host through a forged `Link` header. Every request is built with `http.NewRequestWithContext`, so job and request cancellation and timeouts reach the GitHub call.
+Security guard (**Verified**, `github/transport.go` `newRequest`): `Link` URLs must start with `APIBaseURL + "/"`. Else the client refuses. This prevents a token leak to another host through a forged `Link` header. Every request is built with `http.NewRequestWithContext`, so job and request cancellation and timeouts reach the GitHub call.
 
 ## 8. Bulk operations (Planned, Stage 4)
 

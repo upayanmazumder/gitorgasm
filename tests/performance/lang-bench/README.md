@@ -14,7 +14,7 @@ This benchmark compares Go and Rust on two workloads that Gitorgasm runs. It als
 | `go/cmd/standalone/`         | Go one-shot runner for peak RSS. Also writes the fixture (`gen` mode).    |
 | `go/cmd/hello/`              | Go `net/http` hello service                                               |
 | `go/cmd/loadclient/`         | Go HTTP client. Sends N sequential requests on one keep-alive connection. |
-| `rust/src/lib.rs`            | Rust workloads and PRNG (same logic as `go/lb/`)                          |
+| `rust/src/lib.rs`            | Public exports for repository, timestamp, scoring, and PRNG modules      |
 | `rust/src/bin/bench.rs`      | Rust timing harness                                                       |
 | `rust/src/bin/standalone.rs` | Rust one-shot runner for peak RSS                                         |
 | `rust/src/bin/hello.rs`      | Rust `axum` + `tokio` hello service                                       |

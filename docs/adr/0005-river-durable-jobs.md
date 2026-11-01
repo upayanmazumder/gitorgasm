@@ -9,7 +9,7 @@ Sync, webhook processing, and later bulk operations must survive crashes and res
 
 ## Decision
 
-Use River (v0.49, `core/go.mod`) on the same PostgreSQL instance. **Verified** in `core/internal/jobs/jobs.go`:
+Use River (v0.49, `core/go.mod`) on the same PostgreSQL instance. **Verified** in `core/internal/jobs/queue` (job types, queues, unique options), `core/internal/jobs/sync` (timeout, advisory lock), `core/internal/jobs/internal/execution` (lock and retry helpers), and `core/internal/jobs` (periodic jobs in `NewWorkerClient`):
 
 - `sync_installation`: queue `github`, max 8 attempts, unique by args within a 1-minute period (`ByArgs` + `ByPeriod`), 15-minute timeout. One pass at a time per installation: the worker holds a session advisory lock with the 64-bit key `hashtextextended('gitorgasm:sync_installation:' || id, 0)` and snoozes 30 s when another pass holds it.
 - `process_webhook`: max 10 attempts, unique by args (delivery id).

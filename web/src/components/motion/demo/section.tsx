@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { Slide } from '../slide';
+import { Slide } from '..';
 
 export function Section({
   title,
