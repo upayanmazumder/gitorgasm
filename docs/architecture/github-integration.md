@@ -22,6 +22,15 @@ Pinned API description: `github/rest-api-description` release v2.1.0, file `desc
 - **Verified**: the installation token cache is in process memory (`map[int64]installationToken` in `client.go`). It is not shared between worker replicas. Each replica mints its own tokens. This is acceptable at one worker replica.
 - **Verified**: the slice does not use the user token after login. The sealed token and refresh token are stored in `sessions` for Stage 2 (`httpapi/auth.go` `createSession`). Refresh is **Planned** (Stage 2).
 
+### Installation and grant-refresh browser entry points
+
+Configure the GitHub App **Setup URL** to the frontend `/api/v1/auth/login`, enable **Redirect on update**, and disable **Request user authorization (OAuth) during installation**. The backend `GITHUB_OAUTH_CALLBACK_URL` and GitHub App Callback URL remain the frontend `/api/v1/auth/callback`. Local values are `http://localhost:3000/api/v1/auth/login` and `http://localhost:3000/api/v1/auth/callback`; use HTTPS in production.
+
+The install entry `/api/v1/auth/install` redirects to GitHub. Its return starts a fresh browser-bound OAuth state and PKCE exchange through the Setup URL. The same `/api/v1/auth/login` supports manual grant refresh. The callback ignores any supplied `installation_id`; it replaces grants exclusively from all pages of `GET /user/installations` using the fresh user token and redirects to the fixed `/organizations` UI. Grant changes, session creation, audit, and `InsertTx` sync jobs share one transaction.
+
+**Verified**: GitHub's [Setup URL documentation](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/about-the-setup-url) warns that installation ids in setup returns can be spoofed and requires checking the user's installations instead. Its [user access-token documentation](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app) describes the separate automatic installation authorization flow; Gitorgasm initiates its own flow to supply state and PKCE. Full local settings and browser/error behavior are in [Authentication and authorization](authentication-authorization.md#installation-return-and-local-browser-contract).
+
+
 ## 2. Endpoints in use
 
 **Verified**: all requests send `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`, and `User-Agent: gitorgasm` (`client.go` `do`).

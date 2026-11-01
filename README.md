@@ -27,6 +27,14 @@ pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:3000`. For GitHub sign-in, set the App callback to `http://localhost:3000/api/v1/auth/callback`.
+Open `http://localhost:3000/organizations`. Set these URLs in your development GitHub App:
+
+- Callback URL: `http://localhost:3000/api/v1/auth/callback`.
+- Setup URL: `http://localhost:3000/api/v1/auth/login`.
+- Enable **Redirect on update**.
+- Disable **Request user authorization (OAuth) during installation**. The app starts its own protected sign-in flow after installation.
+
+Sign in, install the app for an organization, then complete sign-in when GitHub returns you to the website.
+Use **Refresh GitHub access** after an organization owner approves installation or your access changes.
 
 Run `make test` to check the project. See [CONTRIBUTING.md](CONTRIBUTING.md) for more commands.

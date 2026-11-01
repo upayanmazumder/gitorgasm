@@ -43,7 +43,11 @@ paths:
               schema: { $ref: '#/components/schemas/Status' }
   /v1/auth/login:
     get:
-      summary: Start GitHub App sign-in (web flow with state and PKCE)
+      summary: Start GitHub App sign-in or refresh installation grants (state and PKCE)
+      description: |
+        Browser navigation endpoint, also used as the GitHub App Setup URL after installation.
+        Always starts fresh OAuth state and PKCE. Incoming installation_id, setup_action,
+        state, and redirect targets are ignored; they never grant access.
       security: []
       responses:
         '302': { description: Redirect to GitHub }
@@ -52,12 +56,19 @@ paths:
     get:
       summary: GitHub OAuth callback
       security: []
+      description: |
+        Requires matching browser-bound OAuth state and a nonempty PKCE verifier.
+        Exchanges the code for a fresh user token, replaces the user's grants only with
+        all pages of GET /user/installations, and creates a session transactionally with sync jobs.
+        Success redirects to the fixed APP_ORIGIN/organizations; no caller-supplied redirect
+        or installation_id is trusted. Failures return the Error schema, not a redirect.
       parameters:
         - { name: code, in: query, schema: { type: string } }
         - { name: state, in: query, schema: { type: string } }
+        - { name: error, in: query, schema: { type: string }, description: GitHub authorization denial; always rejected even if a code is present }
       responses:
         default: { $ref: '#/components/responses/Error' }
-        '302': { description: Session created; redirect to the frontend }
+        '302': { description: Session created and grants refreshed; redirect to APP_ORIGIN/organizations }
         '400': { $ref: '#/components/responses/Error' }
         '502': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
@@ -65,12 +76,21 @@ paths:
     get:
       summary: Redirect to the GitHub App installation page
       security: []
+      description: |
+        Starts installation on GitHub, without granting local access. Configure the GitHub
+        App Setup URL to the frontend /api/v1/auth/login, enable Redirect on update, and
+        disable Request user authorization (OAuth) during installation so Gitorgasm
+        initiates its own state- and PKCE-protected OAuth flow on return.
       responses:
         '302': { description: Redirect to GitHub }
         '503': { $ref: '#/components/responses/Error' }
   /v1/auth/logout:
     post:
       summary: End the current session
+      description: |
+        Idempotently deletes the current session and clears the session and pending OAuth
+        cookies. Requires the frontend Origin header even if no session exists.
+      security: []
       responses:
         default: { $ref: '#/components/responses/Error' }
         '204': { description: Signed out }

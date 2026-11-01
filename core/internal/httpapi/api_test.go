@@ -46,6 +46,13 @@ type harness struct {
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
+	return newHarnessWithGitHub(t, &config.GitHub{
+		WebhookSecret: []byte(webhookSecret), APIBaseURL: "http://127.0.0.1:1", WebBaseURL: "http://127.0.0.1:1",
+	})
+}
+
+func newHarnessWithGitHub(t *testing.T, gh *config.GitHub) *harness {
+	t.Helper()
 	pool := testdb.New(t)
 	jobClient, err := jobs.NewInsertClient(pool)
 	if err != nil {
@@ -56,7 +63,6 @@ func newHarness(t *testing.T) *harness {
 		t.Fatal(err)
 	}
 	origin, _ := url.Parse(appOrigin)
-	gh := &config.GitHub{WebhookSecret: []byte(webhookSecret), APIBaseURL: "http://127.0.0.1:1", WebBaseURL: "http://127.0.0.1:1"}
 	cfg := &config.Config{AppOrigin: origin, CookieSecure: true, SessionTTL: time.Hour, GitHub: gh}
 	s := &httpapi.Server{
 		Pool: pool, Jobs: jobClient, Sealer: sealer, Cfg: cfg, GitHub: github.New(gh),

@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/riverqueue/river"
 
 	"github.com/upayanmazumder/gitorgasm/core/internal/github"
 	"github.com/upayanmazumder/gitorgasm/core/internal/jobs"
@@ -52,7 +51,9 @@ const (
 	oauthCookie   = "gitorgasm_oauth"
 )
 
-// login binds OAuth state and PKCE verifier to a short-lived HttpOnly browser cookie.
+// login starts sign-in or a post-install grant refresh with browser-bound state and PKCE.
+// GitHub's Setup URL points here; installation_id and all other incoming query values
+// are deliberately ignored. Only GET /user/installations authorizes installations.
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	state, verifier := secure.RandomToken(), secure.RandomToken()
 	sum := sha256.Sum256([]byte(verifier))
@@ -76,12 +77,12 @@ func (s *Server) callback(w http.ResponseWriter, r *http.Request) {
 	}
 	state, verifier, ok := strings.Cut(c.Value, ".")
 	got := r.URL.Query().Get("state")
-	if !ok || got == "" || subtle.ConstantTimeCompare([]byte(state), []byte(got)) != 1 {
+	if !ok || state == "" || verifier == "" || got == "" || subtle.ConstantTimeCompare([]byte(state), []byte(got)) != 1 {
 		writeError(w, r, http.StatusBadRequest, "oauth_state_mismatch", "login state mismatch")
 		return
 	}
 	code := r.URL.Query().Get("code")
-	if code == "" {
+	if r.URL.Query().Get("error") != "" || code == "" {
 		writeError(w, r, http.StatusBadRequest, "oauth_denied", "GitHub did not return an authorization code")
 		return
 	}
@@ -109,13 +110,11 @@ func (s *Server) callback(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		ids := make([]int64, 0, len(insts))
-		syncs := make([]river.InsertManyParams, 0, len(insts))
 		for i := range insts {
 			if err := store.UpsertInstallation(ctx, tx, &insts[i]); err != nil {
 				return err
 			}
 			ids = append(ids, insts[i].ID)
-			syncs = append(syncs, river.InsertManyParams{Args: jobs.SyncInstallationArgs{InstallationID: insts[i].ID}})
 		}
 		if err := store.ReplaceUserInstallations(ctx, tx, userID, ids); err != nil {
 			return err
@@ -123,8 +122,8 @@ func (s *Server) callback(w http.ResponseWriter, r *http.Request) {
 		if err := s.createSession(ctx, tx, sessionID, userID, tok); err != nil {
 			return err
 		}
-		if len(syncs) > 0 {
-			if _, err := s.Jobs.InsertManyTx(ctx, tx, syncs); err != nil {
+		for _, id := range ids {
+			if _, err := s.Jobs.InsertTx(ctx, tx, jobs.SyncInstallationArgs{InstallationID: id}, nil); err != nil {
 				return err
 			}
 		}
@@ -138,7 +137,7 @@ func (s *Server) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.setCookie(w, sessionCookie, sessionID, s.Cfg.SessionTTL)
-	http.Redirect(w, r, s.Cfg.AppOrigin.String(), http.StatusFound)
+	http.Redirect(w, r, s.Cfg.AppOrigin.JoinPath("organizations").String(), http.StatusFound)
 }
 
 // createSession binds sealed tokens to their user id so copied ciphertext cannot decrypt.
@@ -168,6 +167,7 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.clearCookie(w, sessionCookie)
+	s.clearCookie(w, oauthCookie)
 	w.WriteHeader(http.StatusNoContent)
 }
 
