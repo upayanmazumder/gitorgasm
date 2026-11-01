@@ -7,7 +7,14 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   ...tanstackQuery.configs['flat/recommended'],
-  globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts']),
+  // React Bits components are vendored upstream source; keep them unmodified for easy updates.
+  globalIgnores([
+    '.next/**',
+    'out/**',
+    'build/**',
+    'next-env.d.ts',
+    'src/components/react-bits/**',
+  ]),
   {
     files: ['**/*.ts', '**/*.tsx'],
     rules: {

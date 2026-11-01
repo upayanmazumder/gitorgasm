@@ -130,6 +130,8 @@ Keep `src/app/` for route entry points, layouts, metadata, and route-specific fr
 - Keep one concern per file. Extract a cohesive component or helper when a file grows.
 - Keep route-specific state near its feature. Put shared hooks in `src/hooks/` and shared pure functions in `src/lib/`.
 - Reuse existing components and variants instead of creating duplicates.
+- `src/components/react-bits/` holds [React Bits](https://reactbits.dev) components installed with `npx shadcn@latest add @react-bits/<Name>-TS-TW`. This is vendored upstream source. Keep changes minimal and mark each one `Local patch`, so it is easy to re-apply after an update. The folder is excluded from ESLint and exempt from the line target. Import it through the barrel, and wrap it in small feature components.
+- Local patch in `dither.tsx`: the cleanup no longer calls `loseContext()`. React StrictMode reuses the canvas on its dev remount, and a lost WebGL context cannot be restored, so the background rendered blank in development.
 
 ### Comments
 
