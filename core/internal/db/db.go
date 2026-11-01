@@ -5,12 +5,15 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"net"
 	"strconv"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
@@ -57,7 +60,7 @@ func Open(ctx context.Context, url string, limits Limits) (*pgxpool.Pool, error)
 	}
 	pingCtx, cancel := context.WithTimeout(ctx, startupWait)
 	defer cancel()
-	if err := retryUntilReady(pingCtx, pool.Ping, time.Second); err != nil {
+	if err := retryUntilReady(pingCtx, pool.Ping, transientStartupError, time.Second); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("ping database: %w", err)
 	}
@@ -67,12 +70,29 @@ func Open(ctx context.Context, url string, limits Limits) (*pgxpool.Pool, error)
 // startupWait bounds how long a starting process waits for PostgreSQL to accept connections.
 const startupWait = 30 * time.Second
 
-// retryUntilReady calls ping until it succeeds or ctx ends, and returns the last ping error.
-func retryUntilReady(ctx context.Context, ping func(context.Context) error, every time.Duration) error {
+// transientStartupError reports failures that clear once PostgreSQL finishes starting.
+// Authentication, DSN, and TLS errors are not transient and must fail fast.
+func transientStartupError(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "57P03"
+	}
+	var netErr net.Error
+	return errors.As(err, &netErr)
+}
+
+// retryUntilReady calls ping until it succeeds, fails with a non-retryable error, or ctx ends.
+// It returns the last ping error.
+func retryUntilReady(
+	ctx context.Context,
+	ping func(context.Context) error,
+	retryable func(error) bool,
+	every time.Duration,
+) error {
 	for {
 		err := ping(ctx)
-		if err == nil {
-			return nil
+		if err == nil || !retryable(err) {
+			return err
 		}
 		select {
 		case <-ctx.Done():
