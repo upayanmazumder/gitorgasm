@@ -1,0 +1,139 @@
+.root {
+  width: 192px;
+  height: 160px;
+}
+
+.button {
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: 24px;
+  background: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.root .button:focus-visible {
+  outline-offset: 4px;
+}
+
+.art {
+  display: block;
+  width: 192px;
+  height: 160px;
+  stroke-linejoin: round;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .art [data-part='arm-wave'] {
+    transform: rotate(150deg);
+  }
+
+  .art [data-part='eyes-happy'] {
+    opacity: 1;
+  }
+
+  .art [data-part='eyes-open'] {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .art[data-playing='true'] [data-part='arm-wave'] {
+    animation: wave-arm var(--motion-wave) both;
+  }
+
+  .art[data-playing='true'] [data-part='head'] {
+    animation: tilt-head var(--motion-wave) var(--ease-in-out) both;
+  }
+
+  .art[data-playing='true'] [data-part='eyes-happy'] {
+    animation: eyes-happy var(--motion-wave) step-end both;
+  }
+
+  .art[data-playing='true'] [data-part='eyes-open'] {
+    animation: eyes-open var(--motion-wave) step-end both;
+  }
+}
+
+@keyframes wave-arm {
+  0% {
+    transform: rotate(0deg);
+    animation-timing-function: var(--ease-overshoot);
+  }
+  20% {
+    transform: rotate(150deg);
+    animation-timing-function: var(--ease-in-out);
+  }
+  32% {
+    transform: rotate(132deg);
+    animation-timing-function: var(--ease-in-out);
+  }
+  44% {
+    transform: rotate(165deg);
+    animation-timing-function: var(--ease-in-out);
+  }
+  56% {
+    transform: rotate(132deg);
+    animation-timing-function: var(--ease-in-out);
+  }
+  68% {
+    transform: rotate(160deg);
+    animation-timing-function: var(--ease-in-out);
+  }
+  80% {
+    transform: rotate(150deg);
+    animation-timing-function: var(--ease-in-out);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes tilt-head {
+  0% {
+    transform: rotate(0deg);
+  }
+  20%,
+  80% {
+    transform: rotate(-4deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes eyes-happy {
+  0% {
+    opacity: 0;
+  }
+  22% {
+    opacity: 1;
+  }
+  78%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes eyes-open {
+  0% {
+    opacity: 1;
+  }
+  22% {
+    opacity: 0;
+  }
+  78%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 767px) {
+  .root,
+  .art {
+    width: 144px;
+    height: 120px;
+  }
+}

@@ -4,14 +4,86 @@ Gitorgasm shows organization activity and scores. The website connects to the ap
 
 ## Home page
 
-The home page at `/` introduces GitHub organization connection, contributor and repository activity scores, date/time filters and search, saved query presets, and daily score refreshes. Its navigation and primary action lead to `/organizations`. It does not present team membership as a supported feature.
+The home page uses the **Sunbeam** design system in `design-system.md`.
+Claude Opus 5.5 wrote the design direction. Claude Sonnet 5.5 wrote the frontend code.
+The design system owns colors, type, spacing, controls, motion, and copy. Read it before you change the page.
 
-Components live in `src/components/home`, with public exports in `index.ts`.
-The `hero` folder owns the heading, primary action, and decorative effect.
-The `features` folder owns feature cards and their content.
-Navigation stays beside the home composition.
-Small wrappers compose vendored React Bits effects from `src/components/react-bits`.
-Decorative effects stay hidden from assistive technology.
+A marigold cat waves from the top of an illustrative scoreboard, in a soft beam of light.
+Below the hero, a commit-line timeline explains three steps, and a filter picture explains scoping.
+The page introduces organization connection, contributor and repository scores, activity filters, UTC periods, saved presets, and daily refreshes.
+Scores describe GitHub activity, not developer productivity.
+Visible labels identify illustrative figures and settings.
+App actions lead to `/organizations`. Navigation uses page anchors and the project repository.
+
+Tokens for color, radius, shadow, motion, and mascot colors apply only to `.home` in `src/app/globals.css`.
+The fonts Bricolage Grotesque and Instrument Sans load in `src/components/home/fonts.ts` and apply to the `.home` root only.
+Application screens keep their neutral theme and root fonts.
+
+Components live in `src/components/home`, with the public export in `index.ts`.
+The `hero`, `mascot`, `scoreboard`, `features`, `scope`, `effects`, and `footer` folders separate the composition.
+`ButtonLink` and `HomeBrand` are shared by the navigation, hero, scope, and footer.
+
+### Brand mark and icon
+
+The mark is an original seated cat with a tail that rises as a git line and ends in a commit ring.
+It is not an Octocat, not a trace of any GitHub artwork, and does not imply a GitHub affiliation.
+The cat is never placed in a circle, and it has no tentacles.
+
+- `src/components/brand` holds the shared geometry (`mark-paths.ts`) and the `BrandMark` component.
+  `BrandMark` draws a marigold tile with an ink cat on a 32 by 32 grid.
+  It is hidden from assistive technology next to the wordmark. Pass `title` when it stands alone.
+- `src/app/icon.svg` is the favicon for browsers that support SVG. It repeats the same geometry with literal colors, because the file is standalone.
+- `src/app/favicon.ico` is the fallback icon. It holds 16, 32, and 48 pixel frames that were rendered from `icon.svg` with `rsvg-convert` and packed with ImageMagick. Render it again when `icon.svg` changes.
+- `src/app/apple-icon.tsx` renders the 180 pixel touch icon from the same geometry.
+- The cat and tail span x 5 to 29.7, so every tile draws them inside a `translate(-1.4 0)` group (`MARK_GLYPH_TRANSFORM`). The tile rectangle does not move.
+
+### Mascot animation
+
+`src/components/home/mascot` draws the hero cat. The art is server HTML, so it shows in the rest pose before scripts run.
+The SVG has parts named `tail`, `body`, `leg-static`, `head`, `eyes-open`, `eyes-happy`, and `arm-wave`.
+The wave moves only `transform` and `opacity`. The SVG box never changes size.
+
+- One wave takes 1600 ms. The arm lifts to 150 degrees with a small overshoot, swings between 132 and 165 degrees, then returns.
+  The head tilts by -4 degrees, and the eyes become happy arcs for the middle of the wave.
+- The wave runs once when 60 percent of the cat is visible. It does not loop and nothing else on the mascot moves.
+- The cat is a button named "Make the Gitorgasm cat wave". Click, tap, Enter, and Space restart the wave. A press during a wave restarts it.
+- With `prefers-reduced-motion: reduce`, the cat shows a static greeting pose with the arm raised and happy eyes.
+  It is then an image named "The Gitorgasm cat waving hello", with no button and no animation.
+  The CSS applies this pose before hydration, and the component swaps the button for the image after it.
+
+### Effects and motion budget
+
+Content and illustrations render in server HTML before effects load.
+At most two things animate in a view: the mascot wave (once) and the LightRays beam.
+Fine-pointer screens without a reduced-motion preference load React Bits effects only at widths of 768 pixels or more.
+LightRays provides the sunbeam behind the hero. SpotlightCard lights only the scoreboard panel.
+The scoreboard keeps its full content in the loading fallback, so nothing flashes blank.
+Touch, mobile, and reduced-motion views keep static surfaces and a CSS light effect.
+DotGrid and Dither are removed.
+
+### React Bits provenance
+
+Vendored source lives in `src/components/react-bits`, with exports through its barrel.
+LightRays and SpotlightCard are official React Bits components from the TypeScript and Tailwind registry.
+These sources need no external dependencies.
+
+| Component     | Official source                                                              | Documentation                                                     |
+| ------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| LightRays     | [LightRays-TS-TW.json](https://reactbits.dev/r/LightRays-TS-TW.json)         | [Light Rays](https://reactbits.dev/backgrounds/light-rays)        |
+| SpotlightCard | [SpotlightCard-TS-TW.json](https://reactbits.dev/r/SpotlightCard-TS-TW.json) | [Spotlight Card](https://reactbits.dev/components/spotlight-card) |
+
+No local vendor patches apply.
+The upstream [MIT + Commons Clause license](https://github.com/DavidHDev/react-bits/blob/main/LICENSE.md) belongs to David Haz.
+Its notice stays in `src/components/react-bits/LICENSE.txt`.
+Retain source attribution and license notices when you update these components.
+Mark necessary vendor changes with a one-line `Local patch` annotation.
+
+### Review checklist
+
+Check the skip link, section navigation, organization actions, keyboard focus, and project link.
+Review widths of 390, 768, 1024, and 1440 pixels in both themes.
+Check the wave with a keyboard, with touch, and with reduced motion on.
+The scoreboard must remain readable while effects load or remain unavailable.
 
 ## Requirements
 

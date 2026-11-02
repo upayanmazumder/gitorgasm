@@ -1,0 +1,21 @@
+export const MARK_VIEWBOX = '0 0 32 32';
+
+// The cat and its tail span x 5 to 29.7, so this shift centers them on the 32 unit tile.
+export const MARK_GLYPH_TRANSFORM = 'translate(-1.4 0)';
+
+export const MARK_EARS = [
+  'M6.2 14 L7.6 5.4 Q8 4 9.2 4.9 L14 9.5 Z',
+  'M21.8 14 L20.4 5.4 Q20 4 18.8 4.9 L14 9.5 Z',
+] as const;
+
+// Even-odd fill cuts the eyes out of the head, so the mark needs no mask ids.
+export const MARK_HEAD =
+  'M11 8.5 H17 A6 6 0 0 1 23 14.5 V15.5 A6 6 0 0 1 17 21.5 H11 A6 6 0 0 1 5 15.5 V14.5 A6 6 0 0 1 11 8.5 Z ' +
+  'M9.6 14.2 A1.2 1.2 0 0 1 12 14.2 V15.6 A1.2 1.2 0 0 1 9.6 15.6 Z ' +
+  'M16 14.2 A1.2 1.2 0 0 1 18.4 14.2 V15.6 A1.2 1.2 0 0 1 16 15.6 Z';
+
+export const MARK_BODY = 'M7.5 20 H20.5 V26 A2 2 0 0 1 18.5 28 H9.5 A2 2 0 0 1 7.5 26 Z';
+
+export const MARK_TAIL = 'M20.5 26.8 C24.6 26.8 26 24.8 26 21.5 V12.6';
+
+export const MARK_RING = { cx: 26, cy: 10, r: 2.6 } as const;

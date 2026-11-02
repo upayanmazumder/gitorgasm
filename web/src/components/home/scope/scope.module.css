@@ -1,0 +1,149 @@
+.section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 48px;
+  padding-block: 72px;
+}
+
+.copy h2 {
+  max-width: 20ch;
+  font-family: var(--home-font-display);
+  font-size: clamp(1.875rem, 1.4rem + 1.6vw, 2.5rem);
+  font-weight: 650;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.copy p {
+  max-width: 60ch;
+  margin-top: 16px;
+}
+
+.copy .boundary {
+  color: var(--home-muted);
+}
+
+.copy a {
+  margin-top: 32px;
+}
+
+.figure {
+  min-width: 0;
+  margin: 0;
+}
+
+.panel {
+  display: grid;
+  gap: 24px;
+  padding: 16px;
+  border: 1px solid var(--home-line);
+  border-radius: var(--home-radius-panel);
+  background: var(--home-surface);
+  box-shadow: var(--home-shadow-panel);
+}
+
+.panelHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panelTitle {
+  font-family: var(--home-font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.pill {
+  padding: 4px 12px;
+  border-radius: var(--home-radius-pill);
+  background: var(--home-surface-hover);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.label {
+  color: var(--home-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.segments {
+  display: flex;
+  gap: 8px;
+}
+
+.segments > span {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  min-height: 44px;
+  padding-inline: 4px;
+  border: 1px solid var(--home-line-strong);
+  border-radius: var(--home-radius-control);
+}
+
+.segments > [data-selected='true'] {
+  background: var(--home-surface-hover);
+  font-weight: 600;
+}
+
+.select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding-inline: 12px;
+  border: 1px solid var(--home-line-strong);
+  border-radius: var(--home-radius-control);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.option strong {
+  margin-left: auto;
+  font-weight: 600;
+}
+
+.checkBox {
+  fill: var(--home-data);
+}
+
+.caption {
+  margin-top: 12px;
+  color: var(--home-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+@media (min-width: 768px) {
+  .section {
+    padding-block: 112px;
+  }
+
+  .panel {
+    padding: 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .section {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 64px;
+    align-items: center;
+  }
+}

@@ -1,31 +1,19 @@
-import Link from 'next/link';
+import { ButtonLink } from './button-link';
+import { HomeBrand } from './home-brand';
+import styles from './home.module.css';
 
 export function HomeNavigation() {
   return (
-    <header className="border-b">
-      <nav
-        aria-label="Main navigation"
-        className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-5 sm:px-10"
-      >
-        <Link
-          href="/"
-          className="rounded-sm text-lg font-semibold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-4"
-        >
-          Gitorgasm
-        </Link>
-        <div className="flex items-center gap-5 text-sm sm:gap-8">
-          <a
-            href="#features"
-            className="rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4"
-          >
-            Features
-          </a>
-          <Link
-            href="/organizations"
-            className="rounded-sm font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4"
-          >
-            Open app <span aria-hidden="true">↗</span>
-          </Link>
+    <header className={styles.header}>
+      <nav aria-label="Main navigation" className={`${styles.container} ${styles.nav}`}>
+        <HomeBrand size={28} />
+        <div className={styles.links}>
+          <ButtonLink href="#how-it-works" variant="text" className={styles.hideSmall}>
+            How it works
+          </ButtonLink>
+          <ButtonLink href="/organizations" variant="secondary" compact>
+            Open app
+          </ButtonLink>
         </div>
       </nav>
     </header>
