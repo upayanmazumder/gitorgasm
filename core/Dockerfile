@@ -8,7 +8,7 @@ ARG VERSION=dev
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/gitorgasm ./cmd/gitorgasm
 
-FROM rust:1.97-bookworm AS build-score
+FROM rust:1.99-bookworm AS build-score
 WORKDIR /src
 COPY scoring/Cargo.toml scoring/Cargo.lock ./
 COPY scoring/src ./src
