@@ -31,8 +31,8 @@ flowchart LR
   API -- "InsertTx" --> RQ
   WRK -- "fetch / complete jobs" --> RQ
   WRK -- "upsert mirror" --> APP
-  WRK -- "installation + app tokens" --> GH
-  API -- "user token at login" --> GH
+  WRK -- "user, installation + app tokens" --> GH
+  API -- "user + app tokens" --> GH
   MIG -- "goose + rivermigrate" --> PG
   PG -. "pg_dump every 30 min, upload hourly" .-> R2
 ```
@@ -65,6 +65,8 @@ Source: `core/internal/db/migrations/`. `00001_core.sql` is the immutable baseli
 | `webhook_deliveries` | Authoritative inbox (short-lived)        | `webhooks.InsertWebhookDelivery`, `webhooks.FinishWebhookDelivery`                | `webhooks.GetWebhookDelivery`                               | Raw signed body as `BYTEA`. Dedupe key = `X-GitHub-Delivery`.                                           |
 | `audit_events`       | Authoritative, append-only               | `audit.Audit`                                                                     | none yet                                                    | Actions in use: `session.created`, `installation.sync_requested`, `session.revoked_by_github`.          |
 | `river_*`            | Authoritative work state                 | River client (`jobs` package, `httpapi`)                                          | River worker                                                | Job kinds: `sync_installation`, `process_webhook`, `reconcile_installations`, `purge_sessions`, `purge_webhook_deliveries` (`internal/jobs/queue`). |
+| `administration_operations` | Authoritative | `store/administration`, transactional HTTP enqueue | Original-actor receipt/history queries and River worker | Intent, session hash, idempotency fingerprint, job binding and durable progress. No plaintext token. |
+| `administration_targets` | Authoritative | Administration worker | Original-actor receipt query | Ordered target outcomes. Unknown external effects are never replayed automatically. |
 
 The baseline `00001_core.sql` defines the GitHub mirror tables. GitHub stays the source of truth; the later schema-hardening migration does not change that ownership.
 
@@ -81,6 +83,7 @@ Every boundary below is in code. **Verified** by the cited function.
 | Webhook receive     | insert `webhook_deliveries` row, `InsertTx` of `process_webhook`                                                                                       | `httpapi/webhook/deliveries.go` `deliver`                |
 | Webhook apply       | event-specific writes, `InsertTx` of follow-up `sync_installation`                                                                                     | `jobs/webhook` `Worker.apply`                  |
 | Repository page     | one multi-row `INSERT … ON CONFLICT` per page of 100                                                                                                   | `tenancy.UpsertRepositories`                   |
+| Administration request | operation, ordered targets, `InsertTx` of `administer_organization`, job binding, audit | `httpapi/administration.Submit` |
 
 Not in one transaction (**Verified**, `jobs/sync` `Worker.Work`):
 
@@ -165,7 +168,15 @@ Sync algorithm (`jobs/sync` `Worker.Work`):
 6. CI runs migrations on empty PostgreSQL 18 databases. `internal/db/migration_upgrade_test.go` also migrates from deployed version 1 and checks reused logins after upgrade.
 7. `00002_schema_hardening.sql` adds `NOT VALID` CHECK storage guards without rewriting the deployed baseline. `00003_concurrent_indexes.sql` uses `-- +goose NO TRANSACTION` and concurrent index operations for an online upgrade. CHECK constraints reject new invalid values; validate existing rows after cleanup.
 
-**Session limits** (**Verified**: `core/internal/db/db.go` `db.Limits`, `core/internal/config/config.go`): each connection sets its limits at startup. `DB_STATEMENT_TIMEOUT` defaults to 15s, `DB_LOCK_TIMEOUT` to 5s, and `DB_IDLE_IN_TX_TIMEOUT` to 30s. The `migrate` role uses no statement timeout but keeps the lock timeout, with a pool of 2. The pool sets a maximum connection lifetime of 1h (plus 5m jitter), an idle time of 5m, a health check every 30s, and a connect timeout of 5s. The api uses `DB_MAX_CONNS=8` and the worker uses 13. The worker needs at least 2 × `WORKER_CONCURRENCY` + 5 connections and refuses to start with fewer. A sync job runs every statement on its advisory-lock connection, so each job uses one pool connection. Postgres sets `max_connections=60`, `log_lock_waits=on`, and a server-wide `idle_in_transaction_session_timeout=5min` as a backstop for `psql` and `pg_dump`. See `deployment-topology.md` §3 for the budget.
+**Session limits** (`core/internal/db/db.go` and `core/internal/config/config.go`): each connection sets its limits at startup.
+`DB_STATEMENT_TIMEOUT` defaults to 15 seconds, `DB_LOCK_TIMEOUT` to five seconds, and `DB_IDLE_IN_TX_TIMEOUT` to 30 seconds.
+Migrations disable the statement timeout but retain the lock timeout. Their pool has two connections.
+Pool connections have a one-hour maximum lifetime, five-minute jitter, five-minute idle timeout, 30-second health interval, and five-second connect timeout.
+The API manifest sets `DB_MAX_CONNS=8`. The worker manifest sets 15 at concurrency four.
+The worker requires at least `2 * WORKER_CONCURRENCY + 7` connections.
+Administration reserves a lock connection and a separate connection for fresh authorization. Sync jobs use their advisory-lock connection for SQL.
+PostgreSQL sets `max_connections=60`, `log_lock_waits=on`, and a five-minute `idle_in_transaction_session_timeout`.
+See `deployment-topology.md` §3 for the connection budget. These values describe repository configuration, not a live deployment check.
 
 ## 9. Job argument schema evolution
 
@@ -175,7 +186,7 @@ River stores job args as JSON in `river_job.args`. A job inserted by release N m
 2. Never rename or remove a field while jobs of that kind can be pending. Drain or wait for retention first.
 3. Never change the meaning of an existing field. Create a new kind (for example `sync_installation_v2`) and keep the old worker until no old rows remain.
 4. Unique jobs dedupe by args (`ByArgs: true`). Adding a field changes the unique key. Treat that as a new kind if exact dedupe matters.
-5. Job args hold ids only, never secrets or tokens. **Verified** for current kinds: `installation_id`, `delivery_id`, empty struct.
+5. Job args hold IDs only, never secrets or tokens. Current keys include `installation_id`, `delivery_id`, and administration `operation_id`.
 
 ## 10. Planned tables (Stages 3 to 5)
 
@@ -187,8 +198,6 @@ All rows below are **Planned**. Column lists are proposals. Mapping from legacy 
 | `team_members`                                    | Mirror                     | `(team_id, user_github_id)`                                                 | `GET /orgs/{org}/teams/{team_slug}/members` (`teams/list-members-in-org`) | 3     |
 | `org_members`                                     | Mirror                     | `(installation_id, user_github_id)` with `role`                             | `GET /orgs/{org}/members` (`orgs/list-members`)                           | 3     |
 | `org_invitations`                                 | Mirror                     | `github_id`                                                                 | `GET /orgs/{org}/invitations` (`orgs/list-pending-invitations`)           | 3     |
-| `operations`, `operation_items`                   | Authoritative              | `id`, `(operation_id, item_key)`                                            | bulk operation plans and per-item results                                 | 4     |
-| `idempotency_keys`                                | Authoritative, ephemeral   | `(user_id, key)`                                                            | `Idempotency-Key` header                                                  | 4     |
 | `scoring_presets` + 7 child tables                | Authoritative              | `(installation_id, name)`                                                   | seed or legacy import                                                     | 5     |
 | `signals`                                         | Derived from GitHub events | dedup tuple `(user_id, type, repository_id, event_timestamp, content_hash)` | GraphQL ingest                                                            | 5     |
 | `computed_scores`, `leaderboard_materializations` | Derived                    | see `database-audit.md` §7.2                                                | Rust `scoring`                                                            | 5     |

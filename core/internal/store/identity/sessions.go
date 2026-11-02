@@ -46,11 +46,12 @@ func CreateSession(ctx context.Context, q store.DBTX, s NewSession) error {
 
 // SessionUser is the authenticated principal resolved from a session cookie.
 type SessionUser struct {
-	UserID    int64   `json:"-"`
-	GitHubID  int64   `json:"github_id"`
-	Login     string  `json:"login"`
-	Name      *string `json:"name"`
-	AvatarURL *string `json:"avatar_url"`
+	UserID      int64   `json:"-"`
+	SessionHash []byte  `json:"-"`
+	GitHubID    int64   `json:"github_id"`
+	Login       string  `json:"login"`
+	Name        *string `json:"name"`
+	AvatarURL   *string `json:"avatar_url"`
 }
 
 // LookupSession updates last_seen_at at most once per minute to limit writes.

@@ -67,7 +67,7 @@ func Load(mode Mode) (*Config, error) {
 		return c, errors.Join(errs...)
 	}
 	if mode == ModeWorker && workers > 0 && int(c.DBMaxConns) < minWorkerConns(workers) {
-		errs = append(errs, fmt.Errorf("DB_MAX_CONNS must be at least %d for WORKER_CONCURRENCY=%d (2 queues x workers + 1 scoring job + %d for River)",
+		errs = append(errs, fmt.Errorf("DB_MAX_CONNS must be at least %d for WORKER_CONCURRENCY=%d (2 queues x workers + 1 scoring job + 2 administration connections + %d for River)",
 			minWorkerConns(workers), workers, riverConns))
 	}
 	c.ScoringBin = get("SCORING_BIN", "/gitorgasm-score")
@@ -97,5 +97,5 @@ func Load(mode Mode) (*Config, error) {
 // riverConns reserves connections for River's listener, fetching, completion, election, and maintenance.
 const riverConns = 4
 
-// minWorkerConns reserves one connection per job across both queues, one for scoring, and River headroom.
-func minWorkerConns(workers int) int { return 2*workers + 1 + riverConns }
+// minWorkerConns reserves both ordinary queues, scoring, an administration lock plus authorization, and River headroom.
+func minWorkerConns(workers int) int { return 2*workers + 3 + riverConns }

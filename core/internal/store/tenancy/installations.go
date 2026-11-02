@@ -45,7 +45,8 @@ func UpsertInstallation(ctx context.Context, q store.DBTX, inst *models.Installa
 // ReplaceUserInstallations removes stale grants while setting GitHub's current access list.
 func ReplaceUserInstallations(ctx context.Context, q store.DBTX, userID int64, installationIDs []int64) error {
 	if _, err := q.Exec(ctx, `
-		DELETE FROM user_installations WHERE user_id = $1 AND NOT (installation_id = ANY($2))`,
+		DELETE FROM user_installations
+		WHERE user_id = $1 AND NOT (installation_id = ANY(coalesce($2::bigint[], '{}'::bigint[])))`,
 		userID, installationIDs); err != nil {
 		return err
 	}

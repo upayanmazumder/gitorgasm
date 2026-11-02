@@ -4,6 +4,7 @@ import { isServiceUnavailable } from '@/api';
 import { PageHeader, PageShell } from '@/components/layout';
 import { Button, LinkButton, StatusMessage } from '@/components/ui';
 
+import { OrganizationNav } from '../navigation';
 import { ScoreForm } from './form';
 import { PresetsPanel } from './presets';
 import { ScoreResults } from './results';
@@ -34,14 +35,17 @@ export function ScoresView({ login }: Props) {
 
   return (
     <PageShell width="wide">
-      <PageHeader
-        lead={
-          <LinkButton href="/organizations" variant="link">
-            Organizations
-          </LinkButton>
-        }
-        title={`${login} scores`}
-      />
+      <div className="space-y-6">
+        <PageHeader
+          lead={
+            <LinkButton href="/organizations" variant="link">
+              Organizations
+            </LinkButton>
+          }
+          title={`${login} scores`}
+        />
+        <OrganizationNav login={login} current="scores" />
+      </div>
       {daily.isPending && <StatusMessage role="status">Loading scores…</StatusMessage>}
       {daily.isError && (
         <div className="space-y-4">

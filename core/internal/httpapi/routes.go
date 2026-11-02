@@ -3,6 +3,7 @@ package httpapi
 import (
 	"net/http"
 
+	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/administration"
 	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/auth"
 	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/organization"
 	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/response"
@@ -18,6 +19,9 @@ func (s *Server) routes() *http.ServeMux {
 	organizations := &organization.Handler{Pool: s.Pool, Jobs: s.Jobs, Log: s.Log}
 	scoring := &scores.Handler{Pool: s.Pool, Scorer: s.Scorer, Log: s.Log, Now: s.Now}
 	webhooks := &webhook.Handler{Pool: s.Pool, Jobs: s.Jobs, Cfg: s.Cfg, Log: s.Log}
+	administration := &administration.Handler{
+		Pool: s.Pool, Jobs: s.Jobs, GitHub: s.GitHub, Sealer: s.Sealer, Log: s.Log, Now: s.Now,
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.healthz)
@@ -36,6 +40,13 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("GET /v1/organizations/{login}/scores/presets", sessions.RequireSession(scoring.ListPresets))
 	mux.HandleFunc("PUT /v1/organizations/{login}/scores/presets/{name}", sessions.RequireSession(scoring.SavePreset))
 	mux.HandleFunc("DELETE /v1/organizations/{login}/scores/presets/{name}", sessions.RequireSession(scoring.DeletePreset))
+	mux.HandleFunc("GET /v1/organizations/{login}/administration", sessions.RequireSession(administration.Capabilities))
+	mux.HandleFunc("GET /v1/organizations/{login}/administration/users", sessions.RequireSession(administration.SearchUsers))
+	mux.HandleFunc("GET /v1/organizations/{login}/administration/teams", sessions.RequireSession(administration.Teams))
+	mux.HandleFunc("GET /v1/organizations/{login}/administration/members", sessions.RequireSession(administration.Members))
+	mux.HandleFunc("POST /v1/organizations/{login}/administration/operations", sessions.RequireSession(administration.Submit))
+	mux.HandleFunc("GET /v1/organizations/{login}/administration/operations", sessions.RequireSession(administration.ListOperations))
+	mux.HandleFunc("GET /v1/organizations/{login}/administration/operations/{id}", sessions.RequireSession(administration.GetOperation))
 
 	mux.HandleFunc("POST /webhooks/github", s.requireGitHub(webhooks.Handler()))
 	return mux

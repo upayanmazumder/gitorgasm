@@ -91,7 +91,7 @@ Source for capacity: `docs/architecture/cluster-audit.md` §2 and §8 (**Verifie
 | -------------- | ----------------- | -------- | --------- | --------- | --------- | -------------------------------------------------------------------------------------------------- |
 | api            | 1                 | 50m      | 500m      | 128Mi     | 256Mi     | `GOMEMLIMIT=200MiB`, `DB_MAX_CONNS=8`                                                              |
 | migrate (init) | per api pod start | 20m      | 500m      | 32Mi      | 128Mi     | runs to completion before `api` starts. Lower than app requests, so it adds nothing to the pod sum |
-| worker         | 1                 | 50m      | 500m      | 128Mi     | 256Mi     | `GOMEMLIMIT=200MiB`, `DB_MAX_CONNS=13`, `WORKER_CONCURRENCY=4`                                     |
+| worker         | 1                 | 50m      | 500m      | 128Mi     | 256Mi     | `GOMEMLIMIT=200MiB`, `DB_MAX_CONNS=15`, `WORKER_CONCURRENCY=4`                                     |
 | postgres       | 1                 | 100m     | 1000m     | 256Mi     | 512Mi     | `shared_buffers=64MB`, `max_connections=60`, `work_mem=4MB`, `log_min_duration_statement=500ms`    |
 | **Total**      |                   | **200m** | 2000m     | **512Mi** | 1024Mi    |                                                                                                    |
 
@@ -104,7 +104,17 @@ Fit (**Verified** inputs, arithmetic here):
 
 **Decision**: memory is the binding constraint. Do not add replicas, Redis, or NATS. Reclaim memory from other apps first if requests stay above 85% (`cluster-audit.md` §8 Proposal).
 
-Connection budget (**Verified** values, arithmetic here): the api uses `DB_MAX_CONNS=8` from the generated ConfigMap `gitorgasm-core` (`base/config.env`). The worker overrides it to 13 (`base/worker.yaml`). The worker minimum and default is 2 × `WORKER_CONCURRENCY` + 5 (`config.minWorkerConns`): two queues, one scoring job, and River headroom. The worker refuses to start below it. A sync job runs every statement on its advisory-lock connection, so each job uses one pool connection. In steady state the total is 21. During a rollout with one surge pod of each Deployment it is 2 × (8 + 13) = 42, plus 2 for `migrate` (`main.go` `db.Open(..., 2)`), so 44. This stays below `max_connections=60` and leaves room for `pg_dump` and `psql`. Postgres also sets `log_lock_waits=on` and a server-wide `idle_in_transaction_session_timeout=5min` as a backstop for those sessions. River uses the same pool.
+Connection budget (repository configuration, not a live deployment check): the API pool has 8 connections. The worker pool has 15 connections.
+The worker minimum is `2 * WORKER_CONCURRENCY + 7`. It covers both ordinary queues, scoring, administration authorization and its lock, and River.
+The worker rejects a smaller pool. Sync jobs use their advisory-lock connection for SQL. River shares the worker pool.
+
+| Mode | Calculation | Connection ceiling |
+| --- | --- | --- |
+| Steady state | `8 + 15` | 23 |
+| One surge pod per Deployment, including migration | `2 * (8 + 15) + 2` | 48 |
+| PostgreSQL limit | `max_connections` | 60 |
+
+The rollout budget leaves capacity for maintenance clients. PostgreSQL enables `log_lock_waits` and a five-minute `idle_in_transaction_session_timeout`.
 
 ## 4. Argo CD and change path
 

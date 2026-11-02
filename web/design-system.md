@@ -1,7 +1,7 @@
 # Gitorgasm design system (Sunbeam)
 
 Owner: design direction by Opus 5.5. Implementation by Sonnet 5.5.
-Scope: every route (`/`, `/organizations`, `/organizations/[login]`, `/motion`, and the unmatched 404), the brand mark, and the favicon. One theme applies to all routes.
+Scope: every route (`/`, `/organizations`, `/organizations/[login]`, `/organizations/[login]/people`, `/motion`, and the unmatched 404), the brand mark, and the favicon. One theme applies to all routes.
 The homepage keeps its approved composition (sections 9 and 10). Application screens use the same tokens, type, controls, panels, and focus rules.
 This file replaces the older "Signal Field" direction and the earlier homepage-only scope.
 
@@ -720,6 +720,14 @@ Keep every label, role, heading level, element order, route path, and handler. K
 - `form/fields/filter-fields.tsx`: the text and number inputs become `Field` with `Input`. "Hide bots" becomes `CheckboxField`. The `details` element gets `md:col-span-2`, and its summary uses the base rule. The JSON field is `Field` (`mt-2`) with `Textarea rows={6} className="font-mono text-sm"`.
 - `presets/presets-panel.tsx`: the `section` uses `panelVariants()` and `space-y-4`. Use `Field` with `NativeSelect` and `Input` from `@/components/ui`. "Save preset" and "Remove preset" become `Button type="button" variant="outline"` inside `flex flex-wrap gap-3`.
 - `results/score-results.tsx`: the freshness line is `StatusMessage role="status"`. Its tone is `success` when fresh, `error` when ingestion failed, and `neutral` otherwise. Each `Board` section uses `panelVariants()` and `space-y-4`. Rows use `flex items-baseline justify-between gap-4 border-b border-border py-3 last:border-b-0`. The score `strong` gets `font-semibold tabular-nums`. "No activity in this period." uses `text-muted-foreground`.
+
+### Organization navigation
+
+`organizations/navigation/organization-nav.tsx` renders `nav aria-label="Organization sections"` below `PageHeader` on `/organizations/[login]` and `/organizations/[login]/people`. The header and the nav share a `space-y-6` wrapper. The current link is `LinkButton variant="outline"` with `aria-current="page"`. The other link is `LinkButton variant="link"`.
+
+### `/organizations/[login]/people`
+
+One wide page: header and nav, then "Request progress" when `?receipt=` is set, then the request section ("New request" or "Review request"), then "Recent requests". The request and progress sections are raised panels. Subsections inside a panel use headings and a top border, never a nested panel. The review replaces the editor in place. No modal, toast, image, spinner, or progress bar. `RadioField` in `ui` is a copy of `CheckboxField` for single-choice groups. The file input is `Input type="file"` inside `Field`. The README section "People workspace" describes the workflow and the supported imports.
 
 ### `/motion`
 

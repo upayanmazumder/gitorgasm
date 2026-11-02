@@ -13,6 +13,7 @@ import (
 	"github.com/upayanmazumder/gitorgasm/core/internal/jobs"
 	"github.com/upayanmazumder/gitorgasm/core/internal/obs"
 	"github.com/upayanmazumder/gitorgasm/core/internal/scorer"
+	"github.com/upayanmazumder/gitorgasm/core/internal/secure"
 )
 
 func runWorker(ctx context.Context, log *slog.Logger) error {
@@ -32,9 +33,14 @@ func runWorker(ctx context.Context, log *slog.Logger) error {
 		return err
 	}
 	defer pool.Close()
+	sealer, err := secure.NewSealer(cfg.TokenKey)
+	if err != nil {
+		return err
+	}
 	client, err := jobs.NewWorkerClient(pool, github.New(cfg.GitHub), jobs.WorkerOptions{
 		Concurrency: cfg.WorkerCount, ReconcileEvery: cfg.ReconcileEvery, Logger: log,
 		Scorer: scorer.New(cfg.ScoringBin, 1, time.Minute),
+		Sealer: sealer,
 	})
 	if err != nil {
 		return err

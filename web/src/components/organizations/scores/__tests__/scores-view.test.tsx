@@ -54,4 +54,20 @@ describe('ScoresView', () => {
     expect(screen.queryByText('Loading scores…')).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
+
+  it('links to the People section and marks Scores as the current section', () => {
+    vi.spyOn(api, 'get').mockImplementation(() => Promise.withResolvers<never>().promise);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <ScoresView login="acme" />
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByRole('link', { name: 'People' })).toHaveAttribute(
+      'href',
+      '/organizations/acme/people'
+    );
+    expect(screen.getByRole('link', { name: 'Scores' })).toHaveAttribute('aria-current', 'page');
+  });
 });
