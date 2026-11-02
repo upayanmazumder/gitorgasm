@@ -1,3 +1,4 @@
+export { BrandLink } from './brand-link';
 export { BrandMark } from './brand-mark';
 export {
   MARK_BODY,

@@ -1,0 +1,1 @@
+export { fontVariables } from './fonts';

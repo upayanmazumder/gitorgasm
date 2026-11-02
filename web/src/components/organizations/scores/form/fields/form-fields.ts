@@ -5,8 +5,6 @@ export interface FormFieldsProps {
   set: <K extends keyof ScoreFormValues>(key: K, value: ScoreFormValues[K]) => void;
 }
 
-export const inputClassName = 'rounded border p-2';
-
 export function textField(
   { form, set }: FormFieldsProps,
   key: 'start' | 'end' | 'search' | 'repository' | 'userId' | 'kinds'
@@ -14,6 +12,5 @@ export function textField(
   return {
     value: form[key],
     onChange: (event: { target: { value: string } }) => set(key, event.target.value),
-    className: inputClassName,
   };
 }

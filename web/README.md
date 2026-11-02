@@ -2,11 +2,37 @@
 
 Gitorgasm shows organization activity and scores. The website connects to the app server.
 
+## Theme
+
+One theme, named **Sunbeam**, applies to every route: `/`, `/organizations`, `/organizations/[login]`, `/motion`, and the unmatched 404 page.
+`design-system.md` owns colors, type, spacing, controls, motion, and copy. Read it before you change any screen.
+Claude Opus 5.5 wrote the design direction. Claude Sonnet 5.5 wrote the frontend code.
+
+`src/app/globals.css` contains imports only. The theme modules live in `src/styles`:
+
+- `tokens.css` holds raw color tokens on `:root` and `.dark`, `color-scheme`, radii, the panel shadow, and the mascot colors.
+- `theme.css` maps the tokens to Tailwind names with `@theme inline`. It defines no values.
+- `typography.css` holds the typeface stacks and the base heading, body, and code roles.
+- `motion.css` holds the motion tokens, the reduced-motion override, and the `transition-control` utility.
+- `base.css` holds page colors, the shared focus ring, and native control rules.
+- `fonts.ts` loads Bricolage Grotesque and Instrument Sans with `next/font/google`. `RootLayout` applies `fontVariables` to `<html>`.
+
+`next-themes` sets `.dark` on `<html>`. `ThemeProvider` uses `disableTransitionOnChange`, so a theme change does not animate control colors. No route or component defines theme tokens.
+Components use mapped Tailwind utilities such as `bg-card` and `text-muted-foreground`. CSS modules use the raw tokens.
+Marigold appears only as a fill: primary buttons, the brand tile, the mascot, and the beam.
+`src/app/not-found.tsx` renders `NotFoundView`. It replaces the Next.js default 404 page, which injects unlayered body styles that override the theme.
+
+Shared building blocks:
+
+- `src/components/ui` holds `Button`, `LinkButton`, `Field`, `Input`, `Textarea`, `NativeSelect`, `CheckboxField`, `StatusMessage`, `panelVariants`, and `Toaster`.
+  Every control is at least 44 pixels high. App code does not style raw `button`, `input`, `select`, or `textarea` elements.
+  Use `LinkButton` for links that look like buttons. Pass `native` for `/api/v1/auth/*`, which needs a full page navigation.
+- `src/components/layout` holds `PageShell` and `PageHeader` for application pages.
+- `src/components/brand` holds `BrandMark` and `BrandLink`.
+
 ## Home page
 
-The home page uses the **Sunbeam** design system in `design-system.md`.
-Claude Opus 5.5 wrote the design direction. Claude Sonnet 5.5 wrote the frontend code.
-The design system owns colors, type, spacing, controls, motion, and copy. Read it before you change the page.
+The home page keeps the approved Sunbeam composition.
 
 A marigold cat waves from the top of an illustrative scoreboard, in a soft beam of light.
 Below the hero, a commit-line timeline explains three steps, and a filter picture explains scoping.
@@ -15,13 +41,12 @@ Scores describe GitHub activity, not developer productivity.
 Visible labels identify illustrative figures and settings.
 App actions lead to `/organizations`. Navigation uses page anchors and the project repository.
 
-Tokens for color, radius, shadow, motion, and mascot colors apply only to `.home` in `src/app/globals.css`.
-The fonts Bricolage Grotesque and Instrument Sans load in `src/components/home/fonts.ts` and apply to the `.home` root only.
-Application screens keep their neutral theme and root fonts.
+Application screens share the theme but never show the cat or the beam.
 
 Components live in `src/components/home`, with the public export in `index.ts`.
 The `hero`, `mascot`, `scoreboard`, `features`, `scope`, `effects`, and `footer` folders separate the composition.
-`ButtonLink` and `HomeBrand` are shared by the navigation, hero, scope, and footer.
+The navigation, hero, scope, and footer use `LinkButton` from `src/components/ui`. The navigation and footer use `BrandLink` from `src/components/brand`.
+Home CSS modules read the raw tokens from `src/styles/tokens.css`. They define no tokens.
 
 ### Brand mark and icon
 
@@ -29,9 +54,9 @@ The mark is an original seated cat with a tail that rises as a git line and ends
 It is not an Octocat, not a trace of any GitHub artwork, and does not imply a GitHub affiliation.
 The cat is never placed in a circle, and it has no tentacles.
 
-- `src/components/brand` holds the shared geometry (`mark-paths.ts`) and the `BrandMark` component.
+- `src/components/brand` holds the shared geometry (`mark-paths.ts`), the `BrandMark` component, and `BrandLink`.
   `BrandMark` draws a marigold tile with an ink cat on a 32 by 32 grid.
-  It is hidden from assistive technology next to the wordmark. Pass `title` when it stands alone.
+  `BrandLink` shows the mark and the wordmark as a link to `/`. The mark is hidden from assistive technology next to the wordmark. Pass `title` to `BrandMark` when it stands alone.
 - `src/app/icon.svg` is the favicon for browsers that support SVG. It repeats the same geometry with literal colors, because the file is standalone.
 - `src/app/favicon.ico` is the fallback icon. It holds 16, 32, and 48 pixel frames that were rendered from `icon.svg` with `rsvg-convert` and packed with ImageMagick. Render it again when `icon.svg` changes.
 - `src/app/apple-icon.tsx` renders the 180 pixel touch icon from the same geometry.

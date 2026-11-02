@@ -1,6 +1,7 @@
 'use client';
 
-import Link from 'next/link';
+import { PageHeader, PageShell } from '@/components/layout';
+import { LinkButton, StatusMessage } from '@/components/ui';
 
 import { ScoreForm } from './form';
 import { PresetsPanel } from './presets';
@@ -31,14 +32,20 @@ export function ScoresView({ login }: Props) {
   } = useScoreControls(login);
 
   return (
-    <main className="mx-auto max-w-5xl space-y-8 px-6 py-12">
-      <Link href="/organizations" className="underline">
-        Organizations
-      </Link>
-      <h1 className="text-3xl font-semibold">{login} scores</h1>
-      {daily.isPending && <p role="status">Loading scores…</p>}
+    <PageShell width="wide">
+      <PageHeader
+        lead={
+          <LinkButton href="/organizations" variant="link">
+            Organizations
+          </LinkButton>
+        }
+        title={`${login} scores`}
+      />
+      {daily.isPending && <StatusMessage role="status">Loading scores…</StatusMessage>}
       {daily.isError && (
-        <p role="alert">{errorMessage(daily.error, 'Could not load scores. Try again later.')}</p>
+        <StatusMessage role="alert" tone="error">
+          {errorMessage(daily.error, 'Could not load scores. Try again later.')}
+        </StatusMessage>
       )}
       <ScoreForm
         form={form}
@@ -56,11 +63,13 @@ export function ScoresView({ login }: Props) {
         onRemove={remove}
         busy={savePreset.isPending || removePreset.isPending}
       />
-      {message && <p role="status">{message}</p>}
+      {message && <StatusMessage role="status">{message}</StatusMessage>}
       {calculate.isError && (
-        <p role="alert">{errorMessage(calculate.error, 'Could not calculate scores.')}</p>
+        <StatusMessage role="alert" tone="error">
+          {errorMessage(calculate.error, 'Could not calculate scores.')}
+        </StatusMessage>
       )}
       {shown && <ScoreResults result={shown} />}
-    </main>
+    </PageShell>
   );
 }

@@ -45,7 +45,7 @@
   }
 
   .art[data-playing='true'] [data-part='head'] {
-    animation: tilt-head var(--motion-wave) var(--ease-in-out) both;
+    animation: tilt-head var(--motion-wave) var(--motion-ease-in-out) both;
   }
 
   .art[data-playing='true'] [data-part='eyes-happy'] {
@@ -60,31 +60,31 @@
 @keyframes wave-arm {
   0% {
     transform: rotate(0deg);
-    animation-timing-function: var(--ease-overshoot);
+    animation-timing-function: var(--motion-ease-overshoot);
   }
   20% {
     transform: rotate(150deg);
-    animation-timing-function: var(--ease-in-out);
+    animation-timing-function: var(--motion-ease-in-out);
   }
   32% {
     transform: rotate(132deg);
-    animation-timing-function: var(--ease-in-out);
+    animation-timing-function: var(--motion-ease-in-out);
   }
   44% {
     transform: rotate(165deg);
-    animation-timing-function: var(--ease-in-out);
+    animation-timing-function: var(--motion-ease-in-out);
   }
   56% {
     transform: rotate(132deg);
-    animation-timing-function: var(--ease-in-out);
+    animation-timing-function: var(--motion-ease-in-out);
   }
   68% {
     transform: rotate(160deg);
-    animation-timing-function: var(--ease-in-out);
+    animation-timing-function: var(--motion-ease-in-out);
   }
   80% {
     transform: rotate(150deg);
-    animation-timing-function: var(--ease-in-out);
+    animation-timing-function: var(--motion-ease-in-out);
   }
   100% {
     transform: rotate(0deg);

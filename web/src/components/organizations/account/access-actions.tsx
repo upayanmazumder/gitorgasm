@@ -1,17 +1,17 @@
-import { buttonVariants } from '@/components/ui';
+import { LinkButton } from '@/components/ui';
 
 export function AccessActions() {
   return (
     <>
       <div className="flex flex-wrap gap-3">
-        <a href="/api/v1/auth/install" className={buttonVariants()}>
+        <LinkButton native href="/api/v1/auth/install">
           Install GitHub App
-        </a>
-        <a href="/api/v1/auth/login" className={buttonVariants({ variant: 'outline' })}>
+        </LinkButton>
+        <LinkButton native href="/api/v1/auth/login" variant="outline">
           Refresh GitHub access
-        </a>
+        </LinkButton>
       </div>
-      <p className="max-w-xl text-sm text-muted-foreground">
+      <p className="max-w-[60ch] text-sm text-muted-foreground">
         Choose an organization on GitHub to install the app. Already installed it or changed your
         access? Refresh GitHub access to update the organizations available here.
       </p>

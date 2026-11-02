@@ -1,5 +1,7 @@
 'use client';
 
+import { StatusMessage } from '@/components/ui';
+
 import { AccountSection } from '../account';
 import { OrganizationsSection } from '../directory';
 import { SessionError } from './session-error';
@@ -9,7 +11,7 @@ import { useOrganizationAuthorization } from './use-organization-authorization';
 export function OrganizationAuthorization() {
   const { session, organizations, logout, signedOut } = useOrganizationAuthorization();
 
-  if (session.isPending) return <p role="status">Checking your session…</p>;
+  if (session.isPending) return <StatusMessage role="status">Checking your session…</StatusMessage>;
   if (session.isError) return <SessionError onRetry={() => void session.refetch()} />;
   if (signedOut) return <SignInSection />;
   if (!session.data) return null;

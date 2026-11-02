@@ -1,4 +1,4 @@
-import { Button } from '@/components/ui';
+import { Button, StatusMessage } from '@/components/ui';
 
 import type { Organization } from '../model';
 import { EmptyOrganizations } from './empty-organizations';
@@ -24,20 +24,18 @@ export function OrganizationsSection({
   return (
     <section aria-labelledby="organizations-heading" className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="organizations-heading" className="text-xl font-semibold">
-          Connected organizations
-        </h2>
-        <Button variant="ghost" onClick={onRefresh} disabled={isRefreshDisabled}>
+        <h2 id="organizations-heading">Connected organizations</h2>
+        <Button variant="outline" onClick={onRefresh} disabled={isRefreshDisabled}>
           {isFetching ? 'Checking…' : 'Check organizations'}
         </Button>
       </div>
       {isPending ? (
-        <p role="status">Loading organizations…</p>
+        <StatusMessage role="status">Loading organizations…</StatusMessage>
       ) : hasError ? (
-        <p role="alert">
+        <StatusMessage role="alert" tone="error">
           Could not load your organizations. Check your connection, then choose Check organizations
           to try again.
-        </p>
+        </StatusMessage>
       ) : organizations?.length === 0 ? (
         <EmptyOrganizations />
       ) : (

@@ -1,4 +1,4 @@
-import { Button } from '@/components/ui';
+import { Button, StatusMessage } from '@/components/ui';
 
 import type { OrganizationUser } from '../model';
 import { AccessActions } from './access-actions';
@@ -17,7 +17,7 @@ export function AccountSection({
   onSignOut,
 }: AccountSectionProps) {
   return (
-    <section aria-labelledby="account-heading" className="space-y-5 border-y py-6">
+    <section aria-labelledby="account-heading" className="space-y-6 border-y border-border py-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 id="account-heading" className="text-sm text-muted-foreground">
@@ -33,11 +33,11 @@ export function AccountSection({
         </Button>
       </div>
       <AccessActions />
-      {isSigningOut ? <p role="status">Signing out…</p> : null}
+      {isSigningOut ? <StatusMessage role="status">Signing out…</StatusMessage> : null}
       {hasSignOutError ? (
-        <p role="alert">
+        <StatusMessage role="alert" tone="error">
           Could not sign out. Your session may still be active. Try signing out again.
-        </p>
+        </StatusMessage>
       ) : null}
     </section>
   );

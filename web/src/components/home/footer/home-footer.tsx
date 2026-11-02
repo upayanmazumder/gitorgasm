@@ -1,5 +1,6 @@
-import { ButtonLink } from '../button-link';
-import { HomeBrand } from '../home-brand';
+import { BrandLink } from '@/components/brand';
+import { LinkButton } from '@/components/ui';
+
 import homeStyles from '../home.module.css';
 import styles from './footer.module.css';
 
@@ -8,19 +9,19 @@ export function HomeFooter() {
     <footer className={styles.footer}>
       <div className={`${homeStyles.container} ${styles.inner}`}>
         <div className={styles.about}>
-          <HomeBrand size={24} />
+          <BrandLink size={24} />
           <p>Activity scores for GitHub organizations.</p>
         </div>
         <nav aria-label="Footer navigation" className={styles.links}>
-          <ButtonLink href="#how-it-works" variant="text">
+          <LinkButton href="#how-it-works" variant="link">
             How it works
-          </ButtonLink>
-          <ButtonLink href="/organizations" variant="text">
+          </LinkButton>
+          <LinkButton href="/organizations" variant="link">
             Organizations
-          </ButtonLink>
-          <ButtonLink href="https://github.com/upayanmazumder/gitorgasm" variant="text">
+          </LinkButton>
+          <LinkButton href="https://github.com/upayanmazumder/gitorgasm" variant="link">
             GitHub
-          </ButtonLink>
+          </LinkButton>
         </nav>
         <div className={styles.legal}>
           <p>Gitorgasm is not affiliated with GitHub.</p>
