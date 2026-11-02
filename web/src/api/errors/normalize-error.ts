@@ -1,7 +1,7 @@
 import { isAxiosError } from 'axios';
 import * as z from 'zod';
 
-import type { ApiErrorData } from '@/types';
+import { ApiError, isApiError } from './api-error';
 
 const errorBodySchema = z.object({
   error: z.object({
@@ -10,26 +10,6 @@ const errorBodySchema = z.object({
     request_id: z.string(),
   }),
 });
-
-export class ApiError extends Error {
-  readonly status?: number;
-  readonly code?: string;
-  readonly requestId?: string;
-  readonly details?: unknown;
-
-  constructor({ message, status, code, requestId, details }: ApiErrorData) {
-    super(message);
-    this.name = 'ApiError';
-    this.status = status;
-    this.code = code;
-    this.requestId = requestId;
-    this.details = details;
-  }
-}
-
-export function isApiError(error: unknown): error is ApiError {
-  return error instanceof ApiError;
-}
 
 export function toApiError(error: unknown): ApiError {
   if (isApiError(error)) return error;

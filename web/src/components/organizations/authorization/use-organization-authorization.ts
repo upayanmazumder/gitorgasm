@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { isApiError, request } from '@/api';
-import { createQueryKeys } from '@/lib/query';
+import { createQueryKeys } from '@/lib';
 
 import { organizationsSchema, userSchema } from '../model';
 

@@ -2,7 +2,7 @@ import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
 import * as z from 'zod';
 
-import { ApiError, toApiError } from '../errors';
+import { ApiError, toApiError } from '..';
 
 function axiosErrorWith(status: number, data: unknown) {
   const response: AxiosResponse = {

@@ -1,4 +1,4 @@
-package httpapi
+package auth
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 )
 
 // createSession binds sealed tokens to their user id so copied ciphertext cannot decrypt.
-func (s *Server) createSession(ctx context.Context, tx pgx.Tx, sessionID string, userID int64, tok *models.UserToken) error {
+func (s *Handler) createSession(ctx context.Context, tx pgx.Tx, sessionID string, userID int64, tok *models.UserToken) error {
 	ad := []byte(strconv.FormatInt(userID, 10))
 	ns := identity.NewSession{
 		IDHash:      secure.Hash(sessionID),
@@ -34,7 +34,7 @@ func (s *Server) createSession(ctx context.Context, tx pgx.Tx, sessionID string,
 	return identity.CreateSession(ctx, tx, ns)
 }
 
-func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
+func (s *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(s.cookieName(sessionCookie)); err == nil {
 		if err := identity.DeleteSession(r.Context(), s.Pool, secure.Hash(c.Value)); err != nil {
 			response.InternalError(s.Log, w, r, err)
@@ -46,7 +46,7 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) authed(next func(http.ResponseWriter, *http.Request, *identity.SessionUser)) http.HandlerFunc {
+func (s *Handler) RequireSession(next func(http.ResponseWriter, *http.Request, *identity.SessionUser)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		c, err := r.Cookie(s.cookieName(sessionCookie))
 		if err != nil || c.Value == "" {
@@ -67,6 +67,6 @@ func (s *Server) authed(next func(http.ResponseWriter, *http.Request, *identity.
 	}
 }
 
-func (s *Server) me(w http.ResponseWriter, _ *http.Request, u *identity.SessionUser) {
+func (s *Handler) Me(w http.ResponseWriter, _ *http.Request, u *identity.SessionUser) {
 	response.JSON(w, http.StatusOK, u)
 }

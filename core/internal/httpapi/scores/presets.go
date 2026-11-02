@@ -1,4 +1,4 @@
-package httpapi
+package scores
 
 import (
 	"net/http"
@@ -6,6 +6,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/internal/access"
 	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/response"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store/identity"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store/scores"
@@ -25,8 +26,8 @@ func presetName(w http.ResponseWriter, r *http.Request) (string, bool) {
 	return name, valid
 }
 
-func (s *Server) listScorePresets(w http.ResponseWriter, r *http.Request, u *identity.SessionUser) {
-	id, ok := s.resolveOrg(w, r, u)
+func (s *Handler) ListPresets(w http.ResponseWriter, r *http.Request, u *identity.SessionUser) {
+	id, ok := access.ResolveOrganization(s.Pool, s.Log, w, r, u)
 	if !ok {
 		return
 	}
@@ -38,8 +39,8 @@ func (s *Server) listScorePresets(w http.ResponseWriter, r *http.Request, u *ide
 	response.JSON(w, http.StatusOK, map[string]any{"data": presets})
 }
 
-func (s *Server) saveScorePreset(w http.ResponseWriter, r *http.Request, u *identity.SessionUser) {
-	id, ok := s.resolveOrg(w, r, u)
+func (s *Handler) SavePreset(w http.ResponseWriter, r *http.Request, u *identity.SessionUser) {
+	id, ok := access.ResolveOrganization(s.Pool, s.Log, w, r, u)
 	if !ok {
 		return
 	}
@@ -64,8 +65,8 @@ func (s *Server) saveScorePreset(w http.ResponseWriter, r *http.Request, u *iden
 	response.JSON(w, http.StatusOK, scores.ScoringPreset{Name: name, Query: query})
 }
 
-func (s *Server) deleteScorePreset(w http.ResponseWriter, r *http.Request, u *identity.SessionUser) {
-	id, ok := s.resolveOrg(w, r, u)
+func (s *Handler) DeletePreset(w http.ResponseWriter, r *http.Request, u *identity.SessionUser) {
+	id, ok := access.ResolveOrganization(s.Pool, s.Log, w, r, u)
 	if !ok {
 		return
 	}

@@ -1,7 +1,7 @@
 import { partialMatchKey } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
 
-import { createQueryKeys, getQueryClient } from '../query';
+import { createQueryKeys, getQueryClient } from '..';
 
 describe('getQueryClient', () => {
   it('reuses one client in the browser', () => {

@@ -20,7 +20,7 @@ Pinned API description: `github/rest-api-description` release v2.1.0, file `desc
 - **Verified** (installation token): "The installation access token will expire after 1 hour." <https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app>
 - **Verified** (user token): "By default, the user access token expires after 8 hours." `refresh_token_expires_in` is "always `15897600` (6 months)". Expiring tokens are an optional App feature. <https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app>
 - **Verified**: the installation token cache is in process memory (`map[int64]installationToken`, field `tokens` in `github/client.go`, logic in `github/tokens.go`). It is not shared between worker replicas. Each replica mints its own tokens. This is acceptable at one worker replica.
-- **Verified**: the slice does not use the user token after login. The sealed token and refresh token are stored in `sessions` for Stage 2 (`httpapi/sessions.go` `createSession`). Refresh is **Planned** (Stage 2).
+- **Verified**: the slice does not use the user token after login. The sealed token and refresh token are stored in `sessions` for Stage 2 (`httpapi/auth/sessions.go` `createSession`). Refresh is **Planned** (Stage 2).
 
 ### Installation and grant-refresh browser entry points
 
@@ -80,7 +80,7 @@ The install entry `/api/v1/auth/install` redirects to GitHub. Its return starts 
 
 ## 5. Webhook ingestion
 
-**Verified** (`httpapi/webhooks.go` `webhook`):
+**Verified** (`httpapi/webhook/deliveries.go` `deliver`):
 
 1. Read at most 25 MB (`maxWebhookBytes`). GitHub caps payloads at 25 MB and does not deliver larger ones. **Verified**: "Payloads are capped at 25 MB." (events page).
 2. Verify `X-Hub-Signature-256` with HMAC-SHA256 in constant time (`github.VerifySignature`, `hmac.Equal`). **Verified**: the header "always starts with `sha256=`" and docs require a constant-time compare. <https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries>

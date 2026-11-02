@@ -2,9 +2,10 @@
 
 import { m } from 'framer-motion';
 
-import { fadeVariants } from '@/lib/motion';
+import { fadeVariants } from '@/lib';
 
-import { resolveTransition, resolveTrigger, type MotionWrapperProps } from './shared';
+import type { MotionWrapperProps } from './shared';
+import { resolveTransition, resolveTrigger } from './shared';
 
 export function Fade({
   children,

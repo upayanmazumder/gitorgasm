@@ -1,4 +1,4 @@
-package httpapi
+package auth
 
 import (
 	"net/http"
@@ -6,14 +6,14 @@ import (
 )
 
 // cookieName uses __Host- for Secure, host-only, Path=/ cookies.
-func (s *Server) cookieName(base string) string {
+func (s *Handler) cookieName(base string) string {
 	if s.Cfg.CookieSecure {
 		return "__Host-" + base
 	}
 	return base
 }
 
-func (s *Server) setCookie(w http.ResponseWriter, base, value string, maxAge time.Duration) {
+func (s *Handler) setCookie(w http.ResponseWriter, base, value string, maxAge time.Duration) {
 	http.SetCookie(w, &http.Cookie{ //nolint:gosec // HttpOnly and SameSite are set; Secure is configured
 		Name:     s.cookieName(base),
 		Value:    value,
@@ -25,7 +25,7 @@ func (s *Server) setCookie(w http.ResponseWriter, base, value string, maxAge tim
 	})
 }
 
-func (s *Server) clearCookie(w http.ResponseWriter, base string) {
+func (s *Handler) clearCookie(w http.ResponseWriter, base string) {
 	http.SetCookie(w, &http.Cookie{ //nolint:gosec // same attributes as setCookie
 		Name: s.cookieName(base), Value: "", Path: "/", MaxAge: -1,
 		HttpOnly: true, Secure: s.Cfg.CookieSecure, SameSite: http.SameSiteLaxMode,

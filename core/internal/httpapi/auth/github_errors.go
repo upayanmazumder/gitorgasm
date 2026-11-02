@@ -1,4 +1,4 @@
-package httpapi
+package auth
 
 import (
 	"errors"
@@ -10,7 +10,7 @@ import (
 )
 
 // githubError maps upstream failures to stable API errors without leaking upstream bodies.
-func (s *Server) githubError(w http.ResponseWriter, r *http.Request, err error) {
+func (s *Handler) githubError(w http.ResponseWriter, r *http.Request, err error) {
 	var apiErr *github.APIError
 	if errors.As(err, &apiErr) {
 		s.Log.WarnContext(r.Context(), "github call failed", "operation", apiErr.Operation, "status", apiErr.Status, "kind", int(apiErr.Kind))
@@ -26,14 +26,4 @@ func (s *Server) githubError(w http.ResponseWriter, r *http.Request, err error) 
 	}
 	s.Log.ErrorContext(r.Context(), "github call failed", "error", err)
 	response.Error(w, r, http.StatusBadGateway, "github_unavailable", "GitHub request failed")
-}
-
-func (s *Server) requireGitHub(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if s.GitHub == nil {
-			response.Error(w, r, http.StatusServiceUnavailable, "github_not_configured", "the GitHub App is not configured on this deployment")
-			return
-		}
-		next(w, r)
-	}
 }

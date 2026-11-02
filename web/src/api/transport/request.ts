@@ -1,8 +1,8 @@
 import type { AxiosInstance, AxiosRequestConfig } from 'axios';
 import type { output as ZodOutput, ZodType } from 'zod';
 
+import { toApiError } from '../errors';
 import { api } from './client';
-import { toApiError } from './errors';
 
 export async function request<S extends ZodType>(
   config: AxiosRequestConfig & { schema: S; client?: AxiosInstance }

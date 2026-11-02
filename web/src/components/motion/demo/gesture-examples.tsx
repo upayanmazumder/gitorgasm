@@ -1,6 +1,6 @@
 import { m } from 'framer-motion';
 
-import { spring } from '@/lib/motion';
+import { spring } from '@/lib';
 
 import { Section } from './section';
 

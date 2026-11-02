@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import { m } from 'framer-motion';
 
-import { defaultTransition, pageVariants } from '@/lib/motion';
+import { defaultTransition, pageVariants } from '@/lib';
 
 interface PageTransitionProps {
   children: ReactNode;

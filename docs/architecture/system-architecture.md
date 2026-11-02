@@ -113,7 +113,7 @@ sequenceDiagram
 | Browser → Vercel rewrite `/api/:path*` → `https://api-gitorgasm.upayan.dev/:path*` | Planned config                           | D7                                                                  |
 | Cloudflare proxy, Origin CA wildcard, Traefik `websecure`                          | **Verified** cluster pattern             | cluster-audit.md                                                    |
 | Ingress host `api-gitorgasm.upayan.dev`                                            | Planned. DNS record needs user approval. | D15                                                                 |
-| api handler, session lookup, tenant join                                           | Exists                                   | `httpapi/sessions.go`, `store/identity`, `store/tenancy` |
+| api handler, session lookup, tenant join                                           | Exists                                   | `httpapi/auth/sessions.go`, `store/identity`, `store/tenancy` |
 | Origin check on unsafe methods                                                     | Exists (D10)                             | `httpapi/middleware`                                                 |
 
 **Assumption**: the session cookie reaches the api because the browser sees only the Vercel origin and Vercel forwards the `Cookie` header on rewrites. Verify at Stage 1.5.
@@ -139,8 +139,8 @@ sequenceDiagram
 
 Other job sources, all **Exists**:
 
-- Login callback enqueues one sync per installation in the session transaction (`httpapi/auth.go`).
-- `POST /v1/organizations/{login}/sync` enqueues a sync with an audit row (`httpapi/orgs.go`).
+- Login callback enqueues one sync per installation in the session transaction (`httpapi/auth/oauth.go`).
+- `POST /v1/organizations/{login}/sync` enqueues a sync with an audit row (`httpapi/organization`).
 - Periodic `reconcile_installations` enqueues a sync per active installation (`internal/jobs/maintenance`).
 
 Job semantics (**Verified** in `internal/jobs`): sync dedupes per installation per 1-minute window and runs one pass at a time per installation (advisory lock). Rate limits snooze. 401, 403, and other 4xx cancel. Tombstones only after every page succeeds.

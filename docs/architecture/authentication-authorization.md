@@ -1,6 +1,6 @@
 # Authentication and authorization
 
-Status: Stage 1 (Foundation). Code: `core/internal/httpapi/auth.go`, `internal/secure/secure.go`, `internal/store/identity`, `internal/store/tenancy`.
+Status: Stage 1 (Foundation). Code: `core/internal/httpapi/auth/oauth.go`, `internal/secure/secure.go`, `internal/store/identity`, `internal/store/tenancy`.
 
 Labels: **Verified** (file path, command, or official URL), **Assumption**, **Decision**, **Alternative considered**, **Planned**.
 

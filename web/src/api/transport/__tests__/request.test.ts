@@ -2,9 +2,8 @@ import { AxiosError, type AxiosAdapter } from 'axios';
 import { describe, expect, it } from 'vitest';
 import * as z from 'zod';
 
-import { createApiClient } from '../client';
-import { isApiError } from '../errors';
-import { request } from '../request';
+import { createApiClient, request } from '..';
+import { isApiError } from '../../errors';
 
 function clientReturning(status: number, data: unknown) {
   const client = createApiClient('/api');

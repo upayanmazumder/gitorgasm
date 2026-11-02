@@ -2,7 +2,7 @@ import axios from 'axios';
 
 import { API_TIMEOUT_MS } from '@/constants';
 
-import { toApiError } from './errors';
+import { toApiError } from '../errors';
 
 export function createApiClient(baseURL: string) {
   const client = axios.create({

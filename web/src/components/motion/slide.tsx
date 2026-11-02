@@ -2,9 +2,11 @@
 
 import { m } from 'framer-motion';
 
-import { createSlideVariants, type SlideDirection } from '@/lib/motion';
+import type { SlideDirection } from '@/lib';
+import { createSlideVariants } from '@/lib';
 
-import { resolveTransition, resolveTrigger, type MotionWrapperProps } from './shared';
+import type { MotionWrapperProps } from './shared';
+import { resolveTransition, resolveTrigger } from './shared';
 
 interface SlideProps extends MotionWrapperProps {
   direction?: SlideDirection;

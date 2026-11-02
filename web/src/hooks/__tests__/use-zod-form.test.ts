@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import * as z from 'zod';
 
-import { useZodForm } from '../use-zod-form';
+import { useZodForm } from '..';
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Name is required'),

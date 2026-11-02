@@ -1,4 +1,4 @@
-package httpapi
+package auth
 
 import (
 	"crypto/sha256"
@@ -19,10 +19,8 @@ import (
 	"github.com/upayanmazumder/gitorgasm/core/internal/store/tenancy"
 )
 
-// login starts sign-in or a post-install grant refresh with browser-bound state and PKCE.
-// GitHub's Setup URL points here; installation_id and all other incoming query values
-// are deliberately ignored. Only GET /user/installations authorizes installations.
-func (s *Server) login(w http.ResponseWriter, r *http.Request) {
+// Login starts browser-bound sign-in with PKCE and ignores untrusted setup parameters.
+func (s *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	state, verifier := secure.RandomToken(), secure.RandomToken()
 	sum := sha256.Sum256([]byte(verifier))
 	challenge := base64.RawURLEncoding.EncodeToString(sum[:])
@@ -30,12 +28,12 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, s.GitHub.AuthorizeURL(state, challenge), http.StatusFound)
 }
 
-func (s *Server) install(w http.ResponseWriter, r *http.Request) {
+func (s *Handler) Install(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, s.GitHub.InstallURL(), http.StatusFound)
 }
 
-// callback stores identity, installation grants, and a session before queuing syncs.
-func (s *Server) callback(w http.ResponseWriter, r *http.Request) {
+// Callback stores identity, installation grants, and a session before queuing syncs.
+func (s *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	c, err := r.Cookie(s.cookieName(oauthCookie))
 	s.clearCookie(w, oauthCookie)

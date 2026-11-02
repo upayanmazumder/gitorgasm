@@ -1,4 +1,4 @@
-package httpapi
+package scores
 
 import (
 	"bytes"
@@ -12,8 +12,7 @@ import (
 
 const maxScoreQueryBytes = 16 << 10
 
-// scoreQuery is a decoded query. Re-encoding sorts keys at every level, so equal queries
-// share one cache key regardless of key order or whitespace.
+// scoreQuery re-encodes decoded objects with sorted keys for stable cache keys.
 type scoreQuery map[string]any
 
 func readScoreQuery(w http.ResponseWriter, r *http.Request) (scoreQuery, bool) {
@@ -38,8 +37,7 @@ func readScoreQuery(w http.ResponseWriter, r *http.Request) (scoreQuery, bool) {
 	return query, true
 }
 
-// withAsOf anchors a named period at asOf when the caller left the anchor out. Saved presets
-// store no anchor, so they always resolve against the current data.
+// withAsOf anchors named periods against current data without changing saved presets.
 func (q scoreQuery) withAsOf(asOf time.Time) scoreQuery {
 	period, ok := q["period"].(map[string]any)
 	if !ok || period["kind"] != "preset" || period["as_of"] != nil {
@@ -72,7 +70,7 @@ func (q scoreQuery) encode() json.RawMessage {
 	return data
 }
 
-func (s *Server) validateQuery(w http.ResponseWriter, r *http.Request, query json.RawMessage) bool {
+func (s *Handler) validateQuery(w http.ResponseWriter, r *http.Request, query json.RawMessage) bool {
 	err := s.Scorer.Validate(r.Context(), query)
 	if err != nil {
 		s.scoreError(w, r, err)

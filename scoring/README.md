@@ -5,9 +5,12 @@ This Rust crate scores a complete snapshot of one organization's GitHub contribu
 ## Module structure
 
 - `model/` defines signals, totals, leaderboard rows, and nested scoring rules.
-- `engine/` separates point calculation, team membership, and leaderboard assembly.
-- `query/` owns filters, periods, and the nested catalog with its result cache.
-- Each domain uses `mod.rs` for public exports. `lib.rs` exposes the crate API.
+- `engine/` keeps event aggregation separate from point calculation, team membership, and public leaderboard adapters.
+- `query/catalog/` separates snapshot selection and scoring from FIFO result-cache bookkeeping.
+- `bin/score_command/` owns request/error protocol types and stdin/stdout execution.
+- `bin/benchmark/` owns timing and its deterministic workload.
+- Binary entrypoints only delegate to their private command modules.
+- Each domain uses `mod.rs` for explicit exports. `lib.rs` exposes the unchanged crate API.
 - Tests group query behavior by catalog, filter, and period.
 - Public leaderboard functions pass borrowed signal iterators to the engine without temporary reference lists.
 

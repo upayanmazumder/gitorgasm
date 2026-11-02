@@ -1,4 +1,4 @@
-package httpapi
+package webhook
 
 import (
 	"encoding/json"
@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/upayanmazumder/gitorgasm/core/internal/github"
+	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/middleware"
 	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/response"
 	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/queue"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store/webhooks"
@@ -30,8 +31,8 @@ const (
 // validEvent matches GitHub event names such as installation_repositories.
 var validEvent = regexp.MustCompile(`^[a-z_]{1,64}$`)
 
-// webhook acknowledges verified deliveries before worker processing to meet GitHub's 10-second timeout.
-func (s *Server) webhook(w http.ResponseWriter, r *http.Request) {
+// deliver acknowledges verified deliveries before worker processing to meet GitHub's timeout.
+func (s *Handler) deliver(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxWebhookBytes))
 	if err != nil {
 		var tooLarge *http.MaxBytesError
@@ -84,4 +85,8 @@ func (s *Server) webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.JSON(w, http.StatusAccepted, map[string]any{"accepted": true, "duplicate": duplicate})
+}
+
+func (s *Handler) Handler() http.HandlerFunc {
+	return middleware.LimitConcurrent(maxWebhookReads, s.deliver)
 }
