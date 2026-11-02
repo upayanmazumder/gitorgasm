@@ -1,5 +1,6 @@
 'use client';
 
+import { isServiceUnavailable } from '@/api';
 import { PageHeader, PageShell } from '@/components/layout';
 import { Button, LinkButton, StatusMessage } from '@/components/ui';
 
@@ -45,6 +46,7 @@ export function ScoresView({ login }: Props) {
       {daily.isError && (
         <div className="space-y-4">
           <StatusMessage role="alert" tone="error">
+            {isServiceUnavailable(daily.error) && 'Could not load scores. '}
             {errorMessage(daily.error, 'Could not load scores. Try again.')}
           </StatusMessage>
           <Button
