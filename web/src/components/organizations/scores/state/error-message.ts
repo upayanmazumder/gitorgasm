@@ -1,4 +1,4 @@
-import { isApiError } from '@/api';
+import { isApiError, isServiceUnavailable } from '@/api';
 
 export function errorMessage(error: unknown, fallback: string): string {
   if (!isApiError(error)) return error instanceof Error ? error.message : fallback;
@@ -17,5 +17,7 @@ export function errorMessage(error: unknown, fallback: string): string {
       return 'You do not have access to this organization.';
   }
   if (error.status === 401) return 'Your session ended. Sign in again.';
+  if (isServiceUnavailable(error))
+    return 'The service may be temporarily unavailable. Try again in a moment.';
   return fallback;
 }

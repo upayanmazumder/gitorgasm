@@ -44,4 +44,55 @@ describe('organization authorization', () => {
     expect(await screen.findByRole('link', { name: 'Sign in with GitHub' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /acme/ })).not.toBeInTheDocument();
   });
+
+  it('reports an unreachable service on the session check and recovers on an explicit retry', async () => {
+    const retried = Promise.withResolvers<{ data: typeof user }>();
+    vi.spyOn(api, 'request')
+      .mockRejectedValueOnce(
+        new ApiError({
+          message: 'Request failed with status code 500',
+          status: 500,
+          code: 'ERR_BAD_RESPONSE',
+        })
+      )
+      .mockReturnValueOnce(retried.promise)
+      .mockImplementation(async config => ({
+        data: config.url === '/v1/me' ? user : { data: [organization] },
+      }));
+    setup();
+    expect(await screen.findByRole('alert')).toHaveTextContent(/temporarily unavailable/);
+    expect(screen.queryByRole('link', { name: 'Sign in with GitHub' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/status code/i)).not.toBeInTheDocument();
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Try again' }));
+    // A refetch of a query that never had data returns to pending, so the alert and button leave.
+    expect(await screen.findByText('Checking your session…')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Sign in with GitHub' })).not.toBeInTheDocument();
+
+    retried.resolve({ data: user });
+    expect(await screen.findByText('@alice')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /acme/ })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('keeps the identity visible when the organization list is unreachable and recovers on Check organizations', async () => {
+    const request = vi.spyOn(api, 'request').mockImplementation(async config => {
+      if (config.url === '/v1/me') return { data: user };
+      throw new ApiError({ message: 'Network Error', code: 'ERR_NETWORK' });
+    });
+    setup();
+    expect(await screen.findByText('@alice')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /organizations\. The service may be temporarily unavailable/
+    );
+    expect(screen.queryByRole('link', { name: 'Sign in with GitHub' })).not.toBeInTheDocument();
+
+    request.mockImplementation(async config => ({
+      data: config.url === '/v1/me' ? user : { data: [organization] },
+    }));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Check organizations' }));
+    expect(await screen.findByRole('link', { name: /acme/ })).toBeInTheDocument();
+  });
 });

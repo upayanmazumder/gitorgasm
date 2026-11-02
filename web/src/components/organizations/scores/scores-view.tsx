@@ -1,7 +1,8 @@
 'use client';
 
+import { isServiceUnavailable } from '@/api';
 import { PageHeader, PageShell } from '@/components/layout';
-import { LinkButton, StatusMessage } from '@/components/ui';
+import { Button, LinkButton, StatusMessage } from '@/components/ui';
 
 import { ScoreForm } from './form';
 import { PresetsPanel } from './presets';
@@ -43,9 +44,19 @@ export function ScoresView({ login }: Props) {
       />
       {daily.isPending && <StatusMessage role="status">Loading scores…</StatusMessage>}
       {daily.isError && (
-        <StatusMessage role="alert" tone="error">
-          {errorMessage(daily.error, 'Could not load scores. Try again later.')}
-        </StatusMessage>
+        <div className="space-y-4">
+          <StatusMessage role="alert" tone="error">
+            {isServiceUnavailable(daily.error) && 'Could not load scores. '}
+            {errorMessage(daily.error, 'Could not load scores. Try again.')}
+          </StatusMessage>
+          <Button
+            variant="outline"
+            onClick={() => void daily.refetch()}
+            disabled={daily.isFetching}
+          >
+            Try again
+          </Button>
+        </div>
       )}
       <ScoreForm
         form={form}

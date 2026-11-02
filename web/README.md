@@ -143,7 +143,7 @@ Only `/api/v1/*` is proxied. The browser calls this app's origin, so session coo
 
 ## Sign-in and organization access
 
-Open `/organizations` to sign in with GitHub. The page checks `/api/v1/me` before loading accessible organizations, shows the signed-in identity, and links each organization to its activity scores. A failed session check is distinct from being signed out and can be retried.
+Open `/organizations` to sign in with GitHub. The page checks `/api/v1/me` before loading accessible organizations, shows the signed-in identity, and links each organization to its activity scores. A failed session check is distinct from being signed out. The page shows an error and a **Try again** button.
 
 - **Install GitHub App** opens `/api/v1/auth/install`. Choose an organization on GitHub; an organization owner may need to approve the installation.
 - **Refresh GitHub access** opens `/api/v1/auth/login` to refresh installation grants through OAuth. Use it after an installation is approved or your GitHub access changes.
@@ -152,7 +152,34 @@ Open `/organizations` to sign in with GitHub. The page checks `/api/v1/me` befor
 
 Configure the GitHub App's **Setup URL** as `/api/v1/auth/login` on the frontend origin and its OAuth callback as `/api/v1/auth/callback`. Disable **Request user authorization (OAuth) during installation**: the setup return must begin the server's state- and PKCE-protected OAuth flow. OAuth returns to `/organizations`; installation query parameters are never treated as proof of access by the UI.
 
-Session and organization data use TanStack Query, with no automatic error retries. Returning to the browser tab rechecks both, and organization caches are keyed by signed-in user. Organization access is always enforced by the API, not the presence of a navigation link.
+Session and organization data use TanStack Query. Returning to the browser tab rechecks both, and organization caches are keyed by signed-in user. Organization access is always enforced by the API, not the presence of a navigation link.
+
+### Service failures
+
+The website does not diagnose the cause of a failed request. It shows "The service may be temporarily unavailable" on the session check, the organization list, and the daily scores in these cases:
+
+- The browser gets no response, or the request times out.
+- The response is 500, 502, 503, or 504 without the API error body.
+
+API errors with an error body keep their own messages. Examples are `scores_busy`, `scores_pending`, and 401 (sign in again).
+
+Retry rules:
+
+- The session, organization, and daily score queries have `retry: false`. A failed initial request is not repeated.
+- The existing refetch on window focus stays. Returning to the tab rechecks the session and the organizations.
+- Preset queries keep the global `retry: 1`. Mutations keep `retry: 0`.
+- Every new retry control is manual: **Try again** on the session check and on daily scores, and **Check organizations** on the organization list. Each control is disabled while its request runs.
+- When the first load fails, the screen shows its loading state while a retry runs. The error returns if the retry fails.
+
+If the API is not running, the Next.js proxy answers `/api/v1/*` with a plain-text 500. The `pnpm dev` terminal also logs `Failed to proxy … ECONNREFUSED`, and the browser network panel shows the failed request.
+These are developer diagnostics. The website does not hide them. Start the API from the repository root with `make up`, then select **Try again**.
+
+## Hydration and browser extensions
+
+Some browser extensions add attributes to `<body>` before React hydrates the page. An example is `cz-shortcut-listen`.
+`<body>` has `suppressHydrationWarning` for this reason. `<html>` has it for `next-themes`.
+React applies the suppression to that one element only. Hydration still reports mismatches in all child content.
+Do not add `suppressHydrationWarning` to other elements. Do not filter console errors or remove extension attributes.
 
 ## Component structure
 

@@ -57,4 +57,37 @@ describe('errorMessage', () => {
       errorMessage(new ApiError({ message: 'x', status: 500, code: 'internal' }), 'fallback')
     ).toBe('fallback');
   });
+
+  it('reports an unreachable service without leaking transport details', () => {
+    const gateway = errorMessage(
+      new ApiError({
+        message: 'Request failed with status code 502',
+        status: 502,
+        code: 'ERR_BAD_RESPONSE',
+      }),
+      'f'
+    );
+    expect(gateway).toMatch(/temporarily unavailable/);
+    expect(gateway).not.toContain('status code');
+    const offline = errorMessage(
+      new ApiError({ message: 'Network Error', code: 'ERR_NETWORK' }),
+      'f'
+    );
+    expect(offline).toMatch(/temporarily unavailable/);
+  });
+
+  it('keeps structured score errors ahead of the unavailable message', () => {
+    expect(
+      errorMessage(
+        new ApiError({ message: 'x', status: 503, code: 'scores_busy', requestId: 'r' }),
+        'f'
+      )
+    ).toMatch(/Scoring is busy/);
+    expect(
+      errorMessage(
+        new ApiError({ message: 'x', status: 503, code: 'scores_pending', requestId: 'r' }),
+        'f'
+      )
+    ).toMatch(/not ready yet/);
+  });
 });

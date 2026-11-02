@@ -9,6 +9,7 @@ interface OrganizationsSectionProps {
   isPending: boolean;
   isFetching: boolean;
   hasError: boolean;
+  isUnavailable: boolean;
   isRefreshDisabled: boolean;
   onRefresh: () => void;
 }
@@ -18,6 +19,7 @@ export function OrganizationsSection({
   isPending,
   isFetching,
   hasError,
+  isUnavailable,
   isRefreshDisabled,
   onRefresh,
 }: OrganizationsSectionProps) {
@@ -33,8 +35,9 @@ export function OrganizationsSection({
         <StatusMessage role="status">Loading organizations…</StatusMessage>
       ) : hasError ? (
         <StatusMessage role="alert" tone="error">
-          Could not load your organizations. Check your connection, then choose Check organizations
-          to try again.
+          {isUnavailable
+            ? 'Could not load your organizations. The service may be temporarily unavailable. Choose Check organizations to try again.'
+            : 'Could not load your organizations. Choose Check organizations to try again.'}
         </StatusMessage>
       ) : organizations?.length === 0 ? (
         <EmptyOrganizations />
