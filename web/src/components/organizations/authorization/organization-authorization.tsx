@@ -1,5 +1,6 @@
 'use client';
 
+import { isServiceUnavailable } from '@/api';
 import { StatusMessage } from '@/components/ui';
 
 import { AccountSection } from '../account';
@@ -12,7 +13,14 @@ export function OrganizationAuthorization() {
   const { session, organizations, logout, signedOut } = useOrganizationAuthorization();
 
   if (session.isPending) return <StatusMessage role="status">Checking your session…</StatusMessage>;
-  if (session.isError) return <SessionError onRetry={() => void session.refetch()} />;
+  if (session.isError)
+    return (
+      <SessionError
+        unavailable={isServiceUnavailable(session.error)}
+        isRetrying={session.isFetching}
+        onRetry={() => void session.refetch()}
+      />
+    );
   if (signedOut) return <SignInSection />;
   if (!session.data) return null;
 
@@ -29,6 +37,7 @@ export function OrganizationAuthorization() {
         isPending={organizations.isPending}
         isFetching={organizations.isFetching}
         hasError={organizations.isError}
+        isUnavailable={isServiceUnavailable(organizations.error)}
         isRefreshDisabled={organizations.isFetching || logout.isPending}
         onRefresh={() => void organizations.refetch()}
       />

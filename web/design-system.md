@@ -768,8 +768,8 @@ Run each search over `web/src`, without `components/react-bits`. Each search mus
 Render each view in light and dark. Check 390, 768, 1024, and 1440 wide. Tab through each view and check the focus ring. Also check that a theme change does not animate control colors.
 
 - `/`: compare with the approved screenshots. The fonts, palette, beam, cat, wave, scoreboard, timeline, filter panel, and footer look the same. Reduced motion shows the static greeting image.
-- `/organizations`: session check, session error with "Try again", signed out (sign-in panel), signed in with organizations, no organizations, organization load error, signing out, and sign-out error.
-- `/organizations/[login]`: loading scores, daily error, default form, custom period with date inputs, open "Custom scoring rules" with the JSON textarea, saved presets, a preset status message, calculation error, fresh results, failed results, incomplete results, and an empty board.
+- `/organizations`: session check, session error with "Try again" (service unavailable and other failure, with the button disabled while the retry runs), signed out (sign-in panel), signed in with organizations, no organizations, organization load error (service unavailable and other failure), signing out, and sign-out error.
+- `/organizations/[login]`: loading scores, daily error with "Try again" (service unavailable and other failure, with the button disabled while the retry runs), default form, custom period with date inputs, open "Custom scoring rules" with the JSON textarea, saved presets, a preset status message, calculation error, fresh results, failed results, incomplete results, and an empty board.
 - Unmatched 404 (for example `/no-such-theme-route`): the HTTP status is 404. No default `next-error` body styles apply. The theme class overrides the opposite OS color scheme. The fonts load. One `main` and one `h1` exist. Tab order starts at the brand link, then the organizations button. Both targets are 44px or larger. Widths 390, 768, 1024, and 1440 all fit.
 - `/motion`: every section, with and without reduced motion.
 
@@ -808,7 +808,7 @@ Brand and homepage
 
 Content and restraint
 
-- [ ] Application copy, labels, roles, heading levels, element order, and routes are unchanged. The only exception is the removed `←` in "Back home".
+- [ ] Application copy, labels, roles, heading levels, element order, and routes are unchanged. The exceptions are the removed `←` in "Back home" and the service availability copy in section 14.
 - [ ] No testimonials, logos, pricing, customer claims, real metrics, or team-management features.
 - [ ] No kicker labels, all-caps labels, mono labels, arrow glyphs, or emoji.
 - [ ] Marigold appears only in the mark, the mascot, primary buttons, and the light beam.
@@ -873,5 +873,5 @@ Ask Opus before you add a color, a font, an animation, a section, a variant, or 
 - The raw `--chart-2` to `--chart-5` values are removed. `chart-2` and `chart-3` map to existing neutral tokens. No `chart-4` or `chart-5` exists, so data stays neutral.
 - The shadcn radius scale is removed. A shadcn component that you add later must use `rounded-control`, `rounded-panel`, or `rounded-full`.
 - Popover, secondary, accent, and sidebar utilities map to the raw `card`, `muted`, `foreground`, `primary`, `border`, and `ring` tokens. The palette has one value per role.
-- Application copy stays unchanged. This includes the middle-dot meta text in the organization list, because it is part of the link names. Only the decorative `←` in "Back home" is removed.
+- Application copy stays unchanged, except the service availability messages. The session check, organization list, and daily scores say "The service may be temporarily unavailable" when the browser gets no usable answer. Each has an explicit retry. The session and daily scores use "Try again". The organization list uses "Check organizations". The old "Check your connection" text is removed, because the client cannot know the cause. All other copy stays unchanged. This includes the middle-dot meta text in the organization list, because it is part of the link names. Only the decorative `←` in "Back home" is removed.
 - Application pages get no skip link, because no navigation comes before `<main>`. `/motion` gains a `main` landmark from `PageShell`.

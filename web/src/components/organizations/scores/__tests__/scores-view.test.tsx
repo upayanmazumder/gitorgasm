@@ -50,7 +50,8 @@ describe('ScoresView', () => {
     expect(screen.getByRole('button', { name: 'Show scores' })).toBeDisabled();
 
     retried.resolve({ data: daily });
-    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
-    expect(screen.getByRole('button', { name: 'Show scores' })).toBeEnabled();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Show scores' })).toBeEnabled());
+    expect(screen.queryByText('Loading scores…')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

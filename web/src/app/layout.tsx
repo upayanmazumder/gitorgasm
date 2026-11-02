@@ -21,7 +21,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning className={cn('h-full', 'antialiased', fontVariables)}>
-      <body className="flex min-h-full flex-col">
+      {/* Browser extensions add attributes to body before hydration. The suppression covers only body's own attributes. */}
+      <body suppressHydrationWarning className="flex min-h-full flex-col">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
