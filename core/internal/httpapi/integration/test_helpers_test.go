@@ -1,4 +1,4 @@
-package httpapi_test
+package integration_test
 
 import (
 	"bytes"
@@ -68,7 +68,7 @@ func newHarnessWithGitHub(t *testing.T, gh *config.GitHub) *harness {
 		Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Now: time.Now, Scorer: testScorer(),
 	}
 
-	doc, err := openapi3.NewLoader().LoadFromFile("../../../contracts/openapi/v1.yaml")
+	doc, err := openapi3.NewLoader().LoadFromFile("../../../../contracts/openapi/v1.yaml")
 	if err != nil {
 		t.Fatalf("load contract: %v", err)
 	}

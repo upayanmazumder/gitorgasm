@@ -10,7 +10,7 @@ Labels: **Verified** (file path or command), **Assumption**, **Decision**, **Alt
 
 1. Public API = REST + JSON over HTTPS. No public GraphQL API.
 2. The OpenAPI file is the contract. Code follows the contract. A contract change and a code change ship in the same pull request.
-3. Tests validate real responses against the contract. **Verified**: `core/internal/httpapi/api_test.go` imports `kin-openapi/openapi3filter`.
+3. Tests validate real responses against the contract. **Verified**: `core/internal/httpapi/integration/test_helpers_test.go` imports `kin-openapi/openapi3filter`.
 4. Resources are nouns under `/v1`. Organizations are addressed by GitHub login (`/v1/organizations/{login}`). Login match is case-insensitive (`lower(a.login) = lower($2)` in `tenancy.AccessibleInstallation`).
 5. Inaccessible and unknown organizations both return 404 `organization_not_found`. This prevents tenant enumeration. **Verified**: `httpapi/internal/access/organization.go` `ResolveOrganization`.
 6. Long work is asynchronous. The API enqueues a job and returns `202`. **Verified**: `POST /v1/organizations/{login}/sync`.
@@ -20,7 +20,7 @@ Labels: **Verified** (file path or command), **Assumption**, **Decision**, **Alt
 
 ## 2. Endpoints (current)
 
-**Verified**: routes in `httpapi/server.go` `Handler`.
+**Verified**: routes in `httpapi/routes.go` `routes`.
 
 | Method and path                              | Auth              | Success   | Purpose                            |
 | -------------------------------------------- | ----------------- | --------- | ---------------------------------- |
@@ -52,15 +52,15 @@ Labels: **Verified** (file path or command), **Assumption**, **Decision**, **Alt
 
 - `code` is stable and machine-readable. Clients branch on `code`, never on `message`.
 - `message` is for humans. It never contains upstream GitHub bodies (`githubError` maps upstream failures to fixed messages).
-- `request_id` equals the `X-Request-Id` response header. An inbound `X-Request-Id` that matches `^[A-Za-z0-9._-]{8,64}$` is reused. Else `middleware.RequestID` generates one.
+- `request_id` equals the `X-Request-Id` response header. An inbound `X-Request-Id` that matches `^[A-Za-z0-9._-]{8,64}$` is reused. Else `observability.RequestID` generates one.
 
 Codes in use. **Verified** in HTTP handlers and `httpapi/response`:
 
 | Code                     | HTTP                | Where                        |
 | ------------------------ | ------------------- | ---------------------------- |
-| `internal`               | 500                 | `response.InternalError`, `middleware.Recoverer` |
+| `internal`               | 500                 | `response.InternalError`, `observability.Recoverer` |
 | `github_not_configured`  | 503                 | `requireGitHub`              |
-| `origin_rejected`        | 403                 | `middleware.CheckOrigin`                |
+| `origin_rejected`        | 403                 | `security.CheckOrigin`                |
 | `unauthenticated`        | 401                 | `authed`                     |
 | `oauth_state_missing`    | 400                 | `callback`                   |
 | `oauth_state_mismatch`   | 400                 | `callback`                   |

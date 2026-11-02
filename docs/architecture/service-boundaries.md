@@ -38,8 +38,11 @@ Domain subpackages in `core/internal/store/` own SQL for identity, tenancy, cont
 The parent package exposes shared query contracts and errors. Callers import domain packages directly.
 Worker packages share durable job contracts through `internal/jobs/queue`. The parent registers workers.
 HTTP handlers use `auth`, `organization`, `scores`, and `webhook` packages under `internal/httpapi`.
-The parent composes routes and middleware. Shared tenant checks stay in `internal/httpapi/internal/access`.
-Middleware, JSON responses, and request identity remain separate leaf packages.
+The parent keeps dependency composition, routes, and probes in separate files.
+Shared tenant checks stay in `internal/httpapi/internal/access`.
+Middleware uses `security`, `observability`, and `admission` subpackages.
+The route integration suite and its shared harness stay in `internal/httpapi/integration`.
+JSON responses and request identity remain separate leaf packages.
 Rust uses nested `model`, `engine`, and `query` modules with explicit public exports.
 The frontend uses feature folders with `index.ts` barrels and direct imports between internal siblings.
 

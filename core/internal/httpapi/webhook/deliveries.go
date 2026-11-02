@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/upayanmazumder/gitorgasm/core/internal/github"
-	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/middleware"
+	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/middleware/admission"
 	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/response"
 	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/queue"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store/webhooks"
@@ -88,5 +88,5 @@ func (s *Handler) deliver(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Handler) Handler() http.HandlerFunc {
-	return middleware.LimitConcurrent(maxWebhookReads, s.deliver)
+	return admission.LimitConcurrent(maxWebhookReads, s.deliver)
 }

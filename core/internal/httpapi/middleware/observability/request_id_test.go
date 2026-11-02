@@ -1,4 +1,4 @@
-package middleware_test
+package observability_test
 
 import (
 	"net/http"
@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/middleware"
+	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/middleware/observability"
 	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/requestid"
 )
 
@@ -19,7 +19,7 @@ func TestRequestID(t *testing.T) {
 			req.Header.Set("X-Request-Id", inbound)
 			rec := httptest.NewRecorder()
 			var identity string
-			h := middleware.RequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			h := observability.RequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				identity = requestid.From(r.Context())
 				if w.Header().Get("X-Request-Id") != identity {
 					t.Fatal("identity was not echoed before dispatch")

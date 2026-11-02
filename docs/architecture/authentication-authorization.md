@@ -76,7 +76,7 @@ Configure the existing App id, client id/secret, private key, webhook secret, an
 
 Callback failures remain non-cacheable JSON `Error` responses with a request id: missing/expired OAuth cookie → 400 `oauth_state_missing`; absent/mismatched state or malformed cookie/verifier → 400 `oauth_state_mismatch`; denial/missing code → 400 `oauth_denied`. GitHub authentication failure → 400 `github_auth_failed`; upstream outage → 502 `github_unavailable`; rate limit → 503 `github_rate_limited`. The browser can restart at `/api/v1/auth/login`; no failure echoes GitHub's description, code, token, or untrusted redirect target.
 
-Regression coverage: `core/internal/httpapi/auth_test.go` covers the PKCE redirect, spoofed installation returns, callback rejection before upstream calls, full paginated grant replacement, upstream failure preservation, late-transaction rollback of grants/sessions/jobs, existing-session grant revocation, and origin-protected idempotent logout. Run `make test-go` for the repository's isolated-database Go suite, or `go test ./internal/httpapi ./internal/github` from `core/` with `TEST_DATABASE_URL` and `SCORING_BIN` set; the implementation task does not claim these checks were executed.
+Regression coverage: `core/internal/httpapi/integration/auth_test.go` covers the PKCE redirect, spoofed installation returns, callback rejection before upstream calls, full paginated grant replacement, upstream failure preservation, late-transaction rollback of grants/sessions/jobs, existing-session grant revocation, and origin-protected idempotent logout. Run `make test-go` for the repository's isolated-database Go suite, or `go test ./internal/httpapi/... ./internal/github/...` from `core/` with `TEST_DATABASE_URL` and `SCORING_BIN` set; the implementation task does not claim these checks were executed.
 
 ## 2. Session model
 
@@ -87,7 +87,7 @@ Regression coverage: `core/internal/httpapi/auth_test.go` covers the PKCE redire
 | Cookie      | `__Host-gitorgasm_session`, HttpOnly, Secure, SameSite=Lax, Path=/ | `setCookie`                     |
 | TTL         | `SESSION_TTL`, default 168 h, absolute                             | `config.go`, `createSession`    |
 | Activity    | `last_seen_at` updated at most once per minute                     | `identity.LookupSession`        |
-| Transport   | cookie only. No bearer header. Never returned in a body.           | `authed`                        |
+| Transport   | cookie only. No bearer header. Never returned in a body.           | `auth.Handler.RequireSession`                        |
 
 - A database leak does not reveal usable session ids. Only hashes are stored.
 - **Decision**: absolute expiry, no sliding renewal. The user logs in again after 7 days.
@@ -118,8 +118,8 @@ Emergency rotation: delete all sessions (`DELETE FROM sessions`). Users log in a
 - `user_installations` is written only by `tenancy.ReplaceUserInstallations` with the list from `GET /user/installations` (user token), at login and explicit/post-install OAuth refresh. The call replaces the full set. Grants that GitHub no longer reports are deleted, including when the new set is empty. **Verified**.
 - GitHub lists only installations of this App that the user can access. **Verified**: comment on `client.ListUserInstallations`, operation `apps/list-installations-for-authenticated-user`.
 - Installation deletion (webhook or 404 in sync) deletes all grants (`tenancy.MarkInstallationDeleted`). **Verified**.
-- Every org-scoped handler calls `resolveOrg` → `tenancy.AccessibleInstallation`, which joins `user_installations` for the session user. Missing grant → 404. **Verified**.
-- `GET /v1/auth/install` only redirects to GitHub. The Setup URL is `/api/v1/auth/login`, not the OAuth callback; any `installation_id` query value is ignored. No endpoint accepts an installation id as authorization. This removes the legacy installation-linking IDOR (SEC-2). **Verified**: `auth.go`, `server.go`.
+- Every org-scoped handler calls `access.ResolveOrganization` → `tenancy.AccessibleInstallation`, which joins `user_installations` for the session user. Missing grant → 404. **Verified**.
+- `GET /v1/auth/install` only redirects to GitHub. The Setup URL is `/api/v1/auth/login`, not the OAuth callback; any `installation_id` query value is ignored. No endpoint accepts an installation id as authorization. This removes the legacy installation-linking IDOR (SEC-2). **Verified**: `httpapi/auth/oauth.go`, `httpapi/routes.go`.
 
 ```mermaid
 flowchart LR
@@ -151,7 +151,7 @@ flowchart LR
 
 ## 6. CSRF
 
-**Verified** (`middleware.CheckOrigin`, decisions item 10):
+**Verified** (`security.CheckOrigin`, decisions item 10):
 
 - Session cookie `SameSite=Lax`. Browsers do not send it on cross-site `POST` subrequests.
 - Every unsafe method (not GET, HEAD, OPTIONS) must send `Origin` equal to `APP_ORIGIN` scheme + host. Else 403 `origin_rejected`.
@@ -163,8 +163,8 @@ flowchart LR
 
 | Trigger                        | Effect                                                                                                                                                                                                               | Evidence                                             |
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| `POST /v1/auth/logout`         | delete the current session row, clear the session and pending OAuth cookies, 204; idempotent and guarded by the frontend Origin | `auth.go` `logout` |
-| Session expiry                 | `LookupSession` ignores rows with `expires_at <= now()`. The handler clears the cookie.                                                                                                                              | `authed`                                             |
+| `POST /v1/auth/logout`         | delete the current session row, clear the session and pending OAuth cookies, 204; idempotent and guarded by the frontend Origin | `httpapi/auth/sessions.go` `Logout` |
+| Session expiry                 | `LookupSession` ignores rows with `expires_at <= now()`. The handler clears the cookie.                                                                                                                              | `auth.Handler.RequireSession`                                             |
 | User revokes the App on GitHub | The `github_app_authorization` `revoked` webhook deletes the user's sessions and installation grants in one transaction. It audits `session.revoked_by_github`. | `internal/jobs/webhook`, `store/identity.RevokeGitHubUser` |
 | Installation deleted           | Grants are deleted, so organization routes return 404. | `store/tenancy.MarkInstallationDeleted` |
 

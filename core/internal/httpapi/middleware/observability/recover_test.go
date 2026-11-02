@@ -1,4 +1,4 @@
-package middleware_test
+package observability_test
 
 import (
 	"bytes"
@@ -11,14 +11,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/middleware"
+	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/middleware/observability"
 	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/requestid"
 )
 
 func TestRecoverer(t *testing.T) {
 	var logs bytes.Buffer
 	log := slog.New(slog.NewJSONHandler(&logs, nil))
-	h := middleware.Recoverer(log, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+	h := observability.Recoverer(log, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		panic("private panic")
 	}))
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -52,7 +52,7 @@ func TestRecovererPreservesAbort(t *testing.T) {
 		t.Run(abort.Error(), func(t *testing.T) {
 			var logs bytes.Buffer
 			log := slog.New(slog.NewJSONHandler(&logs, nil))
-			h := middleware.Recoverer(log, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			h := observability.Recoverer(log, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 				panic(abort)
 			}))
 			rec := httptest.NewRecorder()

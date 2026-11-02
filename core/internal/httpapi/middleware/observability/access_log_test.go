@@ -1,4 +1,4 @@
-package middleware_test
+package observability_test
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/middleware"
+	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/middleware/observability"
 	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/requestid"
 )
 
@@ -83,7 +83,7 @@ func TestAccessLog(t *testing.T) {
 			statusLabel := strconv.Itoa(tt.status)
 			start := requestCount(t, tt.route, http.MethodGet, statusLabel)
 
-			middleware.AccessLog(log, tt.handler).ServeHTTP(httptest.NewRecorder(), req)
+			observability.AccessLog(log, tt.handler).ServeHTTP(httptest.NewRecorder(), req)
 
 			if got := requestCount(t, tt.route, http.MethodGet, statusLabel); got != start+1 {
 				t.Fatalf("requests{route=%q,status=%s} = %v, want %v", tt.route, statusLabel, got, start+1)

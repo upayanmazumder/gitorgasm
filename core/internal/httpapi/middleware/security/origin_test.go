@@ -1,4 +1,4 @@
-package middleware_test
+package security_test
 
 import (
 	"encoding/json"
@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/middleware"
+	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/middleware/security"
 )
 
 func TestCheckOrigin(t *testing.T) {
@@ -29,7 +29,7 @@ func TestCheckOrigin(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			called := false
-			h := middleware.CheckOrigin(origin, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			h := security.CheckOrigin(origin, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				called = true
 				w.WriteHeader(http.StatusNoContent)
 			}))

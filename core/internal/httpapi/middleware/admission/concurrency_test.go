@@ -1,4 +1,4 @@
-package middleware_test
+package admission_test
 
 import (
 	"context"
@@ -7,13 +7,13 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/middleware"
+	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/middleware/admission"
 )
 
 func TestLimitConcurrentStopsCanceledWaiter(t *testing.T) {
 	entered, release, done := make(chan struct{}), make(chan struct{}), make(chan struct{})
 	var calls atomic.Int32
-	h := middleware.LimitConcurrent(1, func(w http.ResponseWriter, _ *http.Request) {
+	h := admission.LimitConcurrent(1, func(w http.ResponseWriter, _ *http.Request) {
 		if calls.Add(1) == 1 {
 			close(entered)
 			<-release
