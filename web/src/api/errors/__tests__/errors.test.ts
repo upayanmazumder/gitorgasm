@@ -1,8 +1,8 @@
-import { AxiosError, AxiosHeaders, type AxiosResponse } from 'axios';
+import { AxiosError, AxiosHeaders, CanceledError, type AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
 import * as z from 'zod';
 
-import { ApiError, toApiError } from '..';
+import { ApiError, isServiceUnavailable, toApiError } from '..';
 
 function axiosErrorWith(status: number, data: unknown) {
   const response: AxiosResponse = {
@@ -12,7 +12,9 @@ function axiosErrorWith(status: number, data: unknown) {
     headers: {},
     config: { headers: new AxiosHeaders() },
   };
-  return new AxiosError('Request failed', 'ERR_BAD_RESPONSE', undefined, undefined, response);
+  // Axios settle() gives 4xx ERR_BAD_REQUEST and every other rejected status ERR_BAD_RESPONSE.
+  const code = status < 500 ? 'ERR_BAD_REQUEST' : 'ERR_BAD_RESPONSE';
+  return new AxiosError('Request failed', code, undefined, undefined, response);
 }
 
 describe('toApiError', () => {
@@ -63,5 +65,46 @@ describe('toApiError', () => {
 
   it('converts unknown values', () => {
     expect(toApiError('something weird').message).toBe('An unexpected error occurred');
+  });
+});
+
+function envelope(code: string) {
+  return { error: { code, message: 'x', request_id: 'req-1' } };
+}
+
+function zodFailure() {
+  const parsed = z.string().min(10).safeParse('x');
+  if (parsed.success) throw new Error('expected parse failure');
+  return parsed.error;
+}
+
+describe('isServiceUnavailable', () => {
+  it.each([
+    ['a network failure', new AxiosError('Network Error', 'ERR_NETWORK'), true],
+    ['a client timeout', new AxiosError('timeout of 10000ms exceeded', 'ECONNABORTED'), true],
+    ['a clarified client timeout', new AxiosError('timeout', 'ETIMEDOUT'), true],
+    [
+      'the Next.js proxy 500 for a refused connection',
+      axiosErrorWith(500, 'Internal Server Error'),
+      true,
+    ],
+    ['a 502 gateway page', axiosErrorWith(502, '<html>Bad Gateway</html>'), true],
+    ['a 503 with an empty body', axiosErrorWith(503, ''), true],
+    ['a 504 gateway page', axiosErrorWith(504, '<html>Gateway Timeout</html>'), true],
+    ['a cancellation', new CanceledError(), false],
+    ['a 503 scores_busy envelope', axiosErrorWith(503, envelope('scores_busy')), false],
+    ['a 503 scores_pending envelope', axiosErrorWith(503, envelope('scores_pending')), false],
+    [
+      'a 502 github_unavailable envelope',
+      axiosErrorWith(502, envelope('github_unavailable')),
+      false,
+    ],
+    ['a 500 internal envelope', axiosErrorWith(500, envelope('internal')), false],
+    ['a 401 unauthenticated envelope', axiosErrorWith(401, envelope('unauthenticated')), false],
+    ['a 404 page without an envelope', axiosErrorWith(404, '<html>Not Found</html>'), false],
+    ['a response validation failure', zodFailure(), false],
+    ['a plain Error', new Error('boom'), false],
+  ])('classifies %s', (_name, input, expected) => {
+    expect(isServiceUnavailable(toApiError(input))).toBe(expected);
   });
 });
