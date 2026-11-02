@@ -6,7 +6,12 @@ Gitorgasm shows organization activity and scores. The website connects to the ap
 
 The home page at `/` introduces GitHub organization connection, contributor and repository activity scores, date/time filters and search, saved query presets, and daily score refreshes. Its navigation and primary action lead to `/organizations`. It does not present team membership as a supported feature.
 
-Components live in `src/components/home`, with public exports in `index.ts`. Small wrappers compose vendored React Bits effects from `src/components/react-bits`. Decorative effects stay hidden from assistive technology.
+Components live in `src/components/home`, with public exports in `index.ts`.
+The `hero` folder owns the heading, primary action, and decorative effect.
+The `features` folder owns feature cards and their content.
+Navigation stays beside the home composition.
+Small wrappers compose vendored React Bits effects from `src/components/react-bits`.
+Decorative effects stay hidden from assistive technology.
 
 ## Requirements
 
@@ -66,6 +71,13 @@ The organization feature separates account actions, authorization, directory vie
 Scores use nested `data`, `form/fields`, `presets`, `results`, and `state` folders.
 Each folder exports its public API through `index.ts`. Internal siblings use direct imports to avoid cycles.
 Form values stay in `form/types.ts`. The `data` folder contains API models and query hooks.
+
+The HTTP layer exposes `api`, `createApiClient`, `request`, and normalized errors through `src/api/index.ts`.
+Its `transport` folder owns Axios client configuration and typed, schema-validated requests.
+Its `errors` folder owns the error shape, class, and response normalization.
+HTTP models no longer live in a global types folder.
+Hooks, schemas, and types specific to an organization screen remain inside that feature.
+Cross-cutting hooks and utilities expose explicit barrels in `src/hooks` and `src/lib`.
 
 ## Deployment (Vercel)
 

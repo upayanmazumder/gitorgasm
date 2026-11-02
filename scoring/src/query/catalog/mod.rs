@@ -6,8 +6,10 @@ use crate::ScoringError;
 use crate::model::{Signal, TeamMembership};
 
 mod cache;
+mod snapshot;
 
-use cache::{Cache, Snapshot, score};
+use cache::{Cache, score};
+use snapshot::Snapshot;
 
 /// Cache counters for one organization. Misses count successful computations only.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]

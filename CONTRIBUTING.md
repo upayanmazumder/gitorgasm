@@ -50,6 +50,10 @@ See the quick start in [README.md](README.md). Tests need Docker: `make test` st
 - Check behavior, maintenance, security, and dependency cost before adding a package.
 - Keep comments to one line when a reason is not clear from the code.
 - Use domain package imports in Go. Shared SQL contracts remain in `internal/store`.
+- Keep `httpapi.Server` for composition. Domain handlers live under `httpapi/auth`, `organization`, `scores`, and `webhook`.
+- Share HTTP tenant checks through `httpapi/internal/access`. Do not add handler forwarding methods to the parent package.
+- Keep HTTP route integration tests and their shared harness in `httpapi/integration`.
+- Group middleware under `middleware/security`, `middleware/observability`, and `middleware/admission`.
 - Use explicit `mod.rs` exports in Rust and `index.ts` barrels in frontend feature folders.
 - Import public entries across folders. Use direct sibling imports within a folder to avoid cycles.
 - Let the configured formatters group imports. Use type-only imports for TypeScript types.

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { HTMLMotionProps, Transition } from 'framer-motion';
 
-import { DURATION, EASE } from '@/lib/motion';
+import { DURATION, EASE } from '@/lib';
 
 export interface MotionWrapperProps extends Omit<
   HTMLMotionProps<'div'>,

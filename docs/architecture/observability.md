@@ -16,11 +16,11 @@ Scope: the Go core in `core`. The cluster stack is plain Prometheus with pod-ann
 | `app_version`          | build flag `-X main.version`, attached by `obs.NewLogger(role).With("app_version", version)` (`cmd/gitorgasm/main.go`) | commit SHA, `dev` locally  |
 | `trace_id`, `span_id`  | added by `traceHandler` when the context has a valid span                                                              | 32 / 16 hex chars          |
 
-Access log (**Verified** `internal/httpapi/middleware` `AccessLog`): one `info` record `request` per request with `method`, `route` (the `net/http` pattern, for example `GET /v1/organizations/{login}/repositories`, or `unmatched`), `status`, `duration_ms`, `request_id`. `/healthz` and `/readyz` are not logged. Errors: `request failed` with `error`, `route`, `request_id` (`response.InternalError`). Panics: `panic` with `value` and `stack` (`middleware.Recoverer`).
+Access log (**Verified** `internal/httpapi/middleware/observability` `AccessLog`): one `info` record `request` per request with `method`, `route` (the `net/http` pattern, for example `GET /v1/organizations/{login}/repositories`, or `unmatched`), `status`, `duration_ms`, `request_id`. `/healthz` and `/readyz` are not logged. Errors: `request failed` with `error`, `route`, `request_id` (`response.InternalError`). Panics: `panic` with `value` and `stack` (`observability.Recoverer`).
 
 ### Request ids
 
-**Verified** (`httpapi/middleware` `RequestID`): the API accepts an inbound `X-Request-Id` only if it matches `^[A-Za-z0-9._-]{8,64}$`. Otherwise it generates a 22-character random id. It echoes the id in the `X-Request-Id` response header. The error body carries it as `error.request_id`. A user can quote this id. An operator then finds the log line in Loki.
+**Verified** (`httpapi/middleware/observability` `RequestID`): the API accepts an inbound `X-Request-Id` only if it matches `^[A-Za-z0-9._-]{8,64}$`. Otherwise it generates a 22-character random id. It echoes the id in the `X-Request-Id` response header. The error body carries it as `error.request_id`. A user can quote this id. An operator then finds the log line in Loki.
 
 ### Tenant-safe diagnostics
 
@@ -39,8 +39,8 @@ Access log (**Verified** `internal/httpapi/middleware` `AccessLog`): one `info` 
 
 | Metric                                    | Type                           | Labels                                               | Source              |
 | ----------------------------------------- | ------------------------------ | ---------------------------------------------------- | ------------------- |
-| `gitorgasm_http_requests_total`           | counter                        | `route`, `method`, `status`                          | `httpapi/middleware` |
-| `gitorgasm_http_request_duration_seconds` | histogram, buckets 5 ms to 5 s | `route`                                              | `httpapi/middleware` |
+| `gitorgasm_http_requests_total`           | counter                        | `route`, `method`, `status`                          | `httpapi/middleware/observability` |
+| `gitorgasm_http_request_duration_seconds` | histogram, buckets 5 ms to 5 s | `route`                                              | `httpapi/middleware/observability` |
 | `gitorgasm_github_requests_total`         | counter                        | `operation`, `status` (`2xx`, `4xx`, `5xx`, `error`) | `github/transport.go` |
 | `gitorgasm_github_rate_limit_remaining`   | gauge                          | `credential` (credential kind, not per installation) | `github/transport.go` |
 | `go_*`, `process_*`                       | default collectors             | none                                                 | `client_golang`     |

@@ -15,7 +15,7 @@ Users sign in with GitHub. The legacy app had authorization defects, including l
 - The `github_app_authorization` webhook with action `revoked` deletes all sessions and all installation grants of that user in one transaction (`identity.RevokeGitHubUser`). The next login rebuilds the grants from `GET /user/installations`.
 - CSRF: SameSite=Lax plus a required `Origin` equal to `APP_ORIGIN` on unsafe methods. The webhook route is exempt (HMAC).
 
-Implementation: **Verified** `core/internal/httpapi/auth.go`, `internal/secure/secure.go`, `internal/httpapi/middleware` (`CheckOrigin`), `internal/store/identity` (`RevokeGitHubUser`), `internal/jobs/webhook` (webhook handler).
+Implementation: **Verified** `core/internal/httpapi/auth/oauth.go`, `internal/secure/secure.go`, `internal/httpapi/middleware/security` (`CheckOrigin`), `internal/store/identity` (`RevokeGitHubUser`), `internal/jobs/webhook` (webhook handler).
 
 ## Consequences
 

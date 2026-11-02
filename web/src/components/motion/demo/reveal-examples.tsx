@@ -1,4 +1,4 @@
-import type { SlideDirection } from '@/lib/motion';
+import type { SlideDirection } from '@/lib';
 
 import { Fade, Scale, Slide, Stagger, StaggerItem } from '..';
 import { Card } from './card';

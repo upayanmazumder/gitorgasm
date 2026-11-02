@@ -2,9 +2,10 @@
 
 import { m } from 'framer-motion';
 
-import { scaleVariants } from '@/lib/motion';
+import { scaleVariants } from '@/lib';
 
-import { resolveTransition, resolveTrigger, type MotionWrapperProps } from './shared';
+import type { MotionWrapperProps } from './shared';
+import { resolveTransition, resolveTrigger } from './shared';
 
 export function Scale({
   children,

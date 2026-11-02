@@ -1,5 +1,5 @@
-import { HomeFeatures } from './home-features';
-import { HomeHero } from './home-hero';
+import { HomeFeatures } from './features';
+import { HomeHero } from './hero';
 import { HomeNavigation } from './home-navigation';
 
 export function HomeView() {

@@ -55,7 +55,7 @@ Source: `core/internal/db/migrations/`. `00001_core.sql` is the immutable baseli
 
 | Table                | Class                                    | Writer (code)                                                                     | Reader (code)                                               | Notes                                                                                                   |
 | -------------------- | ---------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `users`              | Mirror (GitHub identity) + internal id   | `identity.UpsertUser` at login (`httpapi/auth.go` `callback`)                     | `identity.LookupSession`                                    | `id` is internal. `github_id` is unique.                                                                |
+| `users`              | Mirror (GitHub identity) + internal id   | `identity.UpsertUser` at login (`httpapi/auth/oauth.go` `Callback`)                     | `identity.LookupSession`                                    | `id` is internal. `github_id` is unique.                                                                |
 | `sessions`           | Authoritative, ephemeral                 | `identity.CreateSession`, `identity.DeleteSession`, `identity.RevokeGitHubUser`   | `identity.LookupSession`                                    | Stores `SHA-256(session id)` and sealed GitHub tokens. Loss = users log in again.                       |
 | `accounts`           | Mirror                                   | `tenancy.UpsertInstallation`                                                      | `tenancy.ListOrganizations`, `tenancy.AccessibleInstallation` | Non-unique index `accounts_login_recent_idx` on `(lower(login), updated_at DESC)` (migration 3). GitHub frees a login on rename; another account can take it before the mirror resyncs. `tenancy.AccessibleInstallation` picks the most recently updated account (test `TestReusedLoginResolvesToNewestAccount`). |
 | `installations`      | Mirror                                   | `tenancy.UpsertInstallation`, `tenancy.MarkInstallationDeleted`                   | list and access queries                                     | Soft delete with `deleted_at`.                                                                          |
@@ -76,9 +76,9 @@ Every boundary below is in code. **Verified** by the cited function.
 
 | Use case            | One transaction contains                                                                                                                               | Code                                           |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
-| Login callback      | upsert user, upsert each installation and account, replace grants, create session, `InsertTx` of one `sync_installation` job per installation, audit `session.created` | `httpapi/auth.go` `callback` (`pgx.BeginFunc`) |
-| Manual sync request | `InsertTx` of `sync_installation`, audit `installation.sync_requested`                                                                                 | `httpapi/orgs.go` `requestSync`                |
-| Webhook receive     | insert `webhook_deliveries` row, `InsertTx` of `process_webhook`                                                                                       | `httpapi/webhooks.go` `webhook`                |
+| Login callback      | upsert user, upsert each installation and account, replace grants, create session, `InsertTx` of one `sync_installation` job per installation, audit `session.created` | `httpapi/auth/oauth.go` `Callback` (`pgx.BeginFunc`) |
+| Manual sync request | `InsertTx` of `sync_installation`, audit `installation.sync_requested`                                                                                 | `httpapi/organization` `Sync`                |
+| Webhook receive     | insert `webhook_deliveries` row, `InsertTx` of `process_webhook`                                                                                       | `httpapi/webhook/deliveries.go` `deliver`                |
 | Webhook apply       | event-specific writes, `InsertTx` of follow-up `sync_installation`                                                                                     | `jobs/webhook` `Worker.apply`                  |
 | Repository page     | one multi-row `INSERT … ON CONFLICT` per page of 100                                                                                                   | `tenancy.UpsertRepositories`                   |
 
@@ -119,7 +119,7 @@ Not in one transaction (**Verified**, `jobs/sync` `Worker.Work`):
 **Verified** (`core/internal/store/tenancy`):
 
 - `ListOrganizations` starts `FROM user_installations ui … WHERE ui.user_id = $1`. It also requires `i.deleted_at IS NULL`.
-- `AccessibleInstallation` joins `user_installations ui ON … AND ui.user_id = $1`. A missing grant returns `ErrNotFound`. The handler maps it to HTTP 404 `organization_not_found` (`httpapi/orgs.go` `resolveOrg`).
+- `AccessibleInstallation` joins `user_installations ui ON … AND ui.user_id = $1`. A missing grant returns `ErrNotFound`. The handler maps it to HTTP 404 `organization_not_found` (`httpapi/internal/access/organization.go` `ResolveOrganization`).
 - `ListRepositories` filters by `installation_id = $1`. The handler passes only an id that `AccessibleInstallation` returned.
 - Every statement uses bind parameters (`$1`, `$2`, …). No handler builds SQL. All SQL lives in the domain packages under `core/internal/store`.
 - `ReplaceUserInstallations` deletes grants that GitHub no longer reports, in the login transaction.

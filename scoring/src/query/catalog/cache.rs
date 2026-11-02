@@ -1,20 +1,13 @@
 use std::collections::VecDeque;
 
 use super::CacheStats;
+use super::snapshot::Snapshot;
 use crate::ScoringError;
-use crate::engine::scoreboards;
-use crate::model::{Signal, TeamMembership};
 use crate::query::{ScoreQuery, Scoreboards};
 
 struct Entry {
     query: ScoreQuery,
     result: Scoreboards,
-}
-
-#[derive(Default)]
-pub(super) struct Snapshot {
-    pub(super) signals: Vec<Signal>,
-    pub(super) memberships: Vec<TeamMembership>,
 }
 
 #[derive(Default)]
@@ -48,21 +41,7 @@ pub(super) fn score<'a>(
         cache.hits = cache.hits.saturating_add(1);
         return Ok(&cache.entries[index].result);
     }
-    let bounds = query.period.bounds()?;
-    let mut selected = Vec::new();
-    for signal in &snapshot.signals {
-        if !query.filter.includes(signal) {
-            continue;
-        }
-        if let Some((start, end)) = bounds {
-            let timestamp = signal.timestamp()?;
-            if timestamp < start || timestamp >= end {
-                continue;
-            }
-        }
-        selected.push(signal);
-    }
-    let result = scoreboards(selected.into_iter(), &query.rules, &snapshot.memberships)?;
+    let result = snapshot.score(query)?;
     if cache.entries.len() == capacity {
         cache.entries.pop_front();
     }

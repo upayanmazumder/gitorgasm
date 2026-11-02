@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { cn } from '../utils';
+import { cn } from '..';
 
 describe('cn', () => {
   it('concatenates class names', () => {

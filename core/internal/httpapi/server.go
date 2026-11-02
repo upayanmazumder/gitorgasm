@@ -2,7 +2,6 @@
 package httpapi
 
 import (
-	"context"
 	"log/slog"
 	"net/http"
 	"time"
@@ -14,8 +13,8 @@ import (
 
 	"github.com/upayanmazumder/gitorgasm/core/internal/config"
 	"github.com/upayanmazumder/gitorgasm/core/internal/github"
-	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/middleware"
-	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/response"
+	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/middleware/observability"
+	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/middleware/security"
 	"github.com/upayanmazumder/gitorgasm/core/internal/scorer"
 	"github.com/upayanmazumder/gitorgasm/core/internal/secure"
 )
@@ -34,51 +33,16 @@ type Server struct {
 
 // Handler returns the routed and instrumented handler.
 func (s *Server) Handler() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", s.healthz)
-	mux.HandleFunc("GET /readyz", s.readyz)
-
-	mux.HandleFunc("GET /v1/auth/login", s.requireGitHub(s.login))
-	mux.HandleFunc("GET /v1/auth/callback", s.requireGitHub(s.callback))
-	mux.HandleFunc("GET /v1/auth/install", s.requireGitHub(s.install))
-	mux.HandleFunc("POST /v1/auth/logout", s.logout)
-	mux.HandleFunc("GET /v1/me", s.authed(s.me))
-	mux.HandleFunc("GET /v1/organizations", s.authed(s.listOrganizations))
-	mux.HandleFunc("GET /v1/organizations/{login}/repositories", s.authed(s.listRepositories))
-	mux.HandleFunc("POST /v1/organizations/{login}/sync", s.authed(s.requestSync))
-	mux.HandleFunc("GET /v1/organizations/{login}/scores", s.authed(s.getScores))
-	mux.HandleFunc("POST /v1/organizations/{login}/scores/query", s.authed(s.queryScores))
-	mux.HandleFunc("GET /v1/organizations/{login}/scores/presets", s.authed(s.listScorePresets))
-	mux.HandleFunc("PUT /v1/organizations/{login}/scores/presets/{name}", s.authed(s.saveScorePreset))
-	mux.HandleFunc("DELETE /v1/organizations/{login}/scores/presets/{name}", s.authed(s.deleteScorePreset))
-
-	mux.HandleFunc("POST /webhooks/github", s.requireGitHub(middleware.LimitConcurrent(maxWebhookReads, s.webhook)))
-
-	var h http.Handler = mux
-	h = middleware.CheckOrigin(s.Cfg.AppOrigin.Scheme+"://"+s.Cfg.AppOrigin.Host, h)
-	h = middleware.AccessLog(s.Log, h)
-	h = middleware.SecurityHeaders(h)
-	h = middleware.Recoverer(s.Log, h)
-	h = middleware.RequestID(h)
+	var h http.Handler = s.routes()
+	h = security.CheckOrigin(s.Cfg.AppOrigin.Scheme+"://"+s.Cfg.AppOrigin.Host, h)
+	h = observability.AccessLog(s.Log, h)
+	h = security.SecurityHeaders(h)
+	h = observability.Recoverer(s.Log, h)
+	h = observability.RequestID(h)
 	return otelhttp.NewHandler(h, "http", otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {
 		if r.Pattern != "" {
 			return r.Pattern
 		}
 		return r.Method
 	}))
-}
-
-func (s *Server) healthz(w http.ResponseWriter, _ *http.Request) {
-	response.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
-}
-
-// readyz requires PostgreSQL before Kubernetes routes traffic to the pod.
-func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-	defer cancel()
-	if err := s.Pool.Ping(ctx); err != nil {
-		response.JSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unavailable", "database": "unreachable"})
-		return
-	}
-	response.JSON(w, http.StatusOK, map[string]string{"status": "ready", "database": "ok"})
 }

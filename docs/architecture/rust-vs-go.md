@@ -8,7 +8,7 @@ This document selects a language per logical service. It uses measured benchmark
 | --------------------------- | ----------------------- | ------------------------------------------------------------------------------------ |
 | core api                    | Go                      | **Verified** implemented: `core` (`api` role)                                        |
 | worker / sync               | Go                      | **Verified** implemented: `core` (`worker` role)                                     |
-| webhook ingest              | Go (inside core api)    | **Verified** implemented: `POST /webhooks/github` in `core/internal/httpapi/webhooks.go` |
+| webhook ingest              | Go (inside core api)    | **Verified** implemented: `POST /webhooks/github` in `core/internal/httpapi/webhook/deliveries.go` |
 | operations (bulk mutations) | Go (inside core worker) | Planned, Stage 4                                                                     |
 | scoring engine              | Rust                    | **Hypothesis**. Planned, Stage 5. Re-verify before building (section 5).             |
 | analytics                   | Go + SQL rollups        | Planned, Stage 5+                                                                    |

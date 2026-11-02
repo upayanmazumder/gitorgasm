@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { AnimatePresence, m } from 'framer-motion';
 
 import { Button } from '@/components/ui';
-import { spring } from '@/lib/motion';
+import { spring } from '@/lib';
 
 import { Card } from './card';
 import { Section } from './section';

@@ -2,9 +2,10 @@
 
 import { m } from 'framer-motion';
 
-import { staggerContainer, staggerItemVariants } from '@/lib/motion';
+import { staggerContainer, staggerItemVariants } from '@/lib';
 
-import { resolveTransition, resolveTrigger, type MotionWrapperProps } from './shared';
+import type { MotionWrapperProps } from './shared';
+import { resolveTransition, resolveTrigger } from './shared';
 
 interface StaggerProps extends Omit<MotionWrapperProps, 'delay' | 'duration'> {
   stagger?: number;

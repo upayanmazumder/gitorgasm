@@ -15,7 +15,7 @@ GitHub webhooks can arrive twice, out of order, or not at all. GitHub does not r
 - Run `reconcile_installations` every 6 h and when the worker starts. It enqueues a sync for every active installation.
 - Replay protection = signature + delivery id deduplication.
 
-Implementation: **Verified** `core/internal/httpapi/server.go` (route), `internal/httpapi/webhooks.go` (handler, `maxWebhookBytes = 25 << 20`), `internal/jobs/webhook` (worker), `internal/jobs/maintenance` (reconcile).
+Implementation: **Verified** `core/internal/httpapi/routes.go` (route), `internal/httpapi/webhook/deliveries.go` (handler, `maxWebhookBytes = 25 << 20`), `internal/jobs/webhook` (worker), `internal/jobs/maintenance` (reconcile).
 
 ## Consequences
 

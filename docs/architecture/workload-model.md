@@ -32,7 +32,7 @@ This document estimates GitHub request counts, rate-budget use, database size, a
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | Repository sync lists `GET /installation/repositories?per_page=100` and follows `Link` pages.                                                                                                                                                 | **Verified**: `core/internal/github/installations.go` (`ListInstallationRepositories`) |
 | One full sync = 1 `GET /app/installations/{id}` (JWT), up to one token mint (JWT), and `ceil(repos/100)` pages (installation token). | **Verified**: `core/internal/jobs/sync` |
-| Login = token exchange on `github.com` + `GET /user` + `ceil(installations/100)` pages of `GET /user/installations` (user token). It enqueues one sync per installation.                                                                      | **Verified**: `core/internal/httpapi/auth.go` (`callback`)                      |
+| Login = token exchange on `github.com` + `GET /user` + `ceil(installations/100)` pages of `GET /user/installations` (user token). It enqueues one sync per installation.                                                                      | **Verified**: `core/internal/httpapi/auth/oauth.go` (`Callback`)                      |
 | Reconcile enqueues one sync per active installation every `RECONCILE_INTERVAL` (default `6h`), also on worker start. | **Verified**: `internal/jobs/maintenance`, `core/internal/config/config.go` |
 | Worker concurrency: `WORKER_CONCURRENCY` default 4, applied to both the `default` and `github` queues per replica.                                                                                                                            | **Verified**: `config.go`, `jobs.NewWorkerClient`                               |
 | Database pool: `DB_MAX_CONNS` default 10 per process in code, 8 in the production ConfigMap.                                                                                                                                                  | **Verified**: `config.go`, `deploy/kustomize/base/config.env`                  |
@@ -76,7 +76,7 @@ The budget formula is **Verified** (section 1.1). The rows are arithmetic on it.
 
 ### 2.2 Concurrent admins
 
-Logins cost the **user** budget (5,000 req/h per user, shared with other apps the user uses). Each login costs 2 user-token requests for users with ≤100 installations. Read endpoints call no GitHub API. **Verified**: `httpapi/orgs.go` list handlers read only Postgres.
+Logins cost the **user** budget (5,000 req/h per user, shared with other apps the user uses). Each login costs 2 user-token requests for users with ≤100 installations. Read endpoints call no GitHub API. **Verified**: `httpapi/organization` list handlers read only Postgres.
 
 | Scenario                                | GitHub cost                    | Database cost                                                                                                               |
 | --------------------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
@@ -87,7 +87,7 @@ Logins cost the **user** budget (5,000 req/h per user, shared with other apps th
 ### 2.3 Webhook bursts
 
 Each delivery creates one `webhook_deliveries` row and one River job row in one transaction.
-One `process_webhook` job then runs. **Verified**: `httpapi/webhooks.go` and `internal/jobs/webhook`.
+One `process_webhook` job then runs. **Verified**: `httpapi/webhook/deliveries.go` and `internal/jobs/webhook`.
 
 | Burst                                            | GitHub cost (1-minute dedupe) | DB writes                                | Bottleneck                                                                                                          |
 | ------------------------------------------------ | ----------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -175,8 +175,8 @@ CPU is not a bottleneck at any listed scale (**Verified** micro-benchmarks in `t
 
 | Metric                                       | How measured now                                                                                                                     | Status                                                                                             |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| API latency p50/p95/p99 per route            | `histogram_quantile` over `gitorgasm_http_request_duration_seconds{route}` (buckets 5 ms to 5 s)                                     | **Verified**: `core/internal/httpapi/middleware`                                                   |
-| API request rate and error rate              | `gitorgasm_http_requests_total{route,method,status}`                                                                                 | **Verified**: `httpapi/middleware`                                                                 |
+| API latency p50/p95/p99 per route            | `histogram_quantile` over `gitorgasm_http_request_duration_seconds{route}` (buckets 5 ms to 5 s)                                     | **Verified**: `core/internal/httpapi/middleware/observability`                                                   |
+| API request rate and error rate              | `gitorgasm_http_requests_total{route,method,status}`                                                                                 | **Verified**: `httpapi/middleware/observability`                                                                 |
 | GitHub request rate and errors per operation | `gitorgasm_github_requests_total{operation,status}`                                                                                  | **Verified**: `core/internal/github/transport.go`                                                  |
 | Rate budget remaining                        | `gitorgasm_github_rate_limit_remaining{credential}` from `x-ratelimit-remaining`                                                     | **Verified**: `github/transport.go`. Per-installation labels: check label cardinality before Stage 3. |
 | Rate budget reset time and used fraction     | Not exported                                                                                                                         | Planned: gauge from `x-ratelimit-reset` and `x-ratelimit-limit`                                    |
