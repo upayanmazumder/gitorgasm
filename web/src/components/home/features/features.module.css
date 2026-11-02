@@ -1,0 +1,100 @@
+.section {
+  padding-block: 72px;
+}
+
+.section h2 {
+  max-width: 20ch;
+  font-family: var(--home-font-display);
+  font-size: clamp(1.875rem, 1.4rem + 1.6vw, 2.5rem);
+  font-weight: 650;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.intro {
+  max-width: 52ch;
+  margin-top: 16px;
+  color: var(--home-muted);
+  font-size: 1.125rem;
+}
+
+.steps {
+  display: grid;
+  gap: 32px;
+  margin-top: 48px;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  position: relative;
+  padding-left: 64px;
+}
+
+.step h3 {
+  font-family: var(--home-font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.step p {
+  max-width: 60ch;
+  margin-top: 8px;
+  color: var(--home-muted);
+}
+
+.node {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--home-line-strong);
+  border-radius: var(--home-radius-pill);
+  background: var(--home-surface);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.step:not(:last-child)::before {
+  position: absolute;
+  top: 16px;
+  bottom: -32px;
+  left: 15px;
+  width: 2px;
+  background: var(--home-line-strong);
+  content: '';
+}
+
+@media (min-width: 768px) {
+  .section {
+    padding-block: 112px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 48px;
+  }
+
+  .step {
+    padding: 48px 0 0;
+  }
+
+  .step:not(:last-child)::before {
+    top: 15px;
+    right: -48px;
+    bottom: auto;
+    left: 16px;
+    width: auto;
+    height: 2px;
+  }
+}

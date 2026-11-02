@@ -1,25 +1,41 @@
-import { SpotlightCard } from '@/components/react-bits';
+import styles from './features.module.css';
 
-import { features } from './features';
+const steps = [
+  {
+    title: 'Connect an organization',
+    description:
+      'Sign in with GitHub and install the GitHub App on your organization. Gitorgasm shows the contributors and repositories that the app can access.',
+  },
+  {
+    title: 'Choose what counts',
+    description:
+      'Pick an activity type and a UTC date period. Hide bots if you want, then save the combinations you check often as presets.',
+  },
+  {
+    title: 'Come back to fresh scores',
+    description:
+      'Scores update daily, so each visit reflects recent activity in your organization.',
+  },
+];
 
 export function HomeFeatures() {
   return (
-    <section
-      id="features"
-      aria-labelledby="features-heading"
-      className="scroll-mt-8 py-16 sm:py-20"
-    >
-      <h2 id="features-heading" className="text-3xl font-semibold tracking-tight sm:text-4xl">
-        A clearer view of GitHub activity.
-      </h2>
-      <div className="mt-10 grid gap-6 md:grid-cols-3">
-        {features.map(({ title, description }) => (
-          <SpotlightCard key={title} className="p-6">
-            <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
-            <p className="mt-3 text-sm leading-7 text-muted-foreground">{description}</p>
-          </SpotlightCard>
+    <section id="how-it-works" aria-labelledby="workflow-heading" className={styles.section}>
+      <h2 id="workflow-heading">How it works</h2>
+      <p className={styles.intro}>
+        Three steps from a GitHub organization to scores you can return to.
+      </p>
+      <ol className={styles.steps} role="list">
+        {steps.map(({ title, description }, index) => (
+          <li key={title} className={styles.step}>
+            <span className={styles.node} aria-hidden="true">
+              {index + 1}
+            </span>
+            <h3>{title}</h3>
+            <p>{description}</p>
+          </li>
         ))}
-      </div>
+      </ol>
     </section>
   );
 }

@@ -1,0 +1,51 @@
+.field {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: -1;
+  height: 680px;
+  pointer-events: none;
+  overflow: hidden;
+  /* The beam is 70% wide, so the left fade starts at its edge (30%) and hides the canvas boundary. */
+  mask-image:
+    linear-gradient(to bottom, black 60%, transparent),
+    linear-gradient(to right, transparent 30%, black 75%);
+  mask-composite: intersect;
+}
+
+.beam {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 70%;
+  height: 100%;
+  background: radial-gradient(
+    ellipse at 85% 0%,
+    color-mix(in srgb, var(--home-brand) 10%, transparent),
+    transparent 65%
+  );
+}
+
+.surface {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--home-line);
+  border-radius: var(--home-radius-panel);
+  background: var(--home-surface);
+  box-shadow: var(--home-shadow-panel);
+}
+
+@media (min-width: 768px) {
+  .field {
+    height: 780px;
+  }
+}
+
+@media (max-width: 767px) {
+  .beam {
+    width: 100%;
+  }
+}
