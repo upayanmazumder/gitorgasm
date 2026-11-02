@@ -10,10 +10,10 @@ const SpotlightCard = lazy(() =>
   import('@/components/react-bits').then(module => ({ default: module.SpotlightCard }))
 );
 
-// The vendor reads these variables, so the panel keeps the homepage surface and border tokens.
+// The vendor reads these variables, so the panel keeps the card and border tokens.
 const palette = {
-  '--spotlight-card-surface': 'var(--home-surface)',
-  '--spotlight-card-border': 'var(--home-line)',
+  '--spotlight-card-surface': 'var(--card)',
+  '--spotlight-card-border': 'var(--border)',
   '--spotlight-card-shadow': 'none',
 } as CSSProperties;
 
@@ -31,7 +31,7 @@ export function SpotlightPanel({ children, className = '' }: Props) {
       <SpotlightCard
         className={surface}
         style={palette}
-        spotlightColor="var(--home-brand)"
+        spotlightColor="var(--primary)"
         intensity={0.06}
         borderGlow={0.2}
         proximity={0}

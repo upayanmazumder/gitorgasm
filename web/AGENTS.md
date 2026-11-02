@@ -42,11 +42,21 @@ src/
   env.ts                # t3-env schema — import here, never read process.env directly
   app/                  # Next.js App Router pages and layouts
     layout.tsx          # Root layout — providers live here
+    globals.css         # Imports only — theme modules live in src/styles
     page.tsx            # Home page
+    not-found.tsx       # Custom 404. Replaces the Next.js default, which injects unlayered body styles
     motion/             # /motion demo route
+  styles/               # The single Sunbeam theme (one :root and .dark for every route)
+    tokens.css          # Raw color tokens, radii, panel shadow, mascot colors
+    theme.css           # Tailwind bridge: @custom-variant dark and @theme inline
+    typography.css      # Typeface stacks and base heading, body, and code roles
+    motion.css          # Motion tokens, reduced-motion override, transition-control
+    base.css            # Page colors, focus ring, native control rules
+    fonts.ts            # The only next/font load
+    index.ts            # Barrel — exports fontVariables
   components/
-    brand/              # Shared cat mark and geometry (also drives the app icons)
-    home/               # Home screen components and barrel (hero, mascot, scoreboard, …)
+    brand/              # BrandMark, BrandLink, and shared geometry (also drives the app icons)
+    home/               # Home screen components (hero, mascot, scoreboard, …). Homepage-only CSS modules
     organizations/      # Organization screen components and barrel
       model/            # Shared identity and organization schemas
       account/          # Identity, installation, and access actions
@@ -59,6 +69,8 @@ src/
         presets/        # Saved queries
         results/        # Score tables
         state/          # Form controller and error messages
+    layout/             # PageShell and PageHeader for application pages
+    not-found/          # NotFoundView for src/app/not-found.tsx (unmatched routes)
     providers/          # Client-side React context providers
       query-provider.tsx
       theme-provider.tsx
@@ -66,8 +78,14 @@ src/
     motion/             # Framer Motion wrapper components
       demo/             # Motion demo components and barrel
       index.ts
-    ui/                 # shadcn-style primitive components
-      button.tsx
+    ui/                 # Shared primitives. Barrel exports Button, LinkButton, Input, Textarea,
+                        # NativeSelect, Field, CheckboxField, StatusMessage, panelVariants, Toaster
+      button.tsx        # cva variants (default, outline, link) and sizes (default, lg)
+      link-button.tsx   # Link styled as a button. `native` renders <a> for /api/v1/auth/*
+      control.ts        # controlClassName shared by Input, Textarea, NativeSelect
+      input.tsx, textarea.tsx, native-select.tsx, field.tsx, checkbox-field.tsx
+      status-message.tsx, status-icon.tsx  # Icon + text messages, tone neutral|success|error
+      panel.ts          # panelVariants: raised or dashed surface
       sonner.tsx        # Themed <Toaster>
   api/                  # HTTP layer
     client.ts           # axios instance `api` + createApiClient()
@@ -177,7 +195,9 @@ Blank lines between each group are auto-inserted — do not add them by hand.
 - `prettier-plugin-tailwindcss` auto-sorts utility classes on format. Never sort by hand.
 - Use `cn()` for conditional or merged class strings.
 - Use `cva()` for components with variant axes.
-- CSS variables for design tokens live in `src/app/globals.css` — do not inline raw colours.
+- Raw design tokens live in `src/styles/tokens.css`. Do not inline raw colours, and do not define tokens in routes, layouts, or components.
+- Use mapped utilities (`bg-card`, `text-muted-foreground`, `border-input`, `rounded-control`, `rounded-panel`, `shadow-panel`). Use only breakpoints `md:` and `lg:`.
+- Never use `text-primary` or `text-xs`. Text below 14px is not allowed. Marigold is a fill only.
 
 ### Components
 
@@ -241,6 +261,22 @@ Dark mode is class-based (`@custom-variant dark (&:is(.dark *))`). `next-themes`
 
 - Default theme: `system` — follows `prefers-color-scheme` automatically.
 - Use `useMounted()` from `src/hooks/use-mounted.ts` to guard any client-only rendering (e.g. reading `useTheme()` before hydration).
+
+### Global theme (Sunbeam)
+
+`web/design-system.md` is the contract. Read it before you change any screen.
+
+- One theme applies to every route. `src/app/globals.css` contains imports only. Tokens, the Tailwind mapping, type, motion, and base rules live in `src/styles`.
+- Fonts load once in `src/styles/fonts.ts`. `RootLayout` applies `fontVariables` to `<html>`. Do not add another `next/font` load.
+- CSS modules use raw tokens (`var(--card)`, `var(--motion-hover)`). Tailwind code uses mapped utilities. Names such as `--home-*` and `.home` do not exist.
+- Application screens use `PageShell` and `PageHeader` from `@/components/layout`, and the primitives in `@/components/ui`.
+  Never style a raw `button`, `input`, `select`, or `textarea` with theme classes. Never apply `buttonVariants` outside `src/components/ui`.
+- Use `LinkButton` for button-like links. Pass `native` for `/api/v1/auth/*`.
+- Use `StatusMessage` with an explicit `role` for status text. The tone adds the icon and color, never the role.
+- Use `panelVariants()` on the semantic element for panels. Do not add a `Panel` wrapper.
+- The cat, the beam, and decorative motion appear only on `/`. `/motion` keeps its Framer Motion examples only.
+- Controls are 44px high with a 3:1 border (`border-input`). The focus ring is one `:focus-visible` rule in `base.css`. Do not add `outline-none` or `focus-visible:ring-*`.
+- Ask the design owner before you add a color, a font, an animation, a variant, or a copy change.
 
 ---
 

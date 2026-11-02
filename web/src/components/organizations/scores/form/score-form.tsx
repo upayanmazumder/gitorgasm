@@ -2,6 +2,8 @@
 
 import type { FormEvent } from 'react';
 
+import { Button, panelVariants } from '@/components/ui';
+
 import { FilterFields, PeriodFields } from './fields';
 import type { ScoreFormValues as Form } from './types';
 
@@ -22,16 +24,16 @@ export function ScoreForm({ form, onChange, onSubmit, disabled, pending }: Props
   }
 
   return (
-    <form onSubmit={submit} className="grid gap-4 rounded-lg border p-5 sm:grid-cols-2">
+    <form onSubmit={submit} className={panelVariants({ className: 'grid gap-4 md:grid-cols-2' })}>
       <PeriodFields form={form} set={set} />
       <FilterFields form={form} set={set} />
-      <button
+      <Button
         type="submit"
         disabled={disabled || pending}
-        className="rounded bg-zinc-900 px-4 py-2 text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+        className="md:col-span-2 md:justify-self-start"
       >
         {pending ? 'Calculating…' : 'Show scores'}
-      </button>
+      </Button>
     </form>
   );
 }

@@ -40,7 +40,7 @@ export function FilterPanel() {
             <rect x="1" y="1" width="18" height="18" rx="5" className={styles.checkBox} />
             <path
               d="m6 10.2 2.8 2.8L14 7.4"
-              stroke="var(--home-surface)"
+              stroke="var(--card)"
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"

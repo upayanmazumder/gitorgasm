@@ -25,9 +25,9 @@
   left: 24px;
   z-index: 100;
   padding: 12px 16px;
-  border-radius: var(--home-radius-control);
-  background: var(--home-text);
-  color: var(--home-bg);
+  border-radius: var(--control-radius);
+  background: var(--foreground);
+  color: var(--background);
   font-size: 1rem;
 }
 
@@ -47,26 +47,6 @@
   display: flex;
   align-items: center;
   gap: 24px;
-}
-
-.brandLarge,
-.brandSmall {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  font-family: var(--home-font-display);
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.02em;
-}
-
-.brandLarge {
-  font-size: 1.25rem;
-}
-
-.brandSmall {
-  font-size: 1.125rem;
 }
 
 @media (min-width: 768px) {

@@ -1,4 +1,5 @@
-import { ButtonLink } from '../button-link';
+import { LinkButton } from '@/components/ui';
+
 import { FilterPanel } from './filter-panel';
 import styles from './scope.module.css';
 
@@ -15,9 +16,9 @@ export function HomeScope() {
           Scores summarize recorded GitHub activity. They do not measure productivity or the value
           of anyone’s work.
         </p>
-        <ButtonLink href="/organizations" variant="primary">
+        <LinkButton href="/organizations" size="lg">
           Connect an organization
-        </ButtonLink>
+        </LinkButton>
       </div>
       <FilterPanel />
     </section>

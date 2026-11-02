@@ -14,7 +14,7 @@ export function Section({
   return (
     <section className="space-y-6">
       <Slide inView className="space-y-1">
-        <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
+        <h2>{title}</h2>
         <p className="text-sm text-muted-foreground">{hint}</p>
       </Slide>
       {children}

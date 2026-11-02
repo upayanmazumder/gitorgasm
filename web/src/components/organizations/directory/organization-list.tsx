@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import { panelVariants } from '@/components/ui';
+
 import type { Organization } from '../model';
 
 interface OrganizationListProps {
@@ -9,14 +11,14 @@ interface OrganizationListProps {
 export function OrganizationList({ organizations }: OrganizationListProps) {
   return (
     <nav aria-label="Connected organizations">
-      <ul className="divide-y rounded-lg border">
+      <ul className={panelVariants({ padding: 'none', className: 'divide-y divide-border' })}>
         {organizations?.map(organization => (
           <li key={organization.login}>
             <Link
               href={`/organizations/${encodeURIComponent(organization.login)}`}
-              className="block space-y-1 rounded-lg p-5 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-4"
+              className="block space-y-1 p-4 transition-control hover:bg-muted focus-visible:-outline-offset-4 md:p-6"
             >
-              <span className="font-medium">{organization.login}</span>
+              <span className="font-semibold">{organization.login}</span>
               <span className="block text-sm text-muted-foreground">
                 {organization.repository_count}{' '}
                 {organization.repository_count === 1 ? 'repository' : 'repositories'}

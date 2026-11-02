@@ -1,6 +1,5 @@
 import { SunbeamField } from './effects';
 import { HomeFeatures } from './features';
-import { displayFont, textFont } from './fonts';
 import { HomeFooter } from './footer';
 import { HomeHero } from './hero';
 import { HomeNavigation } from './home-navigation';
@@ -9,7 +8,7 @@ import { HomeScope } from './scope';
 
 export function HomeView() {
   return (
-    <div className={`home ${displayFont.variable} ${textFont.variable} ${styles.page}`}>
+    <div className={styles.page}>
       <SunbeamField />
       <a href="#home-content" className={styles.skip}>
         Skip to content

@@ -7,7 +7,6 @@
 
 .copy h2 {
   max-width: 20ch;
-  font-family: var(--home-font-display);
   font-size: clamp(1.875rem, 1.4rem + 1.6vw, 2.5rem);
   font-weight: 650;
   line-height: 1.12;
@@ -21,7 +20,7 @@
 }
 
 .copy .boundary {
-  color: var(--home-muted);
+  color: var(--muted-foreground);
 }
 
 .copy a {
@@ -37,10 +36,10 @@
   display: grid;
   gap: 24px;
   padding: 16px;
-  border: 1px solid var(--home-line);
-  border-radius: var(--home-radius-panel);
-  background: var(--home-surface);
-  box-shadow: var(--home-shadow-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--panel-radius);
+  background: var(--card);
+  box-shadow: var(--panel-shadow);
 }
 
 .panelHeading {
@@ -51,7 +50,7 @@
 }
 
 .panelTitle {
-  font-family: var(--home-font-display);
+  font-family: var(--typeface-display);
   font-size: 1.25rem;
   font-weight: 600;
   line-height: 1.3;
@@ -60,8 +59,8 @@
 
 .pill {
   padding: 4px 12px;
-  border-radius: var(--home-radius-pill);
-  background: var(--home-surface-hover);
+  border-radius: var(--pill-radius);
+  background: var(--muted);
   font-size: 0.875rem;
   line-height: 1.5;
   white-space: nowrap;
@@ -73,7 +72,7 @@
 }
 
 .label {
-  color: var(--home-muted);
+  color: var(--muted-foreground);
   font-size: 0.875rem;
   line-height: 1.5;
 }
@@ -89,12 +88,12 @@
   place-items: center;
   min-height: 44px;
   padding-inline: 4px;
-  border: 1px solid var(--home-line-strong);
-  border-radius: var(--home-radius-control);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--control-radius);
 }
 
 .segments > [data-selected='true'] {
-  background: var(--home-surface-hover);
+  background: var(--muted);
   font-weight: 600;
 }
 
@@ -104,8 +103,8 @@
   justify-content: space-between;
   min-height: 44px;
   padding-inline: 12px;
-  border: 1px solid var(--home-line-strong);
-  border-radius: var(--home-radius-control);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--control-radius);
 }
 
 .option {
@@ -120,12 +119,12 @@
 }
 
 .checkBox {
-  fill: var(--home-data);
+  fill: var(--chart-1);
 }
 
 .caption {
   margin-top: 12px;
-  color: var(--home-muted);
+  color: var(--muted-foreground);
   font-size: 0.875rem;
   line-height: 1.5;
 }

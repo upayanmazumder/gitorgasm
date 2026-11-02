@@ -21,10 +21,10 @@ export function SunbeamField() {
 
   useEffect(() => {
     if (!enabled) return;
-    // The WebGL vendor needs a literal color, so read the scoped token after theme paint.
+    // The WebGL vendor needs a literal color, so read the computed token after theme paint.
     const frame = requestAnimationFrame(() => {
       if (!fieldRef.current) return;
-      setBrand(getComputedStyle(fieldRef.current).getPropertyValue('--home-brand').trim());
+      setBrand(getComputedStyle(fieldRef.current).getPropertyValue('--primary').trim());
     });
     return () => cancelAnimationFrame(frame);
   }, [enabled, resolvedTheme]);

@@ -36,10 +36,12 @@ export function RevealExamples() {
       </Section>
 
       <Section title="Staggered cards" hint="Children animate in sequence from one parent.">
-        <Stagger inView className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <Stagger inView className="grid grid-cols-2 gap-4 md:grid-cols-3">
           {CARDS.map(label => (
             <StaggerItem key={label}>
-              <Card className="text-center font-mono text-sm text-muted-foreground">{label}</Card>
+              <Card className="text-center text-sm text-muted-foreground tabular-nums">
+                {label}
+              </Card>
             </StaggerItem>
           ))}
         </Stagger>

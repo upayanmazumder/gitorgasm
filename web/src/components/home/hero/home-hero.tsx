@@ -1,4 +1,5 @@
-import { ButtonLink } from '../button-link';
+import { LinkButton } from '@/components/ui';
+
 import { WavingMascot } from '../mascot';
 import { ContributionScoreboard } from '../scoreboard';
 import styles from './hero.module.css';
@@ -13,12 +14,12 @@ export function HomeHero() {
           Choose which activity counts, pick a UTC date period, and save the views you check often.
         </p>
         <div className={styles.actions}>
-          <ButtonLink href="/organizations" variant="primary">
+          <LinkButton href="/organizations" size="lg">
             Connect an organization
-          </ButtonLink>
-          <ButtonLink href="#how-it-works" variant="secondary">
+          </LinkButton>
+          <LinkButton href="#how-it-works" variant="outline" size="lg">
             How it works
-          </ButtonLink>
+          </LinkButton>
         </div>
         <p className={styles.note}>Sign in with GitHub to start.</p>
       </div>

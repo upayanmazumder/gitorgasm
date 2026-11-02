@@ -1,0 +1,19 @@
+.large,
+.small {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-family: var(--typeface-display);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.large {
+  font-size: 1.25rem;
+}
+
+.small {
+  font-size: 1.125rem;
+}

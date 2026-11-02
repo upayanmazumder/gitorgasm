@@ -13,7 +13,6 @@
 
 .copy h1 {
   max-width: 15ch;
-  font-family: var(--home-font-display);
   font-size: clamp(2.5rem, 1.6rem + 3.2vw, 4rem);
   font-weight: 650;
   line-height: 1.04;
@@ -24,7 +23,7 @@
 .lead {
   max-width: 52ch;
   margin-top: 24px;
-  color: var(--home-muted);
+  color: var(--muted-foreground);
   font-size: 1.125rem;
   line-height: 1.6;
 }
@@ -38,7 +37,7 @@
 
 .note {
   margin-top: 16px;
-  color: var(--home-muted);
+  color: var(--muted-foreground);
   font-size: 0.875rem;
   line-height: 1.5;
 }

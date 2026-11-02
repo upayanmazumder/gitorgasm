@@ -1,5 +1,6 @@
 import { m } from 'framer-motion';
 
+import { panelVariants } from '@/components/ui';
 import { spring } from '@/lib';
 
 import { Section } from './section';
@@ -11,7 +12,7 @@ export function GestureExamples() {
         <m.div
           whileHover={{ y: -6, scale: 1.03 }}
           transition={spring.snappy}
-          className="cursor-pointer rounded-xl border border-border bg-card p-6 text-center"
+          className={panelVariants({ className: 'cursor-pointer text-center' })}
         >
           Hover me
         </m.div>
@@ -19,7 +20,7 @@ export function GestureExamples() {
           type="button"
           whileTap={{ scale: 0.95 }}
           transition={spring.snappy}
-          className="rounded-xl border border-border bg-card p-6 text-center"
+          className={panelVariants({ className: 'text-center' })}
         >
           Tap me
         </m.button>

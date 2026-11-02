@@ -1,3 +1,5 @@
+import { panelVariants, StatusMessage } from '@/components/ui';
+
 import type { ScoreResult, ScoreRow } from '../data';
 
 interface Props {
@@ -14,18 +16,23 @@ function Board({
   label: (row: ScoreRow) => string;
 }) {
   return (
-    <section className="space-y-2">
-      <h2 className="text-xl font-semibold">{title}</h2>
+    <section className={panelVariants({ className: 'space-y-4' })}>
+      <h2>{title}</h2>
       {rows.length === 0 ? (
-        <p>No activity in this period.</p>
+        <p className="text-muted-foreground">No activity in this period.</p>
       ) : (
-        <ol className="space-y-2">
+        <ol>
           {rows.map(row => (
-            <li key={label(row)} className="flex justify-between rounded border p-3">
+            <li
+              key={label(row)}
+              className="flex items-baseline justify-between gap-4 border-b border-border py-3 last:border-b-0"
+            >
               <span>
                 {row.rank}. {label(row)}
               </span>
-              <strong>{Number(row.score.toFixed(2))} points</strong>
+              <strong className="font-semibold tabular-nums">
+                {Number(row.score.toFixed(2))} points
+              </strong>
             </li>
           ))}
         </ol>
@@ -35,15 +42,17 @@ function Board({
 }
 
 export function ScoreResults({ result }: Props) {
+  const tone = result.fresh ? 'success' : result.state.ingestion_failed ? 'error' : 'neutral';
+
   return (
     <div className="space-y-6">
-      <p role="status">
+      <StatusMessage role="status" tone={tone}>
         {result.fresh
           ? 'Scores are current.'
           : result.state.ingestion_failed
             ? 'The last update failed. These scores may be old.'
             : 'Scores may be old. The latest update is not complete.'}
-      </p>
+      </StatusMessage>
       <Board
         title="Contributors"
         rows={result.data.contributors}

@@ -1,4 +1,4 @@
-import { Button } from '@/components/ui';
+import { Button, StatusMessage } from '@/components/ui';
 
 interface SessionErrorProps {
   onRetry: () => void;
@@ -7,7 +7,9 @@ interface SessionErrorProps {
 export function SessionError({ onRetry }: SessionErrorProps) {
   return (
     <section className="space-y-4">
-      <p role="alert">Could not check your session. Check your connection and try again.</p>
+      <StatusMessage role="alert" tone="error">
+        Could not check your session. Check your connection and try again.
+      </StatusMessage>
       <Button variant="outline" onClick={onRetry}>
         Try again
       </Button>

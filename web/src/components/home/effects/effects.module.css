@@ -22,7 +22,7 @@
   height: 100%;
   background: radial-gradient(
     ellipse at 85% 0%,
-    color-mix(in srgb, var(--home-brand) 10%, transparent),
+    color-mix(in srgb, var(--primary) 10%, transparent),
     transparent 65%
   );
 }
@@ -32,10 +32,10 @@
   isolation: isolate;
   overflow: hidden;
   padding: 0;
-  border: 1px solid var(--home-line);
-  border-radius: var(--home-radius-panel);
-  background: var(--home-surface);
-  box-shadow: var(--home-shadow-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--panel-radius);
+  background: var(--card);
+  box-shadow: var(--panel-shadow);
 }
 
 @media (min-width: 768px) {
