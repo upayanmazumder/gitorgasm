@@ -4,7 +4,7 @@ Gitorgasm shows organization activity and scores. The website connects to the ap
 
 ## Theme
 
-One theme, named **Sunbeam**, applies to every route: `/`, `/organizations`, `/organizations/[login]`, `/motion`, and the unmatched 404 page.
+One theme, named **Sunbeam**, applies to every route: `/`, `/organizations`, `/organizations/[login]`, `/organizations/[login]/people`, `/motion`, and the unmatched 404 page.
 `design-system.md` owns colors, type, spacing, controls, motion, and copy. Read it before you change any screen.
 Claude Opus 5.5 wrote the design direction. Claude Sonnet 5.5 wrote the frontend code.
 
@@ -24,7 +24,7 @@ Marigold appears only as a fill: primary buttons, the brand tile, the mascot, an
 
 Shared building blocks:
 
-- `src/components/ui` holds `Button`, `LinkButton`, `Field`, `Input`, `Textarea`, `NativeSelect`, `CheckboxField`, `StatusMessage`, `panelVariants`, and `Toaster`.
+- `src/components/ui` holds `Button`, `LinkButton`, `Field`, `Input`, `Textarea`, `NativeSelect`, `CheckboxField`, `RadioField`, `StatusMessage`, `panelVariants`, and `Toaster`.
   Every control is at least 44 pixels high. App code does not style raw `button`, `input`, `select`, or `textarea` elements.
   Use `LinkButton` for links that look like buttons. Pass `native` for `/api/v1/auth/*`, which needs a full page navigation.
 - `src/components/layout` holds `PageShell` and `PageHeader` for application pages.
@@ -174,6 +174,39 @@ Retry rules:
 If the API is not running, the Next.js proxy answers `/api/v1/*` with a plain-text 500. The `pnpm dev` terminal also logs `Failed to proxy … ECONNREFUSED`, and the browser network panel shows the failed request.
 These are developer diagnostics. The website does not hide them. Start the API from the repository root with `make up`, then select **Try again**.
 
+## People workspace
+
+`/organizations/[login]/people` lets an organization owner invite people, add people to a team, and change organization roles. Each organization page links to the Scores and People sections.
+The page asks the API for the current owner capability on every visit and on window focus. The API checks owner state again before each change.
+
+Gitorgasm never calls GitHub from the browser. The API runs each change as a background request with the owner's GitHub user token.
+
+### Actions
+
+- **Invite to the organization.** Invite up to 50 people as members. Search public GitHub users, or paste or import usernames. Current members cannot be invited.
+- **Add to a team.** Add up to 50 people as team members. Pick from the current members, search, or paste or import usernames. GitHub invites people who are not organization members. Team maintainers keep their role.
+- **Change organization role.** Set current members to Member or Organization owner. The owner role gives complete administrative access, so the review needs an explicit confirmation box. You cannot change your own role. The API changes active members only. If a person leaves the organization while the request runs, GitHub may send that person an invitation. Check an uncertain result on GitHub.
+
+### Selecting people
+
+- The current-member directory loads one page at a time. Use **Show more members** for the next page. The role filter shows all members, members, or owners.
+- GitHub search runs only when you submit the form. GitHub search needs no sign-in and has a low quota. Results can be incomplete, and the page says so.
+- Paste usernames separated by spaces, commas, semicolons, or new lines. A leading `@` is allowed.
+- Import a CSV or JSON file of at most 64 KiB in UTF-8. CSV needs a `login`, `username`, `github_username`, or `github` header, or one username per row. CSV supports quoted fields and a byte order mark. JSON needs an array of usernames, or of objects with one of those fields. Spreadsheet files (`.xlsx`, `.xls`) are not read. Export CSV from the spreadsheet.
+- Usernames compare without regard to case. The first spelling stays. A request holds at most 50 people. An import that would go over the limit adds no one.
+- Every invalid entry is listed with its row or item number. Valid entries still join the list.
+
+### Review and receipts
+
+No change happens before you confirm the review. The review shows the organization, the action, the team, the new role, and every person. Editing the request discards the review and any confirmation.
+The confirm click creates an idempotency key. If the answer to the request is lost, the page keeps the same request and key. **Send the same request again** repeats it without applying the changes twice. The page never retries a request by itself.
+After the API accepts a request, the page stores the receipt ID in the `?receipt=` URL parameter. A reload resumes the receipt. The page polls only an active receipt in a visible tab. It stops when the receipt finishes. **Recent requests** lists your latest receipts for recovery.
+Results appear in groups: in progress, outcome unknown, failed, not attempted, invited, changed, and unchanged. Outcome unknown means GitHub may have applied the change. Check it on GitHub before you try again. **Review again** starts a new request with only the people that Gitorgasm did not try.
+
+### Access states
+
+The page explains each blocked state: signed out, expired GitHub authorization (sign in again), no access to the organization, not an owner, missing Members permission for the GitHub App, a suspended installation, and an account that is not an organization. A failure of the API or of GitHub shows a retry button, never a signed-out page.
+
 ## Hydration and browser extensions
 
 Some browser extensions add attributes to `<body>` before React hydrates the page. An example is `cz-shortcut-listen`.
@@ -191,8 +224,9 @@ Keep components small and focused. About 80 lines is a target, not a minimum.
 Usually keep implementation files below 100 lines after formatting. Smaller files are welcome.
 Do not compress code or add unnecessary abstractions to meet a line count.
 
-The organization feature separates account actions, authorization, directory views, and shared models.
+The organization feature separates account actions, authorization, directory views, navigation, and shared models.
 Scores use nested `data`, `form/fields`, `presets`, `results`, and `state` folders.
+The People workspace uses `access`, `data`, `draft`, `editor`, `review`, `progress`, `history`, and `workspace` folders. `draft` holds the pure rules and parsers. `data` holds the API schemas and query hooks.
 Each folder exports its public API through `index.ts`. Internal siblings use direct imports to avoid cycles.
 Form values stay in `form/types.ts`. The `data` folder contains API models and query hooks.
 

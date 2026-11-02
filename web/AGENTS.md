@@ -62,6 +62,16 @@ src/
       account/          # Identity, installation, and access actions
       authorization/    # Session state and authorization views
       directory/        # Organization list and empty states
+      navigation/       # OrganizationNav: Scores and People links
+      administration/   # People workspace at /organizations/[login]/people
+        access/         # Owner capability gate and blocked states
+        data/           # Zod schemas, query keys, query and mutation hooks, error copy
+        draft/          # Draft model, login rule, import parsers, workspace reducer
+        editor/         # Action, team, role, member directory, search, import, selection
+        review/         # Exact-target review, acknowledgments, enqueue outcomes
+        progress/       # Live receipt status and itemized results
+        history/        # Recent receipts
+        workspace/      # Composition, receipt URL state, focus requests
       scores/
         data/           # API types and query state
         form/
@@ -79,11 +89,11 @@ src/
       demo/             # Motion demo components and barrel
       index.ts
     ui/                 # Shared primitives. Barrel exports Button, LinkButton, Input, Textarea,
-                        # NativeSelect, Field, CheckboxField, StatusMessage, panelVariants, Toaster
+                        # NativeSelect, Field, CheckboxField, RadioField, StatusMessage, panelVariants, Toaster
       button.tsx        # cva variants (default, outline, link) and sizes (default, lg)
       link-button.tsx   # Link styled as a button. `native` renders <a> for /api/v1/auth/*
       control.ts        # controlClassName shared by Input, Textarea, NativeSelect
-      input.tsx, textarea.tsx, native-select.tsx, field.tsx, checkbox-field.tsx
+      input.tsx, textarea.tsx, native-select.tsx, field.tsx, checkbox-field.tsx, radio-field.tsx
       status-message.tsx, status-icon.tsx  # Icon + text messages, tone neutral|success|error
       panel.ts          # panelVariants: raised or dashed surface
       sonner.tsx        # Themed <Toaster>

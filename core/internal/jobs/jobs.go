@@ -11,6 +11,7 @@ import (
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 
 	"github.com/upayanmazumder/gitorgasm/core/internal/github"
+	adminjobs "github.com/upayanmazumder/gitorgasm/core/internal/jobs/administration"
 	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/ingest"
 	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/maintenance"
 	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/queue"
@@ -18,6 +19,7 @@ import (
 	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/sync"
 	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/webhook"
 	"github.com/upayanmazumder/gitorgasm/core/internal/scorer"
+	"github.com/upayanmazumder/gitorgasm/core/internal/secure"
 )
 
 // WorkerOptions configures the worker process.
@@ -26,6 +28,7 @@ type WorkerOptions struct {
 	ReconcileEvery time.Duration
 	Logger         *slog.Logger
 	Scorer         *scorer.Runner
+	Sealer         *secure.Sealer
 }
 
 // NewWorkerClient returns a River client that executes jobs.
@@ -34,6 +37,7 @@ func NewWorkerClient(pool *pgxpool.Pool, gh *github.Client, opts WorkerOptions) 
 	river.AddWorker(workers, &sync.Worker{Pool: pool, GitHub: gh, Now: time.Now})
 	river.AddWorker(workers, &ingest.Worker{Pool: pool, GitHub: gh, Now: time.Now})
 	river.AddWorker(workers, &scoring.Worker{Pool: pool, Scorer: opts.Scorer})
+	river.AddWorker(workers, &adminjobs.Worker{Pool: pool, GitHub: gh, Sealer: opts.Sealer, Now: time.Now, Log: opts.Logger})
 	river.AddWorker(workers, &webhook.Worker{Pool: pool, GitHub: gh})
 	river.AddWorker(workers, &maintenance.ReconcileWorker{Pool: pool})
 	river.AddWorker(workers, &maintenance.PurgeSessionsWorker{Pool: pool, Now: time.Now, Log: opts.Logger})
@@ -42,9 +46,10 @@ func NewWorkerClient(pool *pgxpool.Pool, gh *github.Client, opts WorkerOptions) 
 		Logger:  opts.Logger,
 		Workers: workers,
 		Queues: map[string]river.QueueConfig{
-			river.QueueDefault: {MaxWorkers: opts.Concurrency},
-			queue.GitHub:       {MaxWorkers: opts.Concurrency},
-			queue.Scoring:      {MaxWorkers: 1},
+			river.QueueDefault:   {MaxWorkers: opts.Concurrency},
+			queue.GitHub:         {MaxWorkers: opts.Concurrency},
+			queue.Scoring:        {MaxWorkers: 1},
+			queue.Administration: {MaxWorkers: 1},
 		},
 		PeriodicJobs: []*river.PeriodicJob{
 			river.NewPeriodicJob(river.PeriodicInterval(opts.ReconcileEvery),

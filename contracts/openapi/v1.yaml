@@ -8,7 +8,7 @@ info:
 
     Rules:
     - Every error uses the `Error` schema.
-    - Lists use keyset pagination with an opaque `cursor`. `next_cursor` is null on the last page.
+    - Lists use an opaque `cursor`; stored lists use keysets and live GitHub directories use bounded upstream pages. `next_cursor` is null on the last supported page.
     - State-changing requests must send an `Origin` header that equals the frontend origin.
     - Organizations the caller cannot access return 404, not 403.
 servers:
@@ -277,6 +277,225 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+  /v1/organizations/{login}/administration:
+    parameters:
+      - { $ref: '#/components/parameters/AdministrationOrganization' }
+    get:
+      operationId: administrationCapabilities
+      summary: Check live organization owner and GitHub App Members write capability
+      description: |
+        Resolves the caller's current installation grant before any GitHub request.
+        Uses the exact session's GitHub App user token and live organization membership.
+        Non-owners or missing Members write permission receive can_manage=false, not a
+        fabricated success for expired tokens or GitHub outages. Reauthenticate through
+        /v1/auth/login when github_reauthentication_required is returned.
+      responses:
+        '200':
+          description: Live capability, including the signed-in GitHub actor
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/AdministrationCapability' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/organizations/{login}/administration/users:
+    parameters:
+      - { $ref: '#/components/parameters/AdministrationOrganization' }
+    get:
+      operationId: searchAdministrationUsers
+      summary: Search one bounded page of public GitHub users
+      description: |
+        Requires live owner capability. The upstream public search request sends no
+        authentication. Input is lowercased and spaces collapsed; a fixed type:user
+        restriction is appended. Cursors are bound to actor, organization and normalized
+        query. No caller-provided GitHub URL is accepted.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 2, maxLength: 64, pattern: '^[A-Za-z0-9_ -]+$' }
+        - { $ref: '#/components/parameters/AdministrationCursor' }
+      responses:
+        '200':
+          description: Public users; incomplete_results is preserved from GitHub
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdministrationSearchPage' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/organizations/{login}/administration/teams:
+    parameters:
+      - { $ref: '#/components/parameters/AdministrationOrganization' }
+    get:
+      operationId: listAdministrationTeams
+      summary: List one page of existing teams using the owner's user token
+      description: Requires live owner capability; team descriptions and privacy metadata are not returned.
+      parameters:
+        - { $ref: '#/components/parameters/AdministrationCursor' }
+      responses:
+        '200':
+          description: Team identities
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdministrationTeamPage' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/organizations/{login}/administration/members:
+    parameters:
+      - { $ref: '#/components/parameters/AdministrationOrganization' }
+    get:
+      operationId: listAdministrationMembers
+      summary: List one live page of current organization members
+      description: |
+        Requires live owner capability. The role filter maps to GitHub's role parameter;
+        admin means organization Owner. Individual rows do not claim a role.
+        Cursors are bound to actor, organization, resource and role.
+      parameters:
+        - { name: role, in: query, schema: { type: string, enum: [all, member, admin], default: all } }
+        - { $ref: '#/components/parameters/AdministrationCursor' }
+      responses:
+        '200':
+          description: Current member identities
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdministrationUserPage' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/organizations/{login}/administration/operations:
+    parameters:
+      - { $ref: '#/components/parameters/AdministrationOrganization' }
+    get:
+      operationId: listAdministrationOperations
+      summary: List the current actor's ten most recent administration receipts
+      description: |
+        Requires a current installation grant and live owner capability. Strict keyset
+        pagination is scoped to the actor and organization. Summaries omit target results.
+        Interrupted job states are projected without modifying durable state.
+      parameters:
+        - { $ref: '#/components/parameters/AdministrationCursor' }
+      responses:
+        '200':
+          description: Actor-only receipt history
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdministrationOperationPage' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+    post:
+      operationId: submitAdministrationOperation
+      summary: Enqueue an explicitly reviewed administration batch
+      description: |
+        Requires the same-origin Origin header, a current grant, a usable session-bound
+        GitHub user token, live organization Owner membership and App Members write.
+        Maximum JSON body size is 16 KiB. Unknown fields, trailing JSON and invalid
+        field combinations are rejected before GitHub authorization requests.
+        Trim usernames, remove one leading @, deduplicate case-insensitively in input
+        order, and accept at most 50 unique safe usernames. Managed-user underscores
+        are supported. Explicit member role for invite/team is equivalent to omission.
+        Team existence is checked before enqueue; missing teams return 422.
+        Operation, targets, River job and audit event commit in one transaction.
+        The same actor/organization/key and canonical payload returns the same receipt
+        without another job. Changed payload returns 409. No automatic mutation retry.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+          description: Opaque UUID, case-insensitive; keep stable after an uncertain response.
+        - name: Origin
+          in: header
+          required: true
+          schema: { type: string, format: uri }
+          description: Must equal the configured frontend origin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdministrationRequest' }
+      responses:
+        '202':
+          description: Queued/running receipt, including an idempotent active replay
+          headers:
+            Location:
+              description: Relative URL of this actor's operation receipt
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdministrationOperationResponse' }
+        '200':
+          description: Idempotent replay of a completed or interrupted receipt
+          headers:
+            Location:
+              description: Relative URL of this actor's operation receipt
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdministrationOperationResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+        '415': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/organizations/{login}/administration/operations/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/AdministrationOrganization' }
+      - { name: id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' } }
+    get:
+      operationId: getAdministrationOperation
+      summary: Read an actor-only durable operation receipt
+      description: |
+        Requires the current installation grant, live owner capability and original
+        actor. Cross-actor and cross-tenant receipts return 404. Missing/terminal River
+        jobs or attempts older than 30 minutes project an interrupted terminal receipt:
+        running targets become unknown/outcome_unknown, queued targets become
+        not_attempted/interrupted, completed results remain intact. GET never writes.
+      responses:
+        '200':
+          description: Durable results or a derived interrupted view
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdministrationOperationResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
   /webhooks/github:
     post:
       summary: GitHub App webhook receiver (HMAC-SHA256 signed)
@@ -306,6 +525,18 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '413': { $ref: '#/components/responses/Error' }
 components:
+  parameters:
+    AdministrationOrganization:
+      name: login
+      in: path
+      required: true
+      schema: { type: string }
+      description: Organization login, resolved case-insensitively through the caller's current installation grants.
+    AdministrationCursor:
+      name: cursor
+      in: query
+      schema: { type: string, minLength: 1, maxLength: 2048 }
+      description: Opaque next_cursor from this actor, organization, resource and filter; arbitrary upstream URLs are invalid.
   securitySchemes:
     session:
       type: apiKey
@@ -318,6 +549,152 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
   schemas:
+    AdministrationCapability:
+      type: object
+      additionalProperties: false
+      required: [organization, actor, can_manage, reason, max_batch_size]
+      properties:
+        organization: { type: string }
+        actor:
+          type: object
+          additionalProperties: false
+          required: [github_id, login]
+          properties:
+            github_id: { type: integer, format: int64 }
+            login: { type: string }
+        can_manage: { type: boolean }
+        reason:
+          type: string
+          nullable: true
+          enum: [not_owner, members_permission_required, unsupported_account, installation_suspended, null]
+        max_batch_size: { type: integer, enum: [50] }
+    AdministrationDirectoryUser:
+      type: object
+      additionalProperties: false
+      required: [id, login]
+      properties:
+        id: { type: integer, format: int64 }
+        login: { type: string }
+    AdministrationDirectoryTeam:
+      type: object
+      additionalProperties: false
+      required: [id, name, slug]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        slug: { type: string }
+    AdministrationUserPage:
+      type: object
+      additionalProperties: false
+      required: [data, next_cursor]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/AdministrationDirectoryUser' }
+        next_cursor: { type: string, nullable: true }
+    AdministrationSearchPage:
+      type: object
+      additionalProperties: false
+      required: [data, next_cursor, incomplete_results]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/AdministrationDirectoryUser' }
+        next_cursor: { type: string, nullable: true }
+        incomplete_results: { type: boolean }
+    AdministrationTeamPage:
+      type: object
+      additionalProperties: false
+      required: [data, next_cursor]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/AdministrationDirectoryTeam' }
+        next_cursor: { type: string, nullable: true }
+    AdministrationLogin:
+      type: string
+      minLength: 1
+      maxLength: 100
+      pattern: '^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$'
+      description: Canonical safe username after trimming whitespace and removing one leading @.
+    AdministrationRequest:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [kind, logins]
+          properties:
+            kind: { type: string, enum: [invite] }
+            logins: { $ref: '#/components/schemas/AdministrationLogins' }
+            role: { type: string, enum: [member] }
+        - type: object
+          additionalProperties: false
+          required: [kind, logins, team_slug]
+          properties:
+            kind: { type: string, enum: [team_membership] }
+            logins: { $ref: '#/components/schemas/AdministrationLogins' }
+            team_slug: { type: string, description: 'Trimmed and lowercased before validation against ^[a-z0-9][a-z0-9_-]{0,99}$.' }
+            role: { type: string, enum: [member] }
+        - type: object
+          additionalProperties: false
+          required: [kind, logins, role]
+          properties:
+            kind: { type: string, enum: [organization_role] }
+            logins: { $ref: '#/components/schemas/AdministrationLogins' }
+            role: { type: string, enum: [member, admin], description: admin grants full organization Owner authority. }
+    AdministrationLogins:
+      type: array
+      minItems: 1
+      description: At most 50 unique canonical usernames after case-insensitive deduplication; body remains bounded to 16 KiB.
+      items:
+        type: string
+        description: Trimmed, optional one leading @ removed, then validated as AdministrationLogin.
+    AdministrationOperationSummary:
+      type: object
+      required: [id, kind, status, team_slug, role, target_count, created_at, completed_at]
+      properties:
+        id: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' }
+        kind: { type: string, enum: [invite, team_membership, organization_role] }
+        status: { type: string, enum: [queued, running, completed, interrupted] }
+        team_slug: { type: string, nullable: true }
+        role: { type: string, enum: [member, admin, null], nullable: true }
+        target_count: { type: integer, minimum: 1, maximum: 50 }
+        created_at: { type: string, format: date-time }
+        completed_at: { type: string, format: date-time, nullable: true }
+    AdministrationTargetResult:
+      type: object
+      additionalProperties: false
+      required: [login, status, code, message]
+      properties:
+        login: { $ref: '#/components/schemas/AdministrationLogin' }
+        status: { type: string, enum: [queued, running, succeeded, invited, unchanged, failed, unknown, not_attempted] }
+        code: { type: string, nullable: true, description: Stable outcome code; never an upstream error body. }
+        message: { type: string, nullable: true, description: Fixed safe product copy; unknown means check GitHub before retrying. }
+    AdministrationOperation:
+      allOf:
+        - { $ref: '#/components/schemas/AdministrationOperationSummary' }
+        - type: object
+          required: [results]
+          properties:
+            results:
+              type: array
+              maxItems: 50
+              items: { $ref: '#/components/schemas/AdministrationTargetResult' }
+    AdministrationOperationResponse:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/AdministrationOperation' }
+    AdministrationOperationPage:
+      type: object
+      additionalProperties: false
+      required: [data, next_cursor]
+      properties:
+        data:
+          type: array
+          maxItems: 10
+          items: { $ref: '#/components/schemas/AdministrationOperationSummary' }
+        next_cursor: { type: string, nullable: true }
     Status:
       type: object
       required: [status]

@@ -53,7 +53,8 @@ func (s *Handler) RequireSession(next func(http.ResponseWriter, *http.Request, *
 			response.Error(w, r, http.StatusUnauthorized, "unauthenticated", "sign in required")
 			return
 		}
-		u, err := identity.LookupSession(r.Context(), s.Pool, secure.Hash(c.Value))
+		sessionHash := secure.Hash(c.Value)
+		u, err := identity.LookupSession(r.Context(), s.Pool, sessionHash)
 		if errors.Is(err, store.ErrNotFound) {
 			s.clearCookie(w, sessionCookie)
 			response.Error(w, r, http.StatusUnauthorized, "unauthenticated", "session expired")
@@ -63,6 +64,7 @@ func (s *Handler) RequireSession(next func(http.ResponseWriter, *http.Request, *
 			response.InternalError(s.Log, w, r, err)
 			return
 		}
+		u.SessionHash = sessionHash
 		next(w, r, u)
 	}
 }

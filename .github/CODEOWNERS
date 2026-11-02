@@ -1,10 +1,18 @@
 # Default owner for everything.
 * @upayanmazumder
 
+/scoring/ @Gslmao
+/core/ @mharshil1234 @Ujjwal160107
+/web/ @Aiden-Trindade
+
 # Security-sensitive paths. Review these with extra care.
-/core/internal/httpapi/auth/     @upayanmazumder
-/core/internal/httpapi/internal/access/ @upayanmazumder
-/core/internal/secure/           @upayanmazumder
-/core/internal/db/migrations/    @upayanmazumder
+/core/internal/httpapi/auth/     @upayanmazumder @mharshil1234 @Ujjwal160107
+/core/internal/httpapi/internal/access/ @upayanmazumder @mharshil1234 @Ujjwal160107
+/core/internal/secure/           @upayanmazumder @mharshil1234 @Ujjwal160107
+/core/internal/db/migrations/    @upayanmazumder @mharshil1234 @Ujjwal160107
+/core/internal/administration/  @upayanmazumder @mharshil1234 @Ujjwal160107
+/core/internal/httpapi/administration/ @upayanmazumder @mharshil1234 @Ujjwal160107
+/core/internal/jobs/administration/ @upayanmazumder @mharshil1234 @Ujjwal160107
+/core/internal/store/administration/ @upayanmazumder @mharshil1234 @Ujjwal160107
 /deploy/                                  @upayanmazumder
 /.github/workflows/                       @upayanmazumder
