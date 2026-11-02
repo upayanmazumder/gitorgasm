@@ -30,6 +30,10 @@
     transform: rotate(150deg);
   }
 
+  .art [data-part='tail'] {
+    animation: none;
+  }
+
   .art [data-part='eyes-happy'] {
     opacity: 1;
   }
@@ -40,6 +44,11 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .art [data-part='tail'] {
+    transform-origin: 110px 145px;
+    animation: tail-wiggle 3s ease-in-out infinite alternate;
+  }
+
   .art[data-playing='true'] [data-part='arm-wave'] {
     animation: wave-arm var(--motion-wave) both;
   }
@@ -54,6 +63,24 @@
 
   .art[data-playing='true'] [data-part='eyes-open'] {
     animation: eyes-open var(--motion-wave) step-end both;
+  }
+}
+
+@keyframes tail-wiggle {
+  0% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(2deg);
+  }
+  50% {
+    transform: rotate(-1.5deg);
+  }
+  75% {
+    transform: rotate(1.5deg);
+  }
+  100% {
+    transform: rotate(-1deg);
   }
 }
 
