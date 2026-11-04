@@ -1,56 +1,25 @@
-# Gitorgasm
+<p align="center">
+  <a href="https://gitorgasm.upayan.dev">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/icon/gitorgasm-logo-dark.svg">
+      <img src="docs/assets/icon/gitorgasm-logo-light.svg" alt="Gitorgasm" height="96">
+    </picture>
+  </a>
+</p>
 
-Gitorgasm shows activity and scores for the GitHub organizations you can access. You can choose a time period, search, filter results, and save your choices.
+<p align="center">See how your GitHub organization is doing, and manage its people in bulk.</p>
 
-## Start locally
+Gitorgasm is a website for teams that work on GitHub. Sign in with GitHub, add Gitorgasm to your organization, and open it to see how the work is going.
 
-Install Docker, Node.js, and pnpm. Then run:
+It scores the people, projects, and teams in your organization, so you can see who contributes and which projects are active. Pick a time period, search or filter the list, and Gitorgasm remembers your choices for next time.
 
-```bash
-git clone https://github.com/upayanmazumder/gitorgasm.git
-cd gitorgasm
-make env
-make up
-make smoke
-```
+Owners also get a People page for changes that take a long time one by one. You can invite people, add them to a team, or change their roles, up to 50 people at a time. Build the list from a GitHub search, your current members, pasted usernames, or a CSV or JSON file. You check every change before you send it, and you see how each one went afterward.
 
-This starts the database and app server. The smoke check works without a GitHub account.
+Gitorgasm follows your GitHub permissions. If you can't open an organization on GitHub, you can't see it here. Only owners can use the People page.
 
-To see your organizations, create a development GitHub App. Give it read access to repository contents, pull requests, and issues. Add its details to `.env.local`, then run `make up-github`.
+## More
 
-Start the website in another terminal:
-
-```bash
-cd web
-printf 'API_ORIGIN=http://localhost:8080\n' > .env.local
-pnpm install
-pnpm dev
-```
-
-Open `http://localhost:3000/organizations`. Set these URLs in your development GitHub App:
-
-- Callback URL: `http://localhost:3000/api/v1/auth/callback`.
-- Setup URL: `http://localhost:3000/api/v1/auth/login`.
-- Enable **Redirect on update**.
-- Disable **Request user authorization (OAuth) during installation**. The app starts its own protected sign-in flow after installation.
-
-Sign in, install the app for an organization, then complete sign-in when GitHub returns you to the website.
-Use **Refresh GitHub access** after an organization owner approves installation or your access changes.
-
-## Manage organization people
-
-Organization owners can open **People** from an organization's score page.
-The GitHub App installation must have approved Organization Members **write** permission.
-
-- Invite people, add people to an existing team, or change Member/Organization owner roles.
-- Select current members or public search results. Paste usernames or import CSV/JSON files up to 64 KiB.
-- Review up to 50 unique usernames, the organization, and the requested team or role before confirming.
-- Follow the durable receipt and its individual results. Closing the tab does not cancel a queued request.
-
-Existing team maintainers retain their role. Role changes reject known nonmembers and block self-demotion.
-GitHub can invite someone removed concurrently during a role change. An unexpected membership state stops the batch with an uncertain result.
-Check uncertain results on GitHub before submitting another request. Sign-out, expired access, or lost ownership stops remaining changes.
-
-See the [administration plan and security model](docs/architecture/organization-administration.md) for the API, permission requirements, and failure behavior.
-
-Run `make test` to check the project. See [CONTRIBUTING.md](CONTRIBUTING.md) for more commands.
+- [Manage organization people](docs/managing-people.md)
+- [Run Gitorgasm on your computer](docs/local-development.md)
+- [Contribute to the project](CONTRIBUTING.md)
+- [Report a security problem](SECURITY.md)
