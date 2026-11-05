@@ -13,17 +13,19 @@ Finding: a same-repository pull request could push the mutable `latest` tag of `
 
 For a `pull_request` run, GitHub uses the workflow files of the PR head ([workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)). A same-repository PR author can edit `ci.yml` and `image-publish.yml`, remove the `if` conditions, and ask for `packages: write`. No change to these files can stop that. The controls below, which live in GitHub settings, are what stop it.
 
-## Settings only the owner can change
+## Settings applied in GitHub (2026-11-05)
 
-1. **Environment `image-publish`** (Settings, Environments): create it, choose "Selected branches and tags" under Deployment branches, and add a branch rule for `main`. Consider deselecting "Allow administrators to bypass configured protection rules" ([Managing environments](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments)). A job that references an environment waits for its protection rules. **Limit:** `GITHUB_TOKEN` and its `packages: write` scope are not tied to an environment. A PR author can delete the `environment:` line and still receive `packages: write` if a job requests it. The environment protects only secrets and variables stored in it. Treat it as a label until item 2 or the option below is in place.
-2. **GHCR package access** (package `gitorgasm/core`, Package settings): remove or restrict "Manage Actions access" so that only this repository's workflows can write, and review who has direct write or admin on the package. Check whether the package settings let you limit write access to the `main` ref; if they do not, rely on item 1.
-3. **Actions settings** (Settings, Actions, General): set the default workflow `GITHUB_TOKEN` permission to read-only, require approval for workflow runs from outside collaborators, and review who has write access to the repository. Anyone with write access can open a same-repository PR.
-4. **Review of workflow changes**: add a ruleset or branch protection on `main` that requires review from code owners (CODEOWNERS already lists `/.github/workflows/` and `/deploy/`). `CONTRIBUTING.md` currently sets required approvals to 0 while there is one maintainer, so a workflow change merges without review. This protects `main`, not a PR run; it keeps the files above intact after merge.
-5. **Provenance check at deploy time**: the build attaches provenance (`mode=max`) and an SBOM. Nothing in the cluster verifies them. The Image Updater entry and the Argo CD Application live in `upayanmazumder/cluster`, not here. Add an admission or verification step there that accepts only images whose attestation shows this repository and `refs/heads/main`. This repository cannot enforce it.
+These settings live in GitHub, not in files. Re-check them if the repository is recreated or transferred.
 
-## Option that needs an owner decision: environment-scoped push credential
+1. **Environment `image-publish`**: deployment branches are limited to `main`, and administrators cannot bypass its rules. **Limit:** `GITHUB_TOKEN` and its `packages: write` scope are not tied to an environment. A PR author can delete the `environment:` line and still receive `packages: write` if a job requests it. The environment protects only secrets and variables stored in it.
+2. **GHCR package `gitorgasm/core`**: inherited access from the source repository is off, and no person has direct access except the owner. The repository `gitorgasm` keeps Actions access with the Admin role, because the publish job needs it. GitHub does not offer a way to limit that access to the `main` ref.
+3. **Actions settings**: the default workflow `GITHUB_TOKEN` permission is read-only.
+4. **Ruleset `main protection`**: it requires review from code owners. CODEOWNERS lists `/.github/workflows/` and `/deploy/`. Repository administrators can bypass the ruleset. This protects `main`, not a PR run.
 
-To make the environment a real gate, push to GHCR with a credential stored as an `image-publish` environment secret instead of `GITHUB_TOKEN`, and set the repository's workflow token to read-only. Environment secrets reach only jobs that reference the environment and pass its branch rule. This changes how publishing authenticates and needs a credential the owner creates (for example a fine-grained credential limited to the package), so it is not implemented in this change. Until then, the first two settings above carry the enforcement.
+## Still open
+
+1. **Provenance check at deploy time**: the build attaches provenance (`mode=max`) and an SBOM. Nothing in the cluster verifies them. The Image Updater entry and the Argo CD Application live in `upayanmazumder/cluster`, not here. The cluster has no admission policy controller today. A check needs one, plus signed attestations from the publish job. That is a new platform component and needs an ADR in the cluster repository. This repository cannot enforce it.
+2. **Credential that only the environment can read**: a push credential stored as an `image-publish` environment secret would make the environment a real gate. GHCR accepts only `GITHUB_TOKEN` and personal access tokens. A classic token with `write:packages` also forces the `repo` scope in the token form. That scope gives full control of the owner's private repositories, which is a worse exposure than the one it would close. No such credential was created. Revisit this if GHCR accepts a narrower credential.
 
 ## Image Updater and tags: left unchanged
 
