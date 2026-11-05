@@ -62,7 +62,7 @@ func (s *Handler) Query(w http.ResponseWriter, r *http.Request, u *identity.Sess
 }
 
 func (s *Handler) calculate(ctx context.Context, id, userID, generation int64, key string, query json.RawMessage) (json.RawMessage, error) {
-	if err := s.Scorer.Validate(ctx, query); err != nil {
+	if err := s.Scorer.Validate(ctx, id, userID, query); err != nil {
 		return nil, err
 	}
 	login, err := tenancy.InstallationLogin(ctx, s.Pool, id, userID)

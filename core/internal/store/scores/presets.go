@@ -34,6 +34,18 @@ func ListScoringPresets(ctx context.Context, q store.DBTX, installationID, userI
 	})
 }
 
+// GetScoringPresetQuery returns the saved body of a preset, or nil if the caller has no access or it does not exist.
+func GetScoringPresetQuery(ctx context.Context, q store.DBTX, installationID, userID int64, name string) (json.RawMessage, error) {
+	var query json.RawMessage
+	err := q.QueryRow(ctx, `SELECT p.query FROM scoring_presets p
+		JOIN user_installations ui ON ui.installation_id = p.installation_id AND ui.user_id = $2
+		WHERE p.installation_id = $1 AND p.name = $3`, installationID, userID, name).Scan(&query)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return query, err
+}
+
 // UpsertScoringPreset saves a preset if the caller has access and the installation is under the preset limit.
 func UpsertScoringPreset(ctx context.Context, q store.DBTX, installationID, userID int64, name string, query json.RawMessage) error {
 	tag, err := q.Exec(ctx, `INSERT INTO scoring_presets (installation_id, name, query)

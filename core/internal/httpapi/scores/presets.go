@@ -53,11 +53,18 @@ func (s *Handler) SavePreset(w http.ResponseWriter, r *http.Request, u *identity
 		return
 	}
 	stored := decoded.withoutAsOf()
-	// Validation needs an anchor for named periods; any instant checks the shape.
-	if !s.validateQuery(w, r, stored.withAsOf(s.Now()).encode()) {
+	query := stored.encode()
+	// A body identical to the saved one already passed validation; skip the scorer slot.
+	unchanged, err := scores.GetScoringPresetQuery(r.Context(), s.Pool, id, u.UserID, name)
+	if err != nil {
+		s.scoreError(w, r, err)
 		return
 	}
-	query := stored.encode()
+	// Validation needs an anchor for named periods; any instant checks the shape.
+	if (unchanged == nil || !sameQuery(unchanged, query)) &&
+		!s.validateQuery(w, r, id, u.UserID, stored.withAsOf(s.Now()).encode()) {
+		return
+	}
 	if err := scores.UpsertScoringPreset(r.Context(), s.Pool, id, u.UserID, name, query); err != nil {
 		s.scoreError(w, r, err)
 		return
