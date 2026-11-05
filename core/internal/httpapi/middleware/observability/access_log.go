@@ -10,6 +10,15 @@ import (
 	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/requestid"
 )
 
+// methodLabel keeps the metric label set fixed. Go accepts any token as a method, so a raw value lets clients create series without limit.
+func methodLabel(method string) string {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions:
+		return method
+	}
+	return "other"
+}
+
 // AccessLog records HTTP metrics and logs requests except health probes.
 func AccessLog(log *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -18,7 +27,7 @@ func AccessLog(log *slog.Logger, next http.Handler) http.Handler {
 		if route == "" {
 			route = "unmatched"
 		}
-		httpRequests.WithLabelValues(route, r.Method, strconv.Itoa(metrics.Code)).Inc()
+		httpRequests.WithLabelValues(route, methodLabel(r.Method), strconv.Itoa(metrics.Code)).Inc()
 		httpDuration.WithLabelValues(route).Observe(metrics.Duration.Seconds())
 		if route == "GET /healthz" || route == "GET /readyz" {
 			return
