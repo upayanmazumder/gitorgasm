@@ -52,6 +52,11 @@ func newHarness(t *testing.T) *harness {
 
 func newHarnessWithGitHub(t *testing.T, gh *config.GitHub) *harness {
 	t.Helper()
+	return newHarnessWithScorer(t, gh, testScorer())
+}
+
+func newHarnessWithScorer(t *testing.T, gh *config.GitHub, runner *scorer.Runner) *harness {
+	t.Helper()
 	pool := testdb.New(t)
 	jobClient, err := queue.NewInsertClient(pool)
 	if err != nil {
@@ -65,7 +70,7 @@ func newHarnessWithGitHub(t *testing.T, gh *config.GitHub) *harness {
 	cfg := &config.Config{AppOrigin: origin, CookieSecure: true, SessionTTL: time.Hour, GitHub: gh}
 	s := &httpapi.Server{
 		Pool: pool, Jobs: jobClient, Sealer: sealer, Cfg: cfg, GitHub: github.New(gh),
-		Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Now: time.Now, Scorer: testScorer(),
+		Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Now: time.Now, Scorer: runner,
 	}
 
 	doc, err := openapi3.NewLoader().LoadFromFile("../../../../contracts/openapi/v1.yaml")

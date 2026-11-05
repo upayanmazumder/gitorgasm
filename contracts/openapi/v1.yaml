@@ -199,7 +199,9 @@ paths:
       description: |
         A named period without `as_of` resolves against the latest ingest time. Results are
         cached per data generation and query. 503 `scores_pending` means the current data is
-        not scored yet; 503 `scores_busy` means every scorer slot is in use.
+        not scored yet; 503 `scores_busy` means no scorer slot became free in time. A user or an organization
+        never holds more than one of the two slots, so a caller can also get `scores_busy` while its
+        own earlier request is still running.
       parameters:
         - { name: login, in: path, required: true, schema: { type: string } }
       requestBody:
@@ -533,6 +535,12 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '413': { $ref: '#/components/responses/Error' }
+        '503':
+          description: |
+            Both intake slots are busy (`busy`; GitHub redelivers) or the GitHub App is not configured.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 components:
   parameters:
     AdministrationOrganization:

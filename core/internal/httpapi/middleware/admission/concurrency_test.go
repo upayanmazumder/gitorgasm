@@ -1,16 +1,16 @@
 package admission_test
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/middleware/admission"
 )
 
-func TestLimitConcurrentStopsCanceledWaiter(t *testing.T) {
+func TestLimitConcurrentRejectsAtOnceWhenFull(t *testing.T) {
 	entered, release, done := make(chan struct{}), make(chan struct{}), make(chan struct{})
 	var calls atomic.Int32
 	h := admission.LimitConcurrent(1, func(w http.ResponseWriter, _ *http.Request) {
@@ -26,15 +26,24 @@ func TestLimitConcurrentStopsCanceledWaiter(t *testing.T) {
 		h.ServeHTTP(first, httptest.NewRequest(http.MethodPost, "/", nil))
 	}()
 	<-entered
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
+
 	second := httptest.NewRecorder()
-	h.ServeHTTP(second, httptest.NewRequest(http.MethodPost, "/", nil).WithContext(ctx))
+	finished := make(chan struct{})
+	go func() {
+		defer close(finished)
+		h.ServeHTTP(second, httptest.NewRequest(http.MethodPost, "/", nil))
+	}()
+	select {
+	case <-finished:
+	case <-time.After(2 * time.Second):
+		t.Fatal("request queued behind a full limiter instead of failing at once")
+	}
+	if second.Code != http.StatusServiceUnavailable || calls.Load() != 1 {
+		t.Fatalf("full limiter: status=%d calls=%d", second.Code, calls.Load())
+	}
+
 	close(release)
 	<-done
-	if calls.Load() != 1 || second.Body.Len() != 0 {
-		t.Fatalf("canceled waiter dispatched: calls=%d body=%q", calls.Load(), second.Body.String())
-	}
 	third := httptest.NewRecorder()
 	h.ServeHTTP(third, httptest.NewRequest(http.MethodPost, "/", nil))
 	if calls.Load() != 2 || first.Code != http.StatusNoContent || third.Code != http.StatusNoContent {

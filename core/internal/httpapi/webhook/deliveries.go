@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -22,6 +23,11 @@ const maxWebhookBytes = 25 << 20
 // maxWebhookReads caps memory pinned by unsigned bodies at maxWebhookReads × maxWebhookBytes.
 const maxWebhookReads = 2
 
+// webhookBodyTimeout bounds how long an unsigned body may take to arrive while it holds a read slot.
+// It is well below GitHub's 10 s delivery timeout and far above the time a 25 MB body needs over a
+// datacenter link, so only stalled or trickling senders are cut off.
+const webhookBodyTimeout = 5 * time.Second
+
 // Header and payload limits match webhook_deliveries CHECK constraints.
 const (
 	maxDeliveryIDLen = 100
@@ -33,7 +39,7 @@ var validEvent = regexp.MustCompile(`^[a-z_]{1,64}$`)
 
 // deliver acknowledges verified deliveries before worker processing to meet GitHub's timeout.
 func (s *Handler) deliver(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxWebhookBytes))
+	body, err := s.readBody(w, r)
 	if err != nil {
 		var tooLarge *http.MaxBytesError
 		if errors.As(err, &tooLarge) {
@@ -85,6 +91,32 @@ func (s *Handler) deliver(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.JSON(w, http.StatusAccepted, map[string]any{"accepted": true, "duplicate": duplicate})
+}
+
+// readBody reads the capped body under a read deadline.
+//
+// After a complete read the deadline is cleared: an expired one would make the server's background
+// connection read cancel the request context. After a failed read it is forced to expire: the server
+// otherwise tries to drain the unread body before writing the error response, which would let a stalled
+// sender keep the slot until the server's ReadTimeout.
+func (s *Handler) readBody(w http.ResponseWriter, r *http.Request) ([]byte, error) {
+	timeout := s.bodyTimeout
+	if timeout <= 0 {
+		timeout = webhookBodyTimeout
+	}
+	rc := http.NewResponseController(w)
+	if err := rc.SetReadDeadline(time.Now().Add(timeout)); err != nil && !errors.Is(err, http.ErrNotSupported) {
+		return nil, err
+	}
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxWebhookBytes))
+	if err != nil {
+		_ = rc.SetReadDeadline(time.Now())
+		return nil, err
+	}
+	if err := rc.SetReadDeadline(time.Time{}); err != nil && !errors.Is(err, http.ErrNotSupported) {
+		return nil, err
+	}
+	return body, nil
 }
 
 func (s *Handler) Handler() http.HandlerFunc {

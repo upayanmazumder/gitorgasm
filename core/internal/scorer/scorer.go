@@ -30,33 +30,69 @@ const (
 )
 
 // Runner bounds concurrent score processes so requests cannot exhaust CPU, memory, or connections.
+// One user and one installation can each hold at most max(concurrency-1, 1) slots, so a single
+// tenant cannot starve the others of the last free slot.
 type Runner struct {
-	bin   string
-	slots chan struct{}
-	wait  time.Duration
+	bin           string
+	slots         chan struct{}
+	wait          time.Duration
+	users         *tenantLimiter
+	installations *tenantLimiter
 }
 
 // New returns a runner for the binary at bin. Callers wait up to wait for a free slot.
 func New(bin string, concurrency int, wait time.Duration) *Runner {
-	return &Runner{bin: bin, slots: make(chan struct{}, max(concurrency, 1)), wait: wait}
+	concurrency = max(concurrency, 1)
+	perTenant := max(concurrency-1, 1)
+	return &Runner{
+		bin: bin, slots: make(chan struct{}, concurrency), wait: wait,
+		users: newTenantLimiter(perTenant), installations: newTenantLimiter(perTenant),
+	}
 }
 
-func (r *Runner) acquire(ctx context.Context) (func(), error) {
+// acquire takes the caller's tenant slots, then a process slot, all within one wait budget.
+// Tenant slots come first so a waiting caller never holds a process slot another tenant needs.
+// A zero userID (worker jobs) has no per-user limit.
+func (r *Runner) acquire(ctx context.Context, installationID, userID int64) (func(), error) {
 	timer := time.NewTimer(r.wait)
 	defer timer.Stop()
+	var releases []func()
+	releaseAll := func() {
+		for i := len(releases) - 1; i >= 0; i-- {
+			releases[i]()
+		}
+	}
+	if userID != 0 {
+		release, err := r.users.acquire(ctx, timer.C, tenantKey{kindUser, userID})
+		if err != nil {
+			return nil, err
+		}
+		releases = append(releases, release)
+	}
+	if installationID != 0 {
+		release, err := r.installations.acquire(ctx, timer.C, tenantKey{kindInstallation, installationID})
+		if err != nil {
+			releaseAll()
+			return nil, err
+		}
+		releases = append(releases, release)
+	}
 	select {
 	case r.slots <- struct{}{}:
-		return func() { <-r.slots }, nil
+		releases = append(releases, func() { <-r.slots })
+		return releaseAll, nil
 	case <-ctx.Done():
+		releaseAll()
 		return nil, ctx.Err()
 	case <-timer.C:
+		releaseAll()
 		return nil, ErrBusy
 	}
 }
 
-// Validate checks a query without reading events.
-func (r *Runner) Validate(ctx context.Context, query json.RawMessage) error {
-	release, err := r.acquire(ctx)
+// Validate checks a query without reading events. The caller's installation and user share the tenant limits.
+func (r *Runner) Validate(ctx context.Context, installationID, userID int64, query json.RawMessage) error {
+	release, err := r.acquire(ctx, installationID, userID)
 	if err != nil {
 		return err
 	}
@@ -70,7 +106,7 @@ func (r *Runner) Validate(ctx context.Context, query json.RawMessage) error {
 
 // Calculate streams events within a read-only transaction whose timeout covers the whole stream.
 func (r *Runner) Calculate(ctx context.Context, db pgx.Tx, installationID, userID int64, organization string, query json.RawMessage) (json.RawMessage, error) {
-	release, err := r.acquire(ctx)
+	release, err := r.acquire(ctx, installationID, userID)
 	if err != nil {
 		return nil, err
 	}

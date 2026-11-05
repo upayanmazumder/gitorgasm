@@ -65,13 +65,25 @@ func (q scoreQuery) withoutAsOf() scoreQuery {
 	return q
 }
 
+// sameQuery reports whether a stored preset body encodes to exactly want. Differences in key order
+// or whitespace do not count; a number written differently only costs a redundant validation.
+func sameQuery(stored, want json.RawMessage) bool {
+	dec := json.NewDecoder(bytes.NewReader(stored))
+	dec.UseNumber()
+	var q scoreQuery
+	if err := dec.Decode(&q); err != nil || q == nil || dec.More() {
+		return false
+	}
+	return bytes.Equal(q.encode(), want)
+}
+
 func (q scoreQuery) encode() json.RawMessage {
 	data, _ := json.Marshal(q) // Values came from json.Decoder, so encoding cannot fail.
 	return data
 }
 
-func (s *Handler) validateQuery(w http.ResponseWriter, r *http.Request, query json.RawMessage) bool {
-	err := s.Scorer.Validate(r.Context(), query)
+func (s *Handler) validateQuery(w http.ResponseWriter, r *http.Request, installationID, userID int64, query json.RawMessage) bool {
+	err := s.Scorer.Validate(r.Context(), installationID, userID, query)
 	if err != nil {
 		s.scoreError(w, r, err)
 	}

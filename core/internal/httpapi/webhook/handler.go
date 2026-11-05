@@ -2,6 +2,7 @@ package webhook
 
 import (
 	"log/slog"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,4 +16,6 @@ type Handler struct {
 	Jobs *river.Client[pgx.Tx]
 	Cfg  *config.Config
 	Log  *slog.Logger
+
+	bodyTimeout time.Duration // zero means webhookBodyTimeout; tests shorten it
 }
