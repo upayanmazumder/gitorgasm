@@ -1,6 +1,6 @@
 # Image publish gate
 
-Finding: a same-repository pull request could push the mutable `latest` tag of `ghcr.io/upayanmazumder/gitorgasm/core`, which Argo CD Image Updater deploys to production (ADR 0012). This page records what the repository files do now and what only the owner can set in GitHub. **The finding is not closed by the files alone.**
+Finding: a same-repository pull request can request package write access and replace the mutable `latest` image. Production now checks a signed publication attestation before admitting Gitorgasm core workloads. Registry write access alone no longer permits unsigned images to start. This does not protect against compromise of the trusted main-branch publisher or cluster administration.
 
 ## What the files do
 
@@ -11,7 +11,7 @@ Finding: a same-repository pull request could push the mutable `latest` tag of `
 
 ## The limit of file-level controls
 
-For a `pull_request` run, GitHub uses the workflow files of the PR head ([workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)). A same-repository PR author can edit `ci.yml` and `image-publish.yml`, remove the `if` conditions, and ask for `packages: write`. No change to these files can stop that. The controls below, which live in GitHub settings, are what stop it.
+For a `pull_request` run, GitHub uses workflow files from the PR head ([workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)). A same-repository PR author can edit workflow conditions and request `packages: write`. File-level publishing guards do not prevent that. The cluster admission policy is the independent deployment boundary.
 
 ## Settings applied in GitHub (2026-11-05)
 
@@ -22,10 +22,19 @@ These settings live in GitHub, not in files. Re-check them if the repository is 
 3. **Actions settings**: the default workflow `GITHUB_TOKEN` permission is read-only.
 4. **Ruleset `main protection`**: it requires review from code owners. CODEOWNERS lists `/.github/workflows/` and `/deploy/`. Repository administrators can bypass the ruleset. This protects `main`, not a PR run.
 
-## Still open
+## Enforced publication check
 
-1. **Deploy-time publication check**: the publish job signs each image digest and attaches a signed publication attestation. Its type is `https://gitorgasm.upayan.dev/attestations/image-publish/v1`. The predicate records the repository, commit, ref, and image digest. This is not a SLSA attestation. The certificate identifies `.github/workflows/image-publish.yml@refs/heads/main`. Cluster ADR 0010 installs Sigstore policy-controller for the `gitorgasm` namespace only. Its initial warning mode does not block unsigned images. Cosign v3 image-signature bundles failed the first live admission check because the controller does not support that format for image signatures. The controller supports signed attestation bundles instead. Enforcement must wait until signed admission succeeds and unsigned admission produces a warning. A separate cluster PR then enables enforcement and rejects unsigned core images.
-2. **Credential that only the environment can read**: a push credential stored as an `image-publish` environment secret would make the environment a real gate. GHCR accepts only `GITHUB_TOKEN` and personal access tokens. A classic token with `write:packages` also forces the `repo` scope in the token form. That scope gives full control of the owner's private repositories, which is a worse exposure than the one it would close. No such credential was created. Revisit this if GHCR accepts a narrower credential.
+The publish job signs the digest and attaches a signed publication attestation of type `https://gitorgasm.upayan.dev/attestations/image-publish/v1`. Its predicate records the repository, commit, ref, and image digest. This records publication, not SLSA build provenance or SBOM verification.
+
+The cluster policy verifies the signature, certificate identity, subject digest, and transparency proof. It requires issuer `https://token.actions.githubusercontent.com` and subject `https://github.com/upayanmazumder/gitorgasm/.github/workflows/image-publish.yml@refs/heads/main`. Predicate constraints require repository `upayanmazumder/gitorgasm` and ref `refs/heads/main`. Another workflow or PR ref does not qualify.
+
+Cluster [ADR 0010](https://github.com/upayanmazumder/cluster/blob/main/docs/adr/0010-gitorgasm-image-signatures.md) records the controller and policy. Enforcement applies only to the exact core image repository in namespace `gitorgasm`. Workload webhooks fail closed. Postgres and other namespaces remain outside this image policy.
+
+Live server-side dry-runs admitted attested index `781672f7fdd17a459770e7a4937b06823fffb467318bdb68f5fa7be2acbfb6cd`. They rejected unsigned index `7410b54ac65caa9dc0ce7298fecf2d8b2dc58975c29f18c97c7ffb21630e18c9`. These checks created no pods. Independent cosign verification also rejected an incorrect workflow identity. That identity check was not a separate live admission test.
+
+## Publishing credential
+
+Publishing still uses `GITHUB_TOKEN`. No separate personal access token or environment secret was created. The environment rule does not restrict that token. Deployment security therefore depends on cluster verification, not on registry write restrictions alone.
 
 ## Image Updater and tags: left unchanged
 
