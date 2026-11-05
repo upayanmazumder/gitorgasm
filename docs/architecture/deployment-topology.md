@@ -151,7 +151,11 @@ Staging cost note: a second copy of the budget costs 200m CPU and 512Mi memory r
 
 1. Job `image` runs after job `core` passes. It builds `core/Dockerfile` with buildx when core, contracts, or its workflows change. It has `contents: read` only and never pushes.
 2. On a push to `main`, job `image-publish` (`.github/workflows/image-publish.yml`, environment `image-publish`, the only job with `packages: write`) logs in to GHCR with `GITHUB_TOKEN` and pushes `ghcr.io/upayanmazumder/gitorgasm/core`. Tags: `sha-<full commit SHA>` and `latest`. `VERSION` build arg = commit SHA (visible in the `app_version` log field). Provenance (`mode=max`) and SBOM are attached.
+   The publish job also signs a publication attestation for the pushed digest using GitHub OIDC. Its certificate identifies `image-publish.yml@refs/heads/main`.
 3. Argo CD Image Updater tracks the digest of `latest` with write-back method `argocd`. It sets the kustomize image override on the Application and makes no git commit. A push to `main` rolls api and worker in approximately 2 minutes.
+4. Sigstore policy-controller verifies the signed publication attestation before core workloads start. The exact signer, repository, ref, and subject digest must match. Unsigned core images are rejected. The webhook covers namespace `gitorgasm` only and fails closed.
+
+Postgres is outside the core-image policy. Its desired image uses the canonical registry name and digest because the admission mutator normalizes all container images. The pinned digest matches the existing PostgreSQL 18.6 image and prevents repeated Argo CD drift.
 
 The cluster needs pull access to GHCR. If package visibility changes to private, add a SOPS-encrypted image pull secret in `deploy/argocd` and reference it in both Deployments before a rollout; otherwise image pulls fail. Risk R20 in `risk-register.md` tracks availability. Settings that files cannot enforce (environment branch rule, GHCR package access, workflow review, provenance at deploy time) are listed in `image-publish-gate.md`.
 
