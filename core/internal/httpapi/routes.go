@@ -21,6 +21,7 @@ func (s *Server) routes() *http.ServeMux {
 	webhooks := &webhook.Handler{Pool: s.Pool, Jobs: s.Jobs, Cfg: s.Cfg, Log: s.Log}
 	administration := &administration.Handler{
 		Pool: s.Pool, Jobs: s.Jobs, GitHub: s.GitHub, Sealer: s.Sealer, Log: s.Log, Now: s.Now,
+		Search: administration.NewSearchGuard(s.Now),
 	}
 
 	mux := http.NewServeMux()

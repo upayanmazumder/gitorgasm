@@ -15,6 +15,16 @@ import (
 
 var ErrIdempotencyConflict = errors.New("idempotency key already used for another request")
 
+// Outstanding (queued or running) operations are capped so one tenant cannot build a backlog
+// that delays every other tenant in the shared administration queue.
+const (
+	MaxOutstandingPerActor        = 3
+	MaxOutstandingPerInstallation = 5
+)
+
+// ErrOperationLimit reports that the actor or installation already has too many outstanding operations.
+var ErrOperationLimit = errors.New("too many outstanding administration operations")
+
 // NewOperation contains intent and a non-secret session binding, never a user token.
 type NewOperation struct {
 	ID             string
@@ -98,6 +108,13 @@ const summaryColumns = `o.id, o.kind, receipt.status, o.team_slug, o.role,
 // created operation does not have its transactional River job attached yet.
 func InsertOperation(ctx context.Context, tx pgx.Tx, in NewOperation) (Operation, bool, error) {
 	key := strings.ToLower(in.IdempotencyKey)
+	// Serialize submissions per actor and per installation so the cap check below cannot race.
+	// Fixed order (actor, then installation) rules out lock cycles between submitters.
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('gitorgasm:administration:submit:actor:' || $1::bigint::text, 0)),
+		pg_advisory_xact_lock(hashtextextended('gitorgasm:administration:submit:installation:' || $2::bigint::text, 0))`,
+		in.ActorUserID, in.InstallationID); err != nil {
+		return Operation{}, false, err
+	}
 	var id string
 	err := tx.QueryRow(ctx, `
 		INSERT INTO administration_operations
@@ -132,6 +149,9 @@ func InsertOperation(ctx context.Context, tx pgx.Tx, in NewOperation) (Operation
 		return Operation{}, false, err
 	}
 	if created {
+		if err := checkOutstanding(ctx, tx, in.ActorUserID, in.InstallationID, id); err != nil {
+			return Operation{}, false, err
+		}
 		if _, err := tx.Exec(ctx, `INSERT INTO administration_targets (operation_id, position, login)
 			SELECT $1, (ordinality - 1)::integer, login
 			FROM unnest($2::text[]) WITH ORDINALITY AS targets(login, ordinality)`, id, in.Logins); err != nil {
@@ -140,6 +160,25 @@ func InsertOperation(ctx context.Context, tx pgx.Tx, in NewOperation) (Operation
 	}
 	op, err := readOperation(ctx, tx, rawView, `o.id = $1`, []any{id}, false)
 	return op, created, err
+}
+
+// checkOutstanding counts other live queued or running receipts; abandoned ones (interruptedView)
+// do not hold a slot, so a lost job can never lock a tenant out permanently.
+func checkOutstanding(ctx context.Context, q store.DBTX, actorUserID, installationID int64, self string) error {
+	var actor, installation int
+	err := q.QueryRow(ctx, `SELECT count(*) FILTER (WHERE o.actor_user_id = $1),
+			count(*) FILTER (WHERE o.installation_id = $2)
+		FROM administration_operations o`+interruptedView+`
+		WHERE o.id <> $3 AND o.status IN ('queued', 'running') AND NOT stopped.interrupted
+			AND (o.actor_user_id = $1 OR o.installation_id = $2)`, actorUserID, installationID, self).
+		Scan(&actor, &installation)
+	if err != nil {
+		return err
+	}
+	if actor >= MaxOutstandingPerActor || installation >= MaxOutstandingPerInstallation {
+		return ErrOperationLimit
+	}
+	return nil
 }
 
 // SetJobID is called after InsertTx and before the submission transaction commits.

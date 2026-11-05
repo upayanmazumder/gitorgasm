@@ -22,6 +22,16 @@ type Execution struct {
 	Organization   string `json:"-"`
 }
 
+// OperationInstallation returns the installation that scopes the worker's advisory lock.
+func OperationInstallation(ctx context.Context, q store.DBTX, id string) (int64, error) {
+	var installationID int64
+	err := q.QueryRow(ctx, `SELECT installation_id FROM administration_operations WHERE id = $1`, id).Scan(&installationID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, store.ErrNotFound
+	}
+	return installationID, err
+}
+
 // LoadExecution intentionally does not require a current grant: the worker must be
 // able to finalize stopped work after access or a session has been revoked. It does
 // not authorize GitHub actions; the same live Authorizer used by HTTP gates those.
@@ -44,7 +54,7 @@ func LoadExecution(ctx context.Context, q store.DBTX, id string) (Execution, err
 	return execution, err
 }
 
-// ClaimOperation never reclaims running work. The worker holds its global advisory
+// ClaimOperation never reclaims running work. The worker holds its installation advisory
 // lock and interrupts an unexpected running receipt rather than replaying writes.
 func ClaimOperation(ctx context.Context, q store.DBTX, id string) (bool, error) {
 	tag, err := q.Exec(ctx, `UPDATE administration_operations SET status = 'running', started_at = now()

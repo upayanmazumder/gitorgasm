@@ -2,6 +2,7 @@ package administration
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/upayanmazumder/gitorgasm/core/internal/httpapi/response"
@@ -54,22 +55,38 @@ func (h *Handler) SearchUsers(w http.ResponseWriter, r *http.Request, u *identit
 		return
 	}
 	c, ok := directoryCursor(w, r, u.UserID, "users", q)
-	if !ok || h.authorize(w, r, u, true) == nil {
+	if !ok {
 		return
 	}
-	// GitHub public search must never receive an installation or user token.
-	users, next, incomplete, err := h.GitHub.SearchUsersPage(r.Context(), q+" type:user", c.Page)
-	if err != nil {
-		h.githubError(w, r, err)
+	access := h.authorize(w, r, u, true)
+	if access == nil {
 		return
 	}
-	data := make([]directoryUser, 0, len(users))
-	for _, user := range users {
+	// The result is public data, so it is shared across tenants by (q, page).
+	key := q + "\x00" + strconv.Itoa(c.Page)
+	result, cached := h.Search.cache.Get(key)
+	if !cached {
+		// Unauthenticated search shares one small upstream quota; spend it fairly. Only cache
+		// misses reach GitHub, so only misses are charged.
+		if !h.Search.allow(w, r, u.UserID, access.InstallationID) {
+			return
+		}
+		// GitHub public search must never receive an installation or user token.
+		users, next, incomplete, err := h.GitHub.SearchUsersPage(r.Context(), q+" type:user", c.Page)
+		if err != nil {
+			h.githubError(w, r, err)
+			return
+		}
+		result = searchResult{users: users, next: next, incomplete: incomplete}
+		h.Search.cache.Set(key, result)
+	}
+	data := make([]directoryUser, 0, len(result.users))
+	for _, user := range result.users {
 		if user.Type == "User" {
 			data = append(data, directoryUser{ID: user.ID, Login: user.Login})
 		}
 	}
-	response.JSON(w, http.StatusOK, searchPage{userPage{data, nextDirectoryCursor(c, next)}, incomplete})
+	response.JSON(w, http.StatusOK, searchPage{userPage{data, nextDirectoryCursor(c, result.next)}, result.incomplete})
 }
 
 func (h *Handler) Members(w http.ResponseWriter, r *http.Request, u *identity.SessionUser) {

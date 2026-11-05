@@ -8,11 +8,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 
+	"github.com/upayanmazumder/gitorgasm/core/internal/administration"
+	"github.com/upayanmazumder/gitorgasm/core/internal/github/models"
 	"github.com/upayanmazumder/gitorgasm/core/internal/jobs/queue"
 	"github.com/upayanmazumder/gitorgasm/core/internal/secure"
 	adminstore "github.com/upayanmazumder/gitorgasm/core/internal/store/administration"
+	"github.com/upayanmazumder/gitorgasm/core/internal/store/tenancy"
 )
 
 func assertAdminResults(t *testing.T, a *adminFixture, id, status, results string) {
@@ -439,5 +443,63 @@ func TestAdministrationMembershipChangedDuringRoleWriteIsUnknown(t *testing.T) {
 				t.Fatalf("ambiguous role write replayed: %v", writes)
 			}
 		})
+	}
+}
+
+func TestAdministrationLockDoesNotBlockAnotherInstallation(t *testing.T) {
+	f := newOrgGitHub()
+	f.user("first", 20, "User")
+	a := newAdminFixture(t, f)
+	ctx := context.Background()
+	other := int64(20)
+	if err := tenancy.UpsertInstallation(ctx, a.pool, &models.Installation{ID: other, RepositorySelection: "all", Account: &models.Account{ID: 200, Login: "globex", Type: "Organization"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := tenancy.ReplaceUserInstallations(ctx, a.pool, a.userID, []int64{instID, other}); err != nil {
+		t.Fatal(err)
+	}
+	first := a.submit(t, `{"kind":"invite","logins":["first"]}`)
+	req, err := administration.ParseRequest([]byte(`{"kind":"invite","logins":["first"]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondID := secure.RandomToken()
+	err = pgx.BeginFunc(ctx, a.pool, func(tx pgx.Tx) error {
+		_, _, err := adminstore.InsertOperation(ctx, tx, adminstore.NewOperation{
+			ID: secondID, InstallationID: other, AccountID: 200, ActorUserID: a.userID, SessionHash: secure.Hash(actorSession),
+			IdempotencyKey: "00000000-0000-4000-8000-0000000000aa", Fingerprint: req.Fingerprint(),
+			Kind: req.Kind, Logins: req.Logins,
+		})
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	entered, release := make(chan struct{}), make(chan struct{})
+	f.onWrite = func(string) { close(entered); <-release }
+	done := make(chan error, 1)
+	go func() {
+		done <- a.worker.Work(ctx, &river.Job[queue.AdministerOrganization]{Args: queue.AdministerOrganization{OperationID: first}})
+	}()
+	select {
+	case <-entered:
+	case <-time.After(10 * time.Second):
+		t.Fatal("first worker never wrote")
+	}
+	replica := *a.worker
+	err = replica.Work(ctx, &river.Job[queue.AdministerOrganization]{Args: queue.AdministerOrganization{OperationID: secondID}})
+	var snooze *river.JobSnoozeError
+	if errors.As(err, &snooze) {
+		close(release)
+		t.Fatalf("another installation's batch was snoozed by the lock: %v", err)
+	}
+	status, _ := a.results(t, secondID)
+	if status == "queued" {
+		close(release)
+		t.Fatal("another installation's batch never started while the first was running")
+	}
+	close(release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
 	}
 }

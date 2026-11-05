@@ -317,6 +317,10 @@ paths:
         authentication. Input is lowercased and spaces collapsed; a fixed type:user
         restriction is appended. Cursors are bound to actor, organization and normalized
         query. No caller-provided GitHub URL is accepted.
+        Results are cached for 45 seconds by normalized query and page. Uncached searches
+        spend the shared unauthenticated GitHub quota, so each actor may make 4 and each
+        installation 6 per minute; beyond that the response is 429 search_rate_limited
+        with Retry-After.
       parameters:
         - name: q
           in: query
@@ -333,6 +337,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
         '502': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
@@ -424,6 +429,9 @@ paths:
         Operation, targets, River job and audit event commit in one transaction.
         The same actor/organization/key and canonical payload returns the same receipt
         without another job. Changed payload returns 409. No automatic mutation retry.
+        An actor may have at most 3, and an installation at most 5, queued or running
+        operations; further new submissions return 429 too_many_operations with
+        Retry-After. Replays of an existing key are unaffected.
       parameters:
         - name: Idempotency-Key
           in: header
@@ -467,6 +475,7 @@ paths:
         '413': { $ref: '#/components/responses/Error' }
         '415': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
         '502': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }

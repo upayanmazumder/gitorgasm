@@ -119,6 +119,9 @@ func (h *Handler) Submit(w http.ResponseWriter, r *http.Request, u *identity.Ses
 		switch {
 		case errors.Is(err, adminstore.ErrIdempotencyConflict):
 			response.Error(w, r, http.StatusConflict, "idempotency_conflict", "this idempotency key was already used for a different request")
+		case errors.Is(err, adminstore.ErrOperationLimit):
+			w.Header().Set("Retry-After", "60")
+			response.Error(w, r, http.StatusTooManyRequests, "too_many_operations", "too many administration operations are still queued or running; wait for one to finish")
 		case errors.Is(err, errTeamNotFound):
 			response.Error(w, r, http.StatusUnprocessableEntity, "team_not_found", "the selected team is no longer available")
 		case errors.Is(err, store.ErrNotFound):
