@@ -11,6 +11,7 @@ info:
     - Lists use an opaque `cursor`; stored lists use keysets and live GitHub directories use bounded upstream pages. `next_cursor` is null on the last supported page.
     - State-changing requests must send an `Origin` header that equals the frontend origin.
     - Organizations the caller cannot access return 404, not 403.
+    - Access to an organization requires an active GitHub organization membership (or ownership of a personal account). A session re-confirms this with GitHub when the last confirmation is older than 15 minutes. Any authenticated request can then return 503 `github_unavailable` or `github_rate_limited` (with `Retry-After`) when GitHub cannot confirm it, or 401 `github_reauthentication_required` when the stored GitHub token is expired or rejected; sign in again through `/v1/auth/login`.
 servers:
   - url: /
 security:

@@ -52,10 +52,14 @@ type SessionUser struct {
 	Login       string  `json:"login"`
 	Name        *string `json:"name"`
 	AvatarURL   *string `json:"avatar_url"`
+	// GrantsStale reports that GitHub has not confirmed the user's installation grants
+	// through this session within the maximum age passed to LookupSession.
+	GrantsStale bool `json:"-"`
 }
 
 // LookupSession updates last_seen_at at most once per minute to limit writes.
-func LookupSession(ctx context.Context, q store.DBTX, idHash []byte) (*SessionUser, error) {
+// maxGrantAge decides SessionUser.GrantsStale against the database clock.
+func LookupSession(ctx context.Context, q store.DBTX, idHash []byte, maxGrantAge time.Duration) (*SessionUser, error) {
 	var u SessionUser
 	err := q.QueryRow(ctx, `
 		WITH s AS (
@@ -63,10 +67,11 @@ func LookupSession(ctx context.Context, q store.DBTX, idHash []byte) (*SessionUs
 		   WHERE id_hash = $1 AND expires_at > now() AND last_seen_at < now() - interval '1 minute'
 		  RETURNING user_id
 		)
-		SELECT u.id, u.github_id, u.login, u.name, u.avatar_url
+		SELECT u.id, u.github_id, u.login, u.name, u.avatar_url,
+		       ss.grants_verified_at <= now() - make_interval(secs => $2)
 		  FROM sessions ss JOIN users u ON u.id = ss.user_id
-		 WHERE ss.id_hash = $1 AND ss.expires_at > now()`, idHash).
-		Scan(&u.UserID, &u.GitHubID, &u.Login, &u.Name, &u.AvatarURL)
+		 WHERE ss.id_hash = $1 AND ss.expires_at > now()`, idHash, maxGrantAge.Seconds()).
+		Scan(&u.UserID, &u.GitHubID, &u.Login, &u.Name, &u.AvatarURL, &u.GrantsStale)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, store.ErrNotFound
 	}
@@ -76,6 +81,12 @@ func LookupSession(ctx context.Context, q store.DBTX, idHash []byte) (*SessionUs
 // DeleteSession removes one session.
 func DeleteSession(ctx context.Context, q store.DBTX, idHash []byte) error {
 	_, err := q.Exec(ctx, `DELETE FROM sessions WHERE id_hash = $1`, idHash)
+	return err
+}
+
+// MarkGrantsVerified records that GitHub just confirmed the grants for this session.
+func MarkGrantsVerified(ctx context.Context, q store.DBTX, idHash []byte) error {
+	_, err := q.Exec(ctx, `UPDATE sessions SET grants_verified_at = now() WHERE id_hash = $1`, idHash)
 	return err
 }
 

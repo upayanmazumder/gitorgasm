@@ -16,7 +16,6 @@ import (
 	"github.com/upayanmazumder/gitorgasm/core/internal/secure"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store/audit"
 	"github.com/upayanmazumder/gitorgasm/core/internal/store/identity"
-	"github.com/upayanmazumder/gitorgasm/core/internal/store/tenancy"
 )
 
 // Login starts browser-bound sign-in with PKCE and ignores untrusted setup parameters.
@@ -63,7 +62,8 @@ func (s *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 		s.githubError(w, r, err)
 		return
 	}
-	insts, err := s.GitHub.ListUserInstallations(ctx, tok.AccessToken)
+	// GET /user/installations also lists repository collaborators; keep verified members and owners only.
+	insts, err := s.verifiedInstallations(ctx, tok.AccessToken, user.ID)
 	if err != nil {
 		s.githubError(w, r, err)
 		return
@@ -75,14 +75,8 @@ func (s *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
-		ids := make([]int64, 0, len(insts))
-		for i := range insts {
-			if err := tenancy.UpsertInstallation(ctx, tx, &insts[i]); err != nil {
-				return err
-			}
-			ids = append(ids, insts[i].ID)
-		}
-		if err := tenancy.ReplaceUserInstallations(ctx, tx, userID, ids); err != nil {
+		ids, err := storeGrants(ctx, tx, userID, insts)
+		if err != nil {
 			return err
 		}
 		if err := s.createSession(ctx, tx, sessionID, userID, tok); err != nil {
