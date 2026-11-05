@@ -54,7 +54,7 @@ func (s *Handler) RequireSession(next func(http.ResponseWriter, *http.Request, *
 			return
 		}
 		sessionHash := secure.Hash(c.Value)
-		u, err := identity.LookupSession(r.Context(), s.Pool, sessionHash)
+		u, err := identity.LookupSession(r.Context(), s.Pool, sessionHash, GrantMaxAge)
 		if errors.Is(err, store.ErrNotFound) {
 			s.clearCookie(w, sessionCookie)
 			response.Error(w, r, http.StatusUnauthorized, "unauthenticated", "session expired")
@@ -65,6 +65,9 @@ func (s *Handler) RequireSession(next func(http.ResponseWriter, *http.Request, *
 			return
 		}
 		u.SessionHash = sessionHash
+		if u.GrantsStale && !s.reverifyGrants(w, r, u) {
+			return
+		}
 		next(w, r, u)
 	}
 }

@@ -49,6 +49,10 @@ func TestInstallationReturnRefreshesOnlyGitHubGrants(t *testing.T) {
 			}
 			w.Header().Set("Link", "<http://"+r.Host+"/user/installations?page=2>; rel=\"next\"")
 			_, _ = w.Write([]byte(`{"installations":[{"id":30,"repository_selection":"all","account":{"id":300,"login":"fresh","type":"Organization"}}]}`))
+		case "/user/memberships/orgs/fresh":
+			_, _ = w.Write([]byte(`{"state":"active","role":"member","organization":{"id":300,"login":"fresh"},"user":{"id":1,"login":"alice"}}`))
+		case "/user/memberships/orgs/second":
+			_, _ = w.Write([]byte(`{"state":"active","role":"admin","organization":{"id":400,"login":"second"},"user":{"id":1,"login":"alice"}}`))
 		default:
 			t.Errorf("unexpected GitHub call %s", r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
