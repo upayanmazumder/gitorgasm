@@ -171,6 +171,7 @@ jobs:
     permissions:
       contents: read
       packages: write # the only job with a packages scope; push to main only
+      id-token: write # keyless image signature
     uses: ./.github/workflows/image-publish.yml
 
   ci:
