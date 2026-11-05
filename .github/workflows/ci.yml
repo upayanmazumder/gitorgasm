@@ -41,6 +41,7 @@ jobs:
               - .github/workflows/ci.yml
               - .github/workflows/core.yml
               - .github/workflows/image.yml
+              - .github/workflows/image-publish.yml
               - core/**
               - contracts/**
               - scoring/**
@@ -158,16 +159,24 @@ jobs:
     needs: [changes, core]
     if: needs.changes.outputs.core == 'true'
     permissions:
-      contents: read
-      packages: write # push to GHCR on main only
+      contents: read # build only, no packages scope on any event
     uses: ./.github/workflows/image.yml
-    with:
-      push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+
+  image-publish:
+    name: Image publish
+    needs: [changes, core, image]
+    if: >-
+      needs.changes.outputs.core == 'true' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write # the only job with a packages scope; push to main only
+    uses: ./.github/workflows/image-publish.yml
 
   ci:
     name: CI
     if: always()
-    needs: [changes, commits, tooling, workflows, core, web, scoring, bench, manifests, image]
+    needs: [changes, commits, tooling, workflows, core, web, scoring, bench, manifests, image, image-publish]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
