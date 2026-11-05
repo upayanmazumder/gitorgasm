@@ -34,13 +34,21 @@ func (*Worker) Timeout(*river.Job[queue.AdministerOrganization]) time.Duration {
 	return 15 * time.Minute
 }
 
-// A single key, not an installation key: writes are serialized across queues and replicas.
+// One key per installation: writes for an installation are serialized across queues and replicas,
+// while other installations proceed. Global pacing is the queue's single worker per process.
 const administrationLockKey = `hashtextextended('gitorgasm:administration:' || $1::bigint::text, 0)`
 
 var errExecution = errors.New("organization administration execution failed")
 
 func (w *Worker) Work(ctx context.Context, job *river.Job[queue.AdministerOrganization]) error {
-	err := execution.WithSessionLock(ctx, w.Pool, administrationLockKey, 0, func(conn *pgxpool.Conn) error {
+	installationID, err := adminstore.OperationInstallation(ctx, w.Pool, job.Args.OperationID)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil // A deleted/missing receipt cannot authorize any work.
+	}
+	if err != nil {
+		return errExecution
+	}
+	err = execution.WithSessionLock(ctx, w.Pool, administrationLockKey, installationID, func(conn *pgxpool.Conn) error {
 		return w.execute(ctx, conn, job.Args.OperationID)
 	})
 	if err == nil {

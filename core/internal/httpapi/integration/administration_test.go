@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -246,6 +247,8 @@ func TestAdministrationReceiptsListOnlyTheActorsRecentOperations(t *testing.T) {
 		if rec := h.do("POST", path, alice, []byte(`{"kind":"invite","logins":["octo"]}`), adminHeaders(key)); rec.Code != http.StatusAccepted {
 			t.Fatalf("submit %d = %d %s", i, rec.Code, rec.Body)
 		}
+		// Finish each receipt so the outstanding-operation cap does not apply to this history test.
+		h.exec(`UPDATE administration_operations SET status = 'completed', started_at = now(), completed_at = now() WHERE status = 'queued'`)
 	}
 	if rec := h.do("POST", path, carol, []byte(`{"kind":"invite","logins":["octo"]}`), adminHeaders("00000000-0000-4000-8000-000000000099")); rec.Code != http.StatusAccepted {
 		t.Fatalf("carol submit = %d", rec.Code)
@@ -620,5 +623,70 @@ func TestAdministrationDirectoryCursorPagesAreBoundedBeforeAuthorization(t *test
 	}
 	if calls, _, _, _ := gh.snapshot(); len(calls) != 0 {
 		t.Fatalf("out-of-bounds cursors reached GitHub: %q", calls)
+	}
+}
+
+func TestAdministrationSearchBurstDoesNotStarveAnotherTenant(t *testing.T) {
+	h, gh := newAdminHarness(t)
+	alice := h.seedActor(1, "alice", "token-alice")
+	h.seedTenant(4, "globex", 200, 20)
+	bob := h.addSession(h.userID(4), "token-bob")
+	gh.set(func(f *adminGitHub) { f.roles["token-alice"], f.roles["token-bob"] = "admin", "admin" })
+	search := func(session, org, q string) *httptest.ResponseRecorder {
+		return h.do("GET", "/v1/organizations/"+org+"/administration/users?q="+q, session, nil, nil)
+	}
+	upstream := func() int { _, _, auth, _ := gh.snapshot(); return len(auth) }
+
+	for _, q := range []string{"aa", "bb", "cc", "dd"} {
+		if rec := search(alice, "acme", q); rec.Code != http.StatusOK {
+			t.Fatalf("search %q = %d %s", q, rec.Code, rec.Body)
+		}
+	}
+	// A repeated (q, page) is served from the cache and does not spend quota.
+	if rec := search(alice, "acme", "aa"); rec.Code != http.StatusOK || upstream() != 4 {
+		t.Fatalf("cached search = %d with %d upstream calls", rec.Code, upstream())
+	}
+	rec := search(alice, "acme", "ee")
+	if rec.Code != http.StatusTooManyRequests || decode[adminError](t, rec).Error.Code != "search_rate_limited" || rec.Header().Get("Retry-After") == "" {
+		t.Fatalf("burst search = %d %s retry-after=%q", rec.Code, rec.Body, rec.Header().Get("Retry-After"))
+	}
+	if upstream() != 4 {
+		t.Fatalf("limited request reached GitHub: %d calls", upstream())
+	}
+	// Another tenant still gets an upstream search.
+	if rec := search(bob, "globex", "ff"); rec.Code != http.StatusOK || upstream() != 5 {
+		t.Fatalf("other tenant search = %d with %d upstream calls: %s", rec.Code, upstream(), rec.Body)
+	}
+}
+
+func TestAdministrationSubmitCapsOutstandingOperationsPerTenant(t *testing.T) {
+	h, gh := newAdminHarness(t)
+	alice := h.seedActor(1, "alice", "token-alice")
+	h.seedTenant(4, "globex", 200, 20)
+	bob := h.addSession(h.userID(4), "token-bob")
+	gh.set(func(f *adminGitHub) { f.roles["token-alice"], f.roles["token-bob"] = "admin", "admin" })
+	submit := func(session, org string, n int) *httptest.ResponseRecorder {
+		key := fmt.Sprintf("00000000-0000-4000-8000-%012d", n)
+		return h.do("POST", "/v1/organizations/"+org+"/administration/operations", session,
+			[]byte(`{"kind":"invite","logins":["octo-cat"]}`), adminHeaders(key))
+	}
+	for n := 1; n <= 3; n++ {
+		if rec := submit(alice, "acme", n); rec.Code != http.StatusAccepted {
+			t.Fatalf("submit %d = %d %s", n, rec.Code, rec.Body)
+		}
+	}
+	rec := submit(alice, "acme", 4)
+	if rec.Code != http.StatusTooManyRequests || decode[adminError](t, rec).Error.Code != "too_many_operations" || rec.Header().Get("Retry-After") == "" {
+		t.Fatalf("submit over cap = %d %s", rec.Code, rec.Body)
+	}
+	if rec := submit(alice, "acme", 1); rec.Code != http.StatusAccepted {
+		t.Fatalf("replay at cap = %d %s", rec.Code, rec.Body)
+	}
+	if rec := submit(bob, "globex", 5); rec.Code != http.StatusAccepted {
+		t.Fatalf("other tenant at cap = %d %s", rec.Code, rec.Body)
+	}
+	var jobs int
+	if err := h.pool.QueryRow(context.Background(), `SELECT count(*) FROM river_job WHERE kind = 'administer_organization'`).Scan(&jobs); err != nil || jobs != 4 {
+		t.Fatalf("jobs = %d (%v), want 4", jobs, err)
 	}
 }

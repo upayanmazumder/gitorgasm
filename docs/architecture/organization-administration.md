@@ -117,7 +117,14 @@ so later team removal does not invalidate a historical idempotent replay.
 
 User search accepts 2–64 ASCII letters, digits, underscores, hyphens and spaces,
 normalizes case/spaces, and appends a fixed `type:user` restriction. GitHub public
-user search receives **no Authorization header**. Directory requests fetch one
+user search receives **no Authorization header**. That unauthenticated search shares
+one small GitHub quota across all tenants, so the API caches results for 45 seconds by
+(normalized query, page) and charges only cache misses against a per-actor (4 per minute)
+and per-installation (6 per minute) allowance. A spent allowance returns `429
+search_rate_limited` with `Retry-After`. Limits and cache are in-process per API replica
+(`httpapi/administration/search_guard.go`), so N replicas allow N times as much, and the
+anonymous quota is still finite: many distinct tenants can still exhaust it together.
+Directory requests fetch one
 30-item page, not every page. Opaque base64url cursors bind actor, organization,
 resource and normalized query/role; search pages are bounded to 34 (GitHub's
 1,000-result window), other directory pages to 10,000. They never carry an
@@ -128,10 +135,15 @@ team metadata and user emails are not included in responses.
 ## Execution and durable failure behavior
 
 The dedicated administration queue has one worker per process, `MaxAttempts: 1`
-and a 15-minute execution timeout. A global PostgreSQL advisory lock serializes
-batches across replicas. Writes are serial with at least one second before each
-target, including the first target of a new batch; this preserves pacing when a
-different replica takes the next batch. After spacing and before each target,
+and a 15-minute execution timeout. A PostgreSQL advisory lock keyed by installation
+serializes batches of one installation across replicas; other installations are not
+blocked by it. Submission caps outstanding (queued or running, not abandoned) operations
+at 3 per actor and 5 per installation, enforced in the insert transaction under
+per-actor and per-installation advisory transaction locks; excess new submissions return
+`429 too_many_operations`, and idempotent replays are exempt. Because each process still
+has one administration worker, a running batch delays others by at most one batch's
+duration, and the caps bound each tenant's backlog. Writes are serial with at least one
+second before each target, including the first target of a new batch. After spacing and before each target,
 revalidate the exact session, grant, token, installation permissions and live
 Owner status. Workers claim a batch once and persist a target as running
 **before** its external write. Restart/duplicate jobs must not replay writes.

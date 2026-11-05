@@ -404,3 +404,104 @@ func TestSafeOutcomeMessagesAndInternalCredentialPrivacy(t *testing.T) {
 		t.Fatalf("internal authorization data serialized: %s", data)
 	}
 }
+
+func TestInsertOperationCapsOutstandingPerActorAndInstallation(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	var second int64
+	if err := f.pool.QueryRow(ctx, `INSERT INTO users (github_id, login) VALUES (2, 'other') RETURNING id`).Scan(&second); err != nil {
+		t.Fatal(err)
+	}
+	f.exec(t, `INSERT INTO user_installations (user_id, installation_id) VALUES ($1, 10), ($1, 20)`, second)
+	try := func(n int, actor, installation, account int64) error {
+		in := f.input(n)
+		in.ActorUserID, in.InstallationID, in.AccountID = actor, installation, account
+		return pgx.BeginFunc(ctx, f.pool, func(tx pgx.Tx) error {
+			op, _, err := adminstore.InsertOperation(ctx, tx, in)
+			if err != nil {
+				return err
+			}
+			client, err := queue.NewInsertClient(f.pool)
+			if err != nil {
+				return err
+			}
+			job, err := client.InsertTx(ctx, tx, queue.AdministerOrganization{OperationID: op.ID}, nil)
+			if err != nil {
+				return err
+			}
+			return adminstore.SetJobID(ctx, tx, op.ID, job.Job.ID)
+		})
+	}
+	n := 0
+	next := func() int { n++; return n }
+	for range adminstore.MaxOutstandingPerActor {
+		if err := try(next(), f.actor, 10, 100); err != nil {
+			t.Fatalf("submit below cap: %v", err)
+		}
+	}
+	if err := try(next(), f.actor, 10, 100); !errors.Is(err, adminstore.ErrOperationLimit) {
+		t.Fatalf("actor over cap = %v", err)
+	}
+	// The same actor is also capped across installations; another actor and installation are not.
+	if err := try(next(), f.actor, 20, 200); !errors.Is(err, adminstore.ErrOperationLimit) {
+		t.Fatalf("actor over cap on another installation = %v", err)
+	}
+	if err := try(next(), second, 20, 200); err != nil {
+		t.Fatalf("other tenant blocked by a saturated tenant: %v", err)
+	}
+	// The installation cap applies across actors: 3 (first actor) + 2 more fill installation 10.
+	for range adminstore.MaxOutstandingPerInstallation - adminstore.MaxOutstandingPerActor {
+		if err := try(next(), second, 10, 100); err != nil {
+			t.Fatalf("submit below installation cap: %v", err)
+		}
+	}
+	if err := try(next(), second, 10, 100); !errors.Is(err, adminstore.ErrOperationLimit) {
+		t.Fatalf("installation over cap = %v", err)
+	}
+	// A finished operation frees its slot.
+	f.exec(t, `UPDATE administration_operations SET status = 'completed', completed_at = now() WHERE id = (SELECT id FROM administration_operations WHERE installation_id = 10 AND actor_user_id = $1 ORDER BY created_at LIMIT 1)`, second)
+	if err := try(next(), second, 10, 100); err != nil {
+		t.Fatalf("slot not released after completion: %v", err)
+	}
+}
+
+func TestInsertOperationSerializesConcurrentCapChecks(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	const attempts = 8
+	results := make(chan error, attempts)
+	start := make(chan struct{})
+	for i := range attempts {
+		go func() {
+			<-start
+			results <- pgx.BeginFunc(ctx, f.pool, func(tx pgx.Tx) error {
+				op, _, err := adminstore.InsertOperation(ctx, tx, f.input(100+i))
+				if err != nil {
+					return err
+				}
+				client, err := queue.NewInsertClient(f.pool)
+				if err != nil {
+					return err
+				}
+				job, err := client.InsertTx(ctx, tx, queue.AdministerOrganization{OperationID: op.ID}, nil)
+				if err != nil {
+					return err
+				}
+				return adminstore.SetJobID(ctx, tx, op.ID, job.Job.ID)
+			})
+		}()
+	}
+	close(start)
+	accepted := 0
+	for range attempts {
+		switch err := <-results; {
+		case err == nil:
+			accepted++
+		case !errors.Is(err, adminstore.ErrOperationLimit):
+			t.Fatal(err)
+		}
+	}
+	if accepted != adminstore.MaxOutstandingPerActor {
+		t.Fatalf("accepted %d concurrent submissions, want %d", accepted, adminstore.MaxOutstandingPerActor)
+	}
+}

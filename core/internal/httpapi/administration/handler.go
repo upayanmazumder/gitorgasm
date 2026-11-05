@@ -26,6 +26,7 @@ type Handler struct {
 	Sealer *secure.Sealer
 	Log    *slog.Logger
 	Now    func() time.Time
+	Search *SearchGuard
 }
 
 func (h *Handler) authorize(w http.ResponseWriter, r *http.Request, u *identity.SessionUser, requireOwner bool) *domain.Access {
