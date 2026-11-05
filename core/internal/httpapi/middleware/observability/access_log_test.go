@@ -104,3 +104,26 @@ func TestAccessLog(t *testing.T) {
 		})
 	}
 }
+
+func TestAccessLogBoundsMethodLabel(t *testing.T) {
+	tests := []struct{ method, label string }{
+		{http.MethodDelete, http.MethodDelete},
+		{"BREW", "other"},
+		{"get", "other"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.method, func(t *testing.T) {
+			const route = "GET /t/method"
+			start := requestCount(t, route, tt.label, "200")
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req.Method = tt.method
+			req.Pattern = route
+
+			observability.AccessLog(slog.New(slog.NewJSONHandler(&bytes.Buffer{}, nil)), http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})).ServeHTTP(httptest.NewRecorder(), req)
+
+			if got := requestCount(t, route, tt.label, "200"); got != start+1 {
+				t.Fatalf("requests{method=%q} = %v, want %v", tt.label, got, start+1)
+			}
+		})
+	}
+}
