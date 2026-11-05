@@ -149,11 +149,11 @@ Staging cost note: a second copy of the budget costs 200m CPU and 512Mi memory r
 
 **Verified** (`.github/workflows/image.yml`, called from `ci.yml` job `image`):
 
-1. The job runs after job `core` passes. It builds `core/Dockerfile` with buildx when core, contracts, or its workflows change. It does not push on PRs.
-2. On a qualifying push to `main`, it logs in to GHCR with `GITHUB_TOKEN` (`packages: write` on the image job) and pushes `ghcr.io/upayanmazumder/gitorgasm/core`. Tags: `sha-<full commit SHA>` and `latest`. `VERSION` build arg = commit SHA (visible in the `app_version` log field). Provenance (`mode=max`) and SBOM are attached.
+1. Job `image` runs after job `core` passes. It builds `core/Dockerfile` with buildx when core, contracts, or its workflows change. It has `contents: read` only and never pushes.
+2. On a push to `main`, job `image-publish` (`.github/workflows/image-publish.yml`, environment `image-publish`, the only job with `packages: write`) logs in to GHCR with `GITHUB_TOKEN` and pushes `ghcr.io/upayanmazumder/gitorgasm/core`. Tags: `sha-<full commit SHA>` and `latest`. `VERSION` build arg = commit SHA (visible in the `app_version` log field). Provenance (`mode=max`) and SBOM are attached.
 3. Argo CD Image Updater tracks the digest of `latest` with write-back method `argocd`. It sets the kustomize image override on the Application and makes no git commit. A push to `main` rolls api and worker in approximately 2 minutes.
 
-The cluster needs pull access to GHCR. If package visibility changes to private, add a SOPS-encrypted image pull secret in `deploy/argocd` and reference it in both Deployments before a rollout; otherwise image pulls fail. Risk R20 in `risk-register.md` tracks availability.
+The cluster needs pull access to GHCR. If package visibility changes to private, add a SOPS-encrypted image pull secret in `deploy/argocd` and reference it in both Deployments before a rollout; otherwise image pulls fail. Risk R20 in `risk-register.md` tracks availability. Settings that files cannot enforce (environment branch rule, GHCR package access, workflow review, provenance at deploy time) are listed in `image-publish-gate.md`.
 
 ## 7. Secrets
 
