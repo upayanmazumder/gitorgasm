@@ -59,3 +59,20 @@ jobs:
           IMAGE: ghcr.io/${{ github.repository }}/core
           DIGEST: ${{ steps.build.outputs.digest }}
         run: cosign sign --yes "${IMAGE}@${DIGEST}"
+      # policy-controller verifies cosign v3 bundles as attestations, not image signatures.
+      - name: Attest image publication
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}/core
+          DIGEST: ${{ steps.build.outputs.digest }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT: ${{ github.sha }}
+          REF: ${{ github.ref }}
+        run: |
+          jq -n \
+            --arg repository "$REPOSITORY" --arg commit "$COMMIT" \
+            --arg ref "$REF" --arg digest "$DIGEST" \
+            '{repository: $repository, commit: $commit, ref: $ref, digest: $digest}' \
+            > publication.json
+          cosign attest --yes \
+            --type https://gitorgasm.upayan.dev/attestations/image-publish/v1 \
+            --predicate publication.json "${IMAGE}@${DIGEST}"
