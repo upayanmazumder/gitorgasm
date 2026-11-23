@@ -15,7 +15,7 @@ x-core: &core
 
 services:
   postgres:
-    image: postgres:18-alpine
+    image: postgres:19-alpine
     # Extra connections accommodate parallel test databases.
     command:
       - postgres
